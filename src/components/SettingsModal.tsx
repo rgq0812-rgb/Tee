@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Settings, Volume2, Wind, Target, Ruler, Bell, Eye, Shield, Globe, Cpu } from 'lucide-react';
+import { X, Settings, Volume2, Wind, Target, Ruler, Bell, Eye, Shield, Globe, Cpu, Music, CheckCircle2, Youtube, Smartphone, Plus, Trash2 } from 'lucide-react';
+import { get, set } from 'idb-keyval';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -15,6 +16,98 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [preciseWind, setPreciseWind] = useState(() => localStorage.getItem('onyx_wind') !== 'false');
   const [innerCircle, setInnerCircle] = useState(() => localStorage.getItem('onyx_inner_circle') !== 'false');
   const [anonScores, setAnonScores] = useState(() => localStorage.getItem('onyx_anon_scores') === 'true');
+  const [isSpotifyConnected, setIsSpotifyConnected] = useState(() => localStorage.getItem('onyx_spotify_connected') === 'true');
+  const [isYoutubeConnected, setIsYoutubeConnected] = useState(() => localStorage.getItem('onyx_youtube_connected') === 'true');
+  const [localTracks, setLocalTracks] = useState<{ name: string; size: string }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const loadLocalTracks = async () => {
+      try {
+        const stored = await get('onyx_local_tracks') as { name: string; size: string }[] | undefined;
+        if (stored) setLocalTracks(stored);
+      } catch (e) {
+        console.error('Failed to load local tracks', e);
+      }
+    };
+    loadLocalTracks();
+  }, []);
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newTracks = Array.from(files).map((f: File) => ({
+      name: f.name,
+      size: (f.size / (1024 * 1024)).toFixed(1) + ' MB'
+    }));
+
+    const updated = [...localTracks, ...newTracks];
+    setLocalTracks(updated);
+    await set('onyx_local_tracks', updated);
+  };
+
+  const removeTrack = async (index: number) => {
+    const updated = localTracks.filter((_, i) => i !== index);
+    setLocalTracks(updated);
+    await set('onyx_local_tracks', updated);
+  };
+
+  const handleConnectSpotify = async () => {
+    try {
+      const response = await fetch('/api/auth/spotify/url');
+      if (!response.ok) throw new Error('Failed to get auth URL');
+      const { url } = await response.json();
+
+      const authWindow = window.open(
+        url,
+        'spotify_popup',
+        'width=600,height=700'
+      );
+
+      if (!authWindow) {
+        alert('Veuillez autoriser les popups pour connecter votre compte Spotify.');
+      }
+    } catch (error) {
+      console.error('Spotify connect error:', error);
+    }
+  };
+
+  const handleConnectYoutube = async () => {
+    try {
+      const response = await fetch('/api/auth/youtube/url');
+      if (!response.ok) throw new Error('Failed to get auth URL');
+      const { url } = await response.json();
+
+      const authWindow = window.open(
+        url,
+        'youtube_popup',
+        'width=600,height=700'
+      );
+
+      if (!authWindow) {
+        alert('Veuillez autoriser les popups pour connecter votre compte YouTube.');
+      }
+    } catch (error) {
+      console.error('YouTube connect error:', error);
+    }
+  };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Basic origin check - in production you should be more strict
+      if (event.data?.type === 'SPOTIFY_AUTH_SUCCESS') {
+        setIsSpotifyConnected(true);
+        localStorage.setItem('onyx_spotify_connected', 'true');
+      }
+      if (event.data?.type === 'YOUTUBE_AUTH_SUCCESS') {
+        setIsYoutubeConnected(true);
+        localStorage.setItem('onyx_youtube_connected', 'true');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('onyx_units', units);
@@ -164,6 +257,170 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       active={anonScores}
                       onToggle={setAnonScores}
                     />
+                  </div>
+                </section>
+
+                {/* MEDIA & SYNC */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-2">
+                    <Music size={14} className="text-[#c9964a]" />
+                    <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest">Médias & Sync</h3>
+                  </div>
+                  
+                  {/* Spotify */}
+                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden p-5 mb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${isSpotifyConnected ? 'bg-[#1DB954]/20 text-[#1DB954]' : 'bg-white/5 text-white/40'}`}>
+                          <Music size={18} />
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <span className="text-xs font-bold text-white uppercase tracking-tight leading-none mb-1">Spotify Playlist</span>
+                          <span className="text-[9px] text-white/30 uppercase tracking-widest">Synchroniser ma musique tactique</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleConnectSpotify}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+                          isSpotifyConnected 
+                            ? 'bg-[#1DB954]/10 text-[#1DB954] border border-[#1DB954]/20' 
+                            : 'bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/20'
+                        }`}
+                      >
+                        {isSpotifyConnected ? (
+                          <>
+                            <CheckCircle2 size={12} />
+                            Connecté
+                          </>
+                        ) : (
+                          'Connecter'
+                        )}
+                      </button>
+                    </div>
+
+                    {isSpotifyConnected && (
+                      <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        className="mt-6 pt-6 border-t border-white/5"
+                      >
+                        <p className="text-[10px] text-[#1DB954] uppercase tracking-widest font-black mb-4">Playlists Spotify</p>
+                        <div className="space-y-3">
+                          <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between group cursor-pointer hover:bg-white/10 transition-colors">
+                            <span className="text-[10px] text-white/60 uppercase font-bold tracking-tighter">Onyx Focus - 128 BPM</span>
+                            <div className="w-6 h-6 bg-[#1DB954]/20 text-[#1DB954] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Target size={12} />
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* YouTube */}
+                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden p-5 mb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${isYoutubeConnected ? 'bg-[#FF0000]/20 text-[#FF0000]' : 'bg-white/5 text-white/40'}`}>
+                          <Youtube size={18} />
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <span className="text-xs font-bold text-white uppercase tracking-tight leading-none mb-1">YouTube Music</span>
+                          <span className="text-[9px] text-white/30 uppercase tracking-widest">Flux audio Google & Playlists</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleConnectYoutube}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+                          isYoutubeConnected 
+                            ? 'bg-[#FF0000]/10 text-[#FF0000] border border-[#FF0000]/20' 
+                            : 'bg-[#FF0000] text-white shadow-lg shadow-[#FF0000]/20'
+                        }`}
+                      >
+                        {isYoutubeConnected ? (
+                          <>
+                            <CheckCircle2 size={12} />
+                            Connecté
+                          </>
+                        ) : (
+                          'Connecter'
+                        )}
+                      </button>
+                    </div>
+                    
+                    {isYoutubeConnected && (
+                      <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        className="mt-6 pt-6 border-t border-white/5"
+                      >
+                        <p className="text-[10px] text-[#FF0000] uppercase tracking-widest font-black mb-4">Playlists YouTube</p>
+                        <div className="space-y-3">
+                          <div className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between group cursor-pointer hover:bg-white/10 transition-colors">
+                            <span className="text-[10px] text-white/60 uppercase font-bold tracking-tighter">Golf Vibes (YouTube)</span>
+                            <div className="w-6 h-6 bg-[#FF0000]/20 text-[#FF0000] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Target size={12} />
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* Fichiers Appareil */}
+                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden p-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${localTracks.length > 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 text-white/40'}`}>
+                          <Smartphone size={18} />
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <span className="text-xs font-bold text-white uppercase tracking-tight leading-none mb-1">Fichiers Appareil</span>
+                          <span className="text-[9px] text-white/30 uppercase tracking-widest">Importer tes musiques locales</span>
+                        </div>
+                      </div>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        multiple 
+                        accept="audio/*"
+                        onChange={handleFileImport}
+                      />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 text-white"
+                      >
+                        <Plus size={12} />
+                        Importer
+                      </button>
+                    </div>
+
+                    {localTracks.length > 0 && (
+                      <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        className="mt-6 pt-6 border-t border-white/5"
+                      >
+                        <p className="text-[10px] text-blue-400 uppercase tracking-widest font-black mb-4">Bibliothèque Mobile</p>
+                        <div className="space-y-2">
+                          {localTracks.map((track, idx) => (
+                            <div key={`local-track-${track.name}-${idx}`} className="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center justify-between group">
+                              <div className="flex flex-col">
+                                <span className="text-[10px] text-white font-bold tracking-tighter truncate max-w-[180px]">{track.name}</span>
+                                <span className="text-[8px] text-white/20 uppercase font-mono">{track.size}</span>
+                              </div>
+                              <button 
+                                onClick={() => removeTrack(idx)}
+                                className="p-2 text-white/20 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
                 </section>
 

@@ -96,12 +96,9 @@ function AppContent() {
     );
   }
 
-  /* AUTH DISABLED FOR NOW BY USER REQUEST */
-  /*
   if (!user) {
     return <AuthScreen />;
   }
-  */
 
   if (!splashSeen) {
     return <SplashScreen onComplete={() => {

@@ -30,14 +30,10 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const audioContext = useRef<AudioContext | null>(null);
+  const currentAudioSource = useRef<AudioBufferSourceNode | null>(null);
 
   useEffect(() => {
     if ('mediaSession' in navigator && isOpen) {
-      const audio = new Audio();
-      audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
-      audio.loop = true;
-
       const setupMediaSession = () => {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: 'Adam AI Mentoring',
@@ -48,22 +44,36 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
         navigator.mediaSession.setActionHandler('play', () => triggerMic());
       };
       setupMediaSession();
-      audio.play().catch(() => {});
     }
   }, [isOpen]);
 
   const triggerMic = () => {
-    if (isListening || isSpeaking || isLoading) return;
+    if (isListening || isLoading) return;
+
+    // Interrupt Adam if he is speaking
+    if (isSpeaking && currentAudioSource.current) {
+      try {
+        currentAudioSource.current.stop();
+      } catch (e) {
+        // Source might have already stopped
+      }
+      setIsSpeaking(false);
+    }
     
     if (!isSpeechRecognitionSupported()) {
       alert("La reconnaissance vocale n'est pas supportée sur ce navigateur. Essaie sur Chrome ou Safari.");
       return;
     }
 
-    if (playPing) playPing(1000, 'sine', 0.1);
+    // Clearer tactical "listening" beep
+    if (playPing) playPing(1200, 'sine', 0.05);
+
     setIsListening(true);
     startListening(
-      (text) => handleSend(text),
+      (text) => {
+        if (playPing) playPing(800, 'sine', 0.05); // "Received" beep
+        handleSend(text);
+      },
       () => setIsListening(false),
       (error) => {
         setIsListening(false);
@@ -93,7 +103,11 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
       if (base64Audio) {
         const source = await playRawPcm(base64Audio);
         if (source) {
-          source.onended = () => setIsSpeaking(false);
+          currentAudioSource.current = source;
+          source.onended = () => {
+            setIsSpeaking(false);
+            currentAudioSource.current = null;
+          };
         } else {
           setIsSpeaking(false);
         }
@@ -110,6 +124,7 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
     const textToSend = textOverride || input;
     if (!textToSend.trim() || isLoading) return;
 
+    if (playPing) playPing(600, 'sine', 0.03); // "Sent" feedback
     const userMessage: Message = { role: 'user', parts: [{ text: textToSend }] };
     setMessages(prev => [...prev, userMessage]);
     setInput('');

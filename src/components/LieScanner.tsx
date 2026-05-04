@@ -218,21 +218,21 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
       </div>
 
       {/* Mode Toggle */}
-      <div className="absolute top-24 left-0 right-0 z-50 flex justify-center px-6">
-        <div className="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-1 flex gap-1 w-full max-w-xs shadow-2xl">
+      <div className="absolute top-28 left-0 right-0 z-50 flex justify-center px-6">
+        <div className="bg-zinc-900/40 backdrop-blur-3xl border border-white/10 rounded-2xl p-1.5 flex gap-1.5 w-full max-w-xs shadow-2xl">
           <button 
             onClick={() => setScanMode('LIE')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all ${scanMode === 'LIE' ? 'bg-[#c9964a] text-black font-black' : 'text-white/40 hover:text-white'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all duration-300 ${scanMode === 'LIE' ? 'bg-[#c9964a] text-black font-black shadow-[0_0_20px_rgba(201,150,74,0.3)]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
           >
             <Waves size={14} />
-            <span className="text-[10px] uppercase">Scanner Lie</span>
+            <span className="text-[10px] uppercase font-black tracking-widest">Scanner Lie</span>
           </button>
           <button 
             onClick={() => setScanMode('GREEN')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all ${scanMode === 'GREEN' ? 'bg-[#c9964a] text-black font-black' : 'text-white/40 hover:text-white'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all duration-300 ${scanMode === 'GREEN' ? 'bg-[#c9964a] text-black font-black shadow-[0_0_20px_rgba(201,150,74,0.3)]' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
           >
             <Target size={14} />
-            <span className="text-[10px] uppercase">Lire Green</span>
+            <span className="text-[10px] uppercase font-black tracking-widest">Lire Green</span>
           </button>
         </div>
       </div>
@@ -295,7 +295,7 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
             </div>
             
             {/* Capture Button Container */}
-            <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col items-center justify-center px-10 gap-4 pb-12">
+            <div className="absolute bottom-0 left-0 right-0 h-56 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col items-center justify-center px-10 gap-4 pb-16">
               {isRecording && (
                 <div className="w-full max-w-xs h-1.5 bg-white/10 rounded-full overflow-hidden">
                   <motion.div 
@@ -337,7 +337,7 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
               <AnimatePresence mode="wait">
                 {analyzing ? (
                   <motion.div 
-                    key="analyzing"
+                    key="lie-scanner-analyzing"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -386,7 +386,7 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
                   </motion.div>
                 ) : result ? (
                   <motion.div 
-                    key="result"
+                    key="lie-scanner-result"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     className="w-full max-w-sm mx-auto space-y-6"

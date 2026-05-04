@@ -97,12 +97,21 @@ REPONSE (Format: ${caddie.name} : "[TON CONSEIL]") :`;
 }
 
 export async function generateSpeech(text: string) {
+  if (!text || text.trim().length === 0) {
+    console.warn("generateSpeech called with empty text");
+    throw new Error("No text provided for speech generation");
+  }
+
   try {
     const ai = getAI();
-    // Using Charon voice for Adam mentor persona - encouraging a very natural, wise infection
+    // Using Charon voice for Adam mentor persona
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview", 
-      contents: [{ parts: [{ text: `Tu es Adam, un vieux sage du golf. Parle d'une voix d'homme mûre, calme, chaleureuse et très expérimentée en FRANÇAIS. Ne dis pas Adam: devant ton texte. ${text}` }] }],
+      contents: [{ 
+        parts: [{ 
+          text: `Tu es Adam, un mentor de golf sage et expérimenté. Parle d'une voix calme et chaleureuse. Prononce ceci : ${text}` 
+        }] 
+      }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -113,9 +122,31 @@ export async function generateSpeech(text: string) {
       },
     });
 
-    const audioPart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData && p.inlineData.data);
+    const candidates = response.candidates;
+    if (!candidates || candidates.length === 0) {
+      throw new Error("No candidates returned from Gemini TTS");
+    }
+
+    const firstCandidate = candidates[0];
+    const parts = firstCandidate.content?.parts;
+    
+    if (!parts) {
+      console.error("No parts in candidate content:", firstCandidate);
+      throw new Error("No content parts returned from Gemini TTS");
+    }
+
+    const audioPart = parts.find(p => p.inlineData && p.inlineData.data);
     const base64Audio = audioPart?.inlineData?.data;
-    if (!base64Audio) throw new Error("No audio data returned");
+
+    if (!base64Audio) {
+      const textPart = parts.find(p => p.text);
+      if (textPart) {
+        console.warn("Gemini returned text instead of audio. Text:", textPart.text);
+        throw new Error(`Model returned text instead of audio: ${textPart.text}`);
+      }
+      console.error("Full response parts for debugging:", JSON.stringify(parts));
+      throw new Error("No audio data returned in any part of the response");
+    }
 
     return base64Audio;
   } catch (error) {

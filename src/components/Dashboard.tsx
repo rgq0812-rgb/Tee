@@ -17,6 +17,8 @@ import { playRawPcm } from '../lib/audioUtils';
 import RulesModal from './RulesModal';
 import LieScanner from './LieScanner';
 
+import { useHoleAssets } from '../hooks/useHoleAssets';
+
 export default function Dashboard({ 
   scorecard, setScorecard, 
   currentHole, setCurrentHole, 
@@ -29,21 +31,30 @@ export default function Dashboard({
   setShowLieScanner
 }: any) {
   const { user } = useAuth();
+  const { assets, quotaExceeded: globalQuotaExceeded } = useHoleAssets();
   const { playWind, playPing } = useAmbientSound();
   const [showCourseSelector, setShowCourseSelector] = useState(false);
   const [showCaddieSelector, setShowCaddieSelector] = useState(false);
   const [showSyncMenu, setShowSyncMenu] = useState(false);
   const [activeCaddie, setActiveCaddie] = useState<any>(CADDIES.strat); // Default to ADAM
-  const [customHoleImages, setCustomHoleImages] = useState<Record<string, string>>({});
+  
+  const customHoleImages = useMemo(() => {
+    const images: Record<string, string> = {};
+    assets.filter(a => a.id.startsWith(selectedCourse.id) || (a as any).userId === user?.uid).forEach(a => {
+      images[a.id] = a.imageData;
+    });
+    return images;
+  }, [assets, selectedCourse.id, user?.uid]);
+
   const [wind, setWind] = useState({ speed: Math.floor(Math.random() * 25) + 5, direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.floor(Math.random() * 8)] });
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [gpsStatus, setGpsStatus] = useState<'searching' | 'active' | 'denied' | 'unavailable'>('searching');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isEarPosition, setIsEarPosition] = useState(false);
-  const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [units, setUnits] = useState(() => localStorage.getItem('onyx_units') || 'meters');
   const [isMuted, setIsMuted] = useState(() => localStorage.getItem('onyx_voice') === 'false');
+  const welcomePlayedRef = React.useRef(false);
 
   // Sync units and muted state
   useEffect(() => {
@@ -59,23 +70,6 @@ export default function Dashboard({
       clearInterval(interval);
     };
   }, []);
-  
-  // Real-time listener for custom images
-  useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, 'hole_assets'), where('userId', '==', user.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const images: Record<string, string> = {};
-      snapshot.forEach(doc => {
-        images[doc.id] = doc.data().imageData;
-      });
-      setCustomHoleImages(images);
-      setQuotaExceeded(false);
-    }, (error) => {
-      if (error.message.includes('quota')) setQuotaExceeded(true);
-    });
-    return () => unsub();
-  }, [user]);
 
   // GPS Tracking
   useEffect(() => {
@@ -169,18 +163,89 @@ export default function Dashboard({
     }
   }, [isSpeaking, playWind, currentHoleData, distance, wind, arsenal, playerForm, handicap, activeCaddie, setAdvice, isMuted]);
 
-  // Ear Gesture
+  // Ear Gesture & Media Key Tap
   useEffect(() => {
     const handleOrientation = (e: DeviceOrientationEvent) => {
-      if (Math.abs(e.beta || 0) > 75 && Math.abs(e.gamma || 0) < 35 && !isEarPosition && !isSpeaking) {
+      // Beta > 75 is roughly phone vertical (near ear)
+      const inPosition = Math.abs(e.beta || 0) > 75 && Math.abs(e.gamma || 0) < 35;
+      
+      if (inPosition && !isEarPosition && !isSpeaking) {
         if (window.navigator.vibrate) window.navigator.vibrate([40, 20, 40]);
         generateAdvice();
       }
-      setIsEarPosition(Math.abs(e.beta || 0) > 75 && Math.abs(e.gamma || 0) < 35);
+      setIsEarPosition(inPosition);
     };
-    window.addEventListener('deviceorientation', handleOrientation);
-    return () => window.removeEventListener('deviceorientation', handleOrientation);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Many Bluetooth earpieces send media keys when "tapped"
+      // MediaPlayPause: 179, MediaTrackNext: 176, MediaTrackPrevious: 177
+      const mediaKeys = ['MediaPlayPause', 'MediaTrackNext', 'MediaTrackPrevious', 'AudioVolumeUp', 'AudioVolumeDown'];
+      if (mediaKeys.includes(e.key) || [176, 177, 179].includes(e.keyCode)) {
+        e.preventDefault();
+        if (!isSpeaking) {
+          generateAdvice();
+        }
+      }
+    };
+
+    const requestPermission = async () => {
+      // @ts-ignore - iOS specific permission request
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          // @ts-ignore
+          const response = await DeviceOrientationEvent.requestPermission();
+          if (response === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation);
+          }
+        } catch (e) {
+          console.error("Orientation permission denied:", e);
+        }
+      } else {
+        window.addEventListener('deviceorientation', handleOrientation);
+      }
+    };
+
+    requestPermission();
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('deviceorientation', handleOrientation);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isSpeaking, isEarPosition, generateAdvice]);
+
+  // Handle audio unlocking and welcome message
+  useEffect(() => {
+    const unlockAudio = async () => {
+      if (welcomePlayedRef.current) return;
+      welcomePlayedRef.current = true;
+
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+
+      const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        ctx.resume();
+      }
+
+      // Voice confirmation of connection
+      try {
+        const audioData = await generateSpeech("Système Onyx activé. Connexion établie. Bonne partie.");
+        await playRawPcm(audioData);
+      } catch (e) {
+        console.error("Welcome speech failed", e);
+      }
+    };
+
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
 
   const navigateHole = (direction: 'next' | 'prev') => {
     if (playPing) playPing(direction === 'next' ? 880 : 440, 'sine', 0.05);
@@ -210,11 +275,17 @@ export default function Dashboard({
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-xl font-black text-red-600 uppercase tracking-tighter">🚨 ONYX V2</h1>
-            <div className="flex items-center gap-2">
-              <span className="text-[#c9964a] text-[10px] font-black tracking-[0.5em] uppercase">HUD TACTIQUE ACTIF</span>
+            <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${gpsStatus === 'active' ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`} />
                 <span className="text-[7px] font-black uppercase text-white/40">{gpsStatus.toUpperCase()} GPS</span>
+              </div>
+              <div className="w-[1px] h-3 bg-white/10" />
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full transition-colors ${isEarPosition ? 'bg-[#c9964a] shadow-[0_0_8px_#c9964a]' : 'bg-white/10'}`} />
+                <span className={`text-[7px] font-black uppercase transition-colors ${isEarPosition ? 'text-[#c9964a]' : 'text-white/40'}`}>
+                  {isEarPosition ? 'CAPTEUR OREILLE ACTIF' : 'CAPTEUR PROXIMITÉ'}
+                </span>
               </div>
             </div>
           </div>
@@ -290,7 +361,10 @@ export default function Dashboard({
               {Array.from({ length: 18 }, (_, i) => i + 1).map(h => (
                 <button
                   key={`hole-nav-${h}`}
-                  onClick={() => setCurrentHole(h)}
+                  onClick={() => {
+                    setCurrentHole(h);
+                    setActiveTab('scorecard');
+                  }}
                   className={`flex-shrink-0 w-10 h-10 rounded-lg border font-mono font-black italic text-xs transition-all active:scale-90 flex flex-col items-center justify-center ${
                     currentHole === h 
                     ? 'bg-red-600 border-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' 
@@ -316,13 +390,16 @@ export default function Dashboard({
         </div>
       </div>
 
-      <div className="relative z-10 px-6 pt-6 flex-1 flex flex-col">
+      <div 
+        className="relative z-10 px-6 pt-6 flex-1 flex flex-col cursor-pointer active:scale-[0.99] transition-transform"
+        onClick={() => setActiveTab('scorecard')}
+      >
         {currentHoleData && <TacticalHoleView hole={currentHoleData as any} customImage={currentCustomImage} userLocation={userLocation} />}
         
         <div className="flex-1 flex flex-col items-center justify-center py-8">
            <div className="flex gap-4 mb-4">
              {['cold', 'forme', 'pur'].map(f => (
-               <button key={`form-btn-${f}`} onClick={() => setPlayerForm(f)} className={`text-[8px] font-black px-3 py-1 rounded-full border ${playerForm === f ? 'bg-[#c9964a] text-black border-[#c9964a]' : 'bg-white/5 text-white/40 border-white/10'}`}>{f.toUpperCase()}</button>
+               <button key={`dash-form-btn-${f}`} onClick={() => setPlayerForm(f)} className={`text-[8px] font-black px-3 py-1 rounded-full border ${playerForm === f ? 'bg-[#c9964a] text-black border-[#c9964a]' : 'bg-white/5 text-white/40 border-white/10'}`}>{f.toUpperCase()}</button>
              ))}
            </div>
            <div className="text-[120px] font-black italic leading-none font-mono text-white drop-shadow-2xl">
@@ -355,7 +432,7 @@ export default function Dashboard({
 
       <AnimatePresence>
         {showSyncMenu && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
+          <motion.div key="sync-menu" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
             <div className="bg-[#1a1a1a] border border-white/10 p-8 rounded-[2rem] w-full max-w-sm relative">
               <button onClick={() => setShowSyncMenu(false)} className="absolute top-6 right-6 text-white/40"><X size={24} /></button>
               <h3 className="text-xl font-black uppercase text-[#c9964a] mb-6">Gestion Tactique</h3>
@@ -369,7 +446,7 @@ export default function Dashboard({
         )}
 
         {showCourseSelector && (
-          <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} className="fixed inset-0 z-[200] bg-black p-6 pt-16">
+          <motion.div key="course-selector" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed inset-0 z-[200] bg-black p-6 pt-16">
             <button onClick={() => setShowCourseSelector(false)} className="text-white/40 uppercase text-[10px] border border-white/10 px-4 py-2 rounded-full mb-8">Fermer</button>
             <div className="grid gap-4">
               {COURSES.map(c => <button key={`course-sel-${c.id}`} onClick={() => { setSelectedCourse(c); setShowCourseSelector(false); }} className="p-6 text-left bg-white/5 rounded-3xl border border-white/10 font-black uppercase">{c.name}</button>)}
@@ -378,7 +455,7 @@ export default function Dashboard({
         )}
 
         {showCaddieSelector && (
-          <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} className="fixed inset-0 z-[200] bg-black p-6 pt-16">
+          <motion.div key="caddie-selector" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed inset-0 z-[200] bg-black p-6 pt-16">
              <button onClick={() => setShowCaddieSelector(false)} className="text-white/40 uppercase text-[10px] border border-white/10 px-4 py-2 rounded-full mb-8">Fermer</button>
              <div className="grid gap-4">
               {Object.values(CADDIES).map((c: any) => <button key={`caddie-sel-${c.id}`} onClick={() => { setActiveCaddie(c); setShowCaddieSelector(false); }} className="p-6 text-left bg-white/5 rounded-3xl border border-white/10 flex items-center gap-4"><Brain size={20} /><div className="font-black uppercase">{c.name}</div></button>)}

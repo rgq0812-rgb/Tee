@@ -22,11 +22,15 @@ export async function playRawPcm(base64Data: string, sampleRate = 24000) {
 
     // Convert to Float32Array (assuming 16-bit PCM)
     // The bytes are in Int16 format (2 bytes per sample)
-    const int16Array = new Int16Array(bytes.buffer);
-    const float32Array = new Float32Array(int16Array.length);
+    const byteLen = bytes.byteLength;
+    // Ensure we have an even number of bytes for Int16 conversion
+    const alignedLen = byteLen - (byteLen % 2);
+    const float32Array = new Float32Array(alignedLen / 2);
+    const dataView = new DataView(bytes.buffer, bytes.byteOffset, alignedLen);
     
-    for (let i = 0; i < int16Array.length; i++) {
-      float32Array[i] = int16Array[i] / 32768.0;
+    for (let i = 0; i < float32Array.length; i++) {
+      // Linear 16-bit PCM is usually little-endian
+      float32Array[i] = dataView.getInt16(i * 2, true) / 32768.0;
     }
 
     const audioBuffer = audioContext.createBuffer(1, float32Array.length, sampleRate);

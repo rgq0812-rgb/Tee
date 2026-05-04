@@ -80,6 +80,7 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
       <AnimatePresence>
         {showResetConfirm && (
           <motion.div 
+            key="reset-confirm-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -309,6 +310,7 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
       <AnimatePresence>
         {editingHole !== null && (
           <motion.div 
+            key={`editing-hole-overlay-${editingHole}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -492,6 +494,7 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
       <AnimatePresence>
         {showModeSelector && (
           <motion.div 
+            key="mode-selector-overlay"
             initial={{ opacity: 0, y: '100%' }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: '100%' }}

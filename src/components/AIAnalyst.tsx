@@ -98,7 +98,7 @@ export default function AIAnalyst() {
           <AnimatePresence mode='wait'>
             {result ? (
               <motion.div
-                key="result"
+                key="ai-analyst-result"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="p-8 space-y-6 flex-1"

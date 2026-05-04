@@ -8,12 +8,13 @@ import { useAmbientSound } from '../hooks/use-ambient-sound';
 import RulesModal from './RulesModal';
 import SettingsModal from './SettingsModal';
 
+import { useHoleAssets } from '../hooks/useHoleAssets';
+
 export default function Profile({ selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, handicap, setHandicap, setTourSeen, setActiveTab, setShowMentorModal }: { selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, setActiveTab: (tab: string) => void, setShowMentorModal: (val: boolean) => void, key?: string }) {
   const { user } = useAuth();
   const { playPing } = useAmbientSound();
-  const [assets, setAssets] = useState<any[]>([]);
+  const { assets, loading, quotaExceeded } = useHoleAssets();
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -32,23 +33,6 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [holeToUpload, setHoleToUpload] = useState<number>(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    
-    // Real-time listener for tactical photos
-    const q = query(collection(db, 'hole_assets'), where('userId', '==', user.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAssets(data);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'hole_assets');
-      setLoading(false);
-    });
-
-    return () => unsub();
-  }, [user]);
 
   const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -252,7 +236,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
                         { id: 'pur', label: 'Pur', icon: Gem, color: 'text-purple-400', bg: 'bg-purple-400/10' }
                       ].map(f => (
                         <button
-                          key={`form-btn-${f.id}`}
+                          key={`profile-form-btn-${f.id}`}
                           onClick={() => setPlayerForm(f.id)}
                           className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
                             playerForm === f.id ? `border-${f.color.split('-')[1]}-500/50 ${f.bg}` : 'border-white/5 bg-transparent opacity-40'
@@ -338,6 +322,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
       <AnimatePresence>
         {selectedAsset && (
           <motion.div
+            key="asset-viewer-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -368,6 +353,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
 
         {showUploadModal && (
           <motion.div
+            key="upload-modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
