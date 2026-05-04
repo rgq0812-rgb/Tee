@@ -3,7 +3,11 @@ import { collection, query, where, orderBy, getDocs, limit, setDoc, doc, onSnaps
 import { db, handleFirestoreError, OperationType } from '../services/firebase';
 import { useAuth } from '../services/AuthProvider';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, Trophy, ChevronLeft, ChevronRight, MapPin, Brain, Cloud, Download, Upload as UploadIcon, X, Navigation, Shield, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { 
+  Mic, Trophy, ChevronLeft, ChevronRight, MapPin, Brain, Cloud, 
+  Download, Upload as UploadIcon, X, Navigation, Shield, 
+  AlertCircle, Image as ImageIcon, BookOpen, Camera, Sparkles 
+} from 'lucide-react';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
 import { COURSES, CADDIES } from '../constants';
 import TacticalHoleView from './TacticalHoleView';
@@ -11,7 +15,7 @@ import { getHaversineDistance } from '../utils/geo';
 import { generateSpeech, getTacticalAdvice } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
 import RulesModal from './RulesModal';
-import { BookOpen } from 'lucide-react';
+import LieScanner from './LieScanner';
 
 export default function Dashboard({ 
   scorecard, setScorecard, 
@@ -21,7 +25,8 @@ export default function Dashboard({
   arsenal,
   playerForm, setPlayerForm,
   handicap,
-  setActiveTab
+  setActiveTab,
+  setShowLieScanner
 }: any) {
   const { user } = useAuth();
   const { playWind, playPing } = useAmbientSound();
@@ -223,34 +228,90 @@ export default function Dashboard({
           </motion.button>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <button onClick={() => setShowCourseSelector(true)} className="flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-xl hover:bg-white/10">
-            <MapPin size={16} className="text-[#c9964a]" />
-            <div className="flex flex-col items-start text-left">
-              <span className="text-[8px] font-black text-white/40 uppercase">Course</span>
-              <span className="text-xs font-bold text-white">{selectedCourse.name}</span>
-            </div>
-            <ChevronRight size={14} className="ml-auto text-white/20" />
-          </button>
+          <div className="flex flex-col gap-3">
+            <button onClick={() => setShowCourseSelector(true)} className="flex items-center gap-3 bg-white/5 border border-white/10 p-3 rounded-xl hover:bg-white/10">
+              <MapPin size={16} className="text-[#c9964a]" />
+              <div className="flex flex-col items-start text-left">
+                <span className="text-[8px] font-black text-white/40 uppercase">Course</span>
+                <span className="text-xs font-bold text-white">{selectedCourse.name}</span>
+              </div>
+              <ChevronRight size={14} className="ml-auto text-white/20" />
+            </button>
 
-          <div className="flex items-center justify-between gap-2">
-            <button onClick={() => navigateHole('prev')} disabled={currentHole === 1} className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/5 border border-white/10"><ChevronLeft size={20} /></button>
-            <div className="flex-1 flex items-center justify-center gap-4 bg-red-600/10 border border-red-600/30 py-2 rounded-lg relative group">
-               <button 
-                onClick={() => setScorecard({ ...scorecard, [currentHole]: { ...scorecard[currentHole], strokes: (scorecard[currentHole]?.strokes || 0) + 1 } })}
-                className="absolute inset-0 z-10 active:bg-white/10"
-               />
-              <span className="text-[10px] font-black text-red-600">T{currentHole}</span>
-              <span className="text-xl font-black italic font-mono">{scorecard[currentHole]?.strokes || 0}</span>
+            <button 
+              onClick={() => setShowLieScanner(true)}
+              className="w-full h-24 bg-zinc-900/40 backdrop-blur-2xl border border-white/5 p-4 rounded-[2.5rem] hover:bg-[#c9964a]/5 hover:border-[#c9964a]/20 transition-all duration-500 active:scale-[0.97] group relative overflow-hidden flex items-center justify-between"
+            >
+              {/* Animated HUD corner accents */}
+              <div className="absolute top-4 left-4 w-4 h-4 border-t border-l border-[#c9964a]/30" />
+              <div className="absolute top-4 right-4 w-4 h-4 border-t border-r border-[#c9964a]/30" />
+              <div className="absolute bottom-4 left-4 w-4 h-4 border-b border-l border-[#c9964a]/30" />
+              <div className="absolute bottom-4 right-4 w-4 h-4 border-b border-r border-[#c9964a]/30" />
+              
+              <div className="flex items-center gap-5 relative z-10 pl-2">
+                <div className="relative">
+                  <div className="w-14 h-14 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 rounded-2xl flex items-center justify-center group-hover:shadow-[0_0_20px_rgba(201,150,74,0.2)] transition-all duration-500">
+                    <Camera size={26} className="text-[#c9964a]" />
+                  </div>
+                  <motion.div 
+                    animate={{ opacity: [0, 1, 0] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.8)]"
+                  />
+                </div>
+                
+                <div className="flex flex-col items-start">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-[7px] font-black uppercase text-[#c9964a] tracking-[0.4em] leading-none">Lie Analysis</span>
+                  </div>
+                  <span className="text-xl font-black italic text-white uppercase tracking-tight leading-none">Scanner</span>
+                  <div className="flex items-center gap-1 mt-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                    <div className="w-1 h-3 bg-[#c9964a] rounded-full" />
+                    <span className="text-[7px] font-bold text-white uppercase tracking-widest">Neural Mode Active</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="pr-4 flex items-center gap-3">
+                <div className="flex flex-col items-end opacity-20 group-hover:opacity-100 transition-opacity">
+                   <div className="text-[6px] font-mono text-white/40">HUD_v2</div>
+                   <div className="text-[8px] font-black text-[#c9964a]">001</div>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-[#c9964a]/20 group-hover:border-[#c9964a]/40 transition-all">
+                  <ChevronRight size={18} className="text-white/40 group-hover:text-[#c9964a] translate-x-0 group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </div>
+            </button>
+
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+            <button onClick={() => navigateHole('prev')} disabled={currentHole === 1} className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 active:scale-95 disabled:opacity-20"><ChevronLeft size={20} /></button>
+            
+            <div className="flex gap-1.5 px-1">
+              {Array.from({ length: 18 }, (_, i) => i + 1).map(h => (
+                <button
+                  key={`hole-nav-${h}`}
+                  onClick={() => setCurrentHole(h)}
+                  className={`flex-shrink-0 w-10 h-10 rounded-lg border font-mono font-black italic text-xs transition-all active:scale-90 flex flex-col items-center justify-center ${
+                    currentHole === h 
+                    ? 'bg-red-600 border-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' 
+                    : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'
+                  }`}
+                >
+                  <span className="text-[7px] leading-none mb-0.5 opacity-60">T</span>
+                  {h}
+                </button>
+              ))}
             </div>
-            <div className="bg-emerald-600/10 border border-emerald-600/30 px-3 py-1 rounded-lg flex flex-col items-center">
+
+            <button onClick={() => navigateHole('next')} disabled={currentHole === 18} className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 active:scale-95 disabled:opacity-20"><ChevronRight size={20} /></button>
+            
+            <div className="flex-shrink-0 bg-emerald-600/10 border border-emerald-600/30 px-3 py-1 rounded-lg flex flex-col items-center min-w-[50px]">
                <div className="flex items-center gap-1">
                  <Navigation size={8} style={{ transform: `rotate(${wind.direction === 'N' ? 0 : 180}deg)` }} className="text-emerald-500" />
                  <span className="text-[8px] font-black text-emerald-500">{wind.direction}</span>
                </div>
                <span className="text-sm font-black italic font-mono">{wind.speed}</span>
             </div>
-            <button onClick={() => navigateHole('next')} disabled={currentHole === 18} className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/5 border border-white/10"><ChevronRight size={20} /></button>
           </div>
         </div>
       </div>

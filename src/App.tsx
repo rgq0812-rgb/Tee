@@ -12,6 +12,7 @@ import InnerCircle from './components/InnerCircle';
 import Profile from './components/Profile';
 import WelcomeTour from './components/WelcomeTour';
 import AdamMentorModal from './components/AdamMentorModal';
+import LieScanner from './components/LieScanner';
 import { BookOpen, Sparkles } from 'lucide-react';
 
 import { AppPath, HoleScore, Club } from './types';
@@ -73,6 +74,7 @@ function AppContent() {
 
   const [advice, setAdvice] = useState<string | null>(null);
   const [showMentorModal, setShowMentorModal] = useState(false);
+  const [showLieScanner, setShowLieScanner] = useState(false);
 
   // --- Persistence ---
   useEffect(() => {
@@ -94,9 +96,12 @@ function AppContent() {
     );
   }
 
+  /* AUTH DISABLED FOR NOW BY USER REQUEST */
+  /*
   if (!user) {
     return <AuthScreen />;
   }
+  */
 
   if (!splashSeen) {
     return <SplashScreen onComplete={() => {
@@ -139,6 +144,7 @@ function AppContent() {
             setPlayerForm={setPlayerForm}
             handicap={handicap}
             setActiveTab={setActiveTab}
+            setShowLieScanner={setShowLieScanner}
           />
         )}
         {activeTab === 'challenges' && <Challenges key="challenges" />}
@@ -188,6 +194,11 @@ function AppContent() {
       </motion.button>
     </Layout>
     <AdamMentorModal isOpen={showMentorModal} onClose={() => setShowMentorModal(false)} />
+    <LieScanner 
+      isOpen={showLieScanner} 
+      onClose={() => setShowLieScanner(false)} 
+      isMuted={localStorage.getItem('onyx_voice') === 'false'}
+    />
   </>
 );
 }

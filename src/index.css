@@ -7,8 +7,8 @@
   --font-mono: "Roboto Mono", monospace;
   
   --color-brg-bg: hsl(220 22% 3%);
-  --color-brg-primary: hsl(160 70% 32%);
-  --color-brg-gold: hsl(43 62% 54%);
+  --color-brg-primary: #c9964a;
+  --color-brg-gold: #c9964a;
   --color-brg-secondary: hsl(217 88% 58%);
 }
 
@@ -31,7 +31,21 @@
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
+.glow-gold {
+  text-shadow: 0 0 20px rgba(201, 150, 74, 0.4);
+}
+
+.crystal-panel {
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 0 80px rgba(201, 150, 74, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
 .brg-gradient {
-  background: radial-gradient(circle at bottom right, rgba(160, 70, 28, 0.07), transparent 60%),
-              radial-gradient(circle at bottom center, rgba(43, 62, 35, 0.04), transparent 50%);
+  background: radial-gradient(circle at bottom right, rgba(201, 150, 74, 0.1), transparent 60%),
+              radial-gradient(circle at bottom center, rgba(201, 150, 74, 0.05), transparent 50%);
 }

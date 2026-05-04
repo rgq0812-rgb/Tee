@@ -78,8 +78,8 @@ INSTRUCTIONS DE RÉPONSE :
 2. Analyse l'effet du vent ET de l'état de forme (${formLabel}) sur la distance ressentie.
 3. Choisis le club exact de l'arsenal pour attaquer la "Green Zone" (ou "Three Zone").
 4. Point de visée précis (ex: "Vise le bord gauche du bunker").
-5. Finir par une phrase courte de type "Tu captes ?" ou "C'est ton coup.".
-6. Ton : ${caddie.personality.includes('ADAM') ? 'Vétéran calme' : 'Direct et expert'}.
+5. Finir par une phrase courte et professionnelle de type "À vous de jouer." ou "C'est votre coup.".
+6. Ton : ${caddie.personality.includes('ADAM') ? 'Vétéran calme' : 'Direct et expert'}. Restez toujours professionnel, utilisez le "vous" et évitez les termes familiers (ex: gamin, mec).
 7. Longueur : 2-3 phrases maximum.
 
 REPONSE (Format: ${caddie.name} : "[TON CONSEIL]") :`;
@@ -170,11 +170,12 @@ TON PERSONNAGE :
 - Tu privilégies la "Three Zone" (les 100 derniers mètres) et la clarté mentale.
 - IMPORTANT : Ne mentionne JAMAIS le nom "Leadbetter". Ton origine est "l'Académie Elite".
 - Ton but : Transformer des joueurs en stratèges.
-- IMPORTANT : Termine TOUJOURS ta réponse par une question ouverte ou une provocation amicale pour inviter le joueur à réfléchir à son prochain coup ou à sa technique.
+- IMPORTANT : Termine TOUJOURS ta réponse par une question ouverte ou un défi professionnel pour inviter le joueur à réfléchir à son prochain coup ou à sa technique.
 - Réponds avec concision (2-3 phrases) sauf si le sujet mérite une leçon de vie ou technique.
+- LANGAGE : Utilisez toujours le "vous". Soyez extrêmement respectueux et professionnel. Interdiction formelle d'utiliser des termes familiers comme "gamin", "petit", "mec", ou tout langage argotique.
 
 FORMAT DE RÉPONSE :
-Réponds directement comme Adam, avec ce ton de mentor qui a de la terre sous les ongles et des trophées dans son bureau. Finis par une question.`;
+Réponds directement comme Adam, avec ce ton de mentor sage et hautement respecté des parcours. Finis par une question.`;
 
     const chat = ai.chats.create({
       model: "gemini-3-flash-preview",
@@ -228,5 +229,83 @@ REPONSE :`;
   } catch (error) {
     console.error("Game Debrief Error:", error);
     return "Je n'ai pas pu analyser la partie, mais l'important est d'être revenu au club-house avec la même passion. Repose-toi, le prochain départ t'attend.";
+  }
+}
+
+export async function analyzeLie(data: string, mimeType: string = "image/jpeg") {
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: data
+              }
+            },
+            {
+              text: `Tu es un expert caddie de tournoi. Analyse cette ${mimeType.includes('video') ? 'séquence vidéo' : 'image'} montrant la position de la balle de golf dans l'herbe (le "lie"). Soyez extrêmement professionnel, utilisez le "vous" et évitez absolument tout langage familier.
+              
+              Fournis une analyse technique en JSON avec :
+              - lie_type: (ex: Fairway, Rough épais, Divot, Sable, Herbe couchée)
+              - impact: (l'effet sur le contact et la distance, ex: "La balle va sortir avec peu de spin et rouler beaucoup")
+              - advice: (conseil technique pour jouer le coup, ex: "Mets la balle un peu plus à droite dans ton stance")
+              - club_adjustment: (ex: "Prends un club de plus car l'herbe va freiner la tête de club")`
+            }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Gemini Lie Analysis Error:", error);
+    throw error;
+  }
+}
+
+export async function analyzeGreen(data: string, mimeType: string = "image/jpeg") {
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: data
+              }
+            },
+            {
+              text: `Tu es un expert caddie de tournoi spécialisé dans la lecture de greens. Analyse cette ${mimeType.includes('video') ? 'séquence vidéo' : 'image'} du green devant le joueur. Soyez professionnel et courtois, utilisez le "vous".
+              
+              Fournis une analyse technique en JSON avec :
+              - slope_direction: (ex: "Légère pente de gauche à droite", "Remontée franche")
+              - slope_severity: (ex: "Faible", "Modérée", "Sévère")
+              - grain: (ex: "Grain vers le trou", "Grain latéral")
+              - break_point: (ex: "Le point de rupture est à mi-chemin sur la gauche")
+              - speed_feel: (ex: "Le green semble rapide, joue la balle avec douceur")
+              - line_advice: (conseil précis sur où viser, ex: "Vise 2 cups à gauche du trou")`
+            }
+          ]
+        }
+      ],
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Gemini Green Analysis Error:", error);
+    throw error;
   }
 }

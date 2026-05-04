@@ -268,7 +268,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
                 {/* Full Club List */}
                 <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto no-scrollbar">
                    {arsenal.map((club, idx) => (
-                      <div key={club.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+                      <div key={`club-${club.id}-${idx}`} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
                          <div className="flex flex-col">
                             <span className="text-[7px] font-black text-orange-500/60 uppercase tracking-widest">{club.type}</span>
                             <span className="text-sm font-bold text-white">{club.name}</span>
@@ -314,13 +314,23 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
             </button>
           ))}
           
-          <button
-            onClick={logout}
-            className="w-full bg-red-600/10 text-red-600 p-5 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 border border-red-600/20 active:scale-[0.98] transition-all hover:bg-red-600/20 mt-8"
-          >
-            <LogOut size={16} />
-            DÉCONNEXION DU TERMINAL
-          </button>
+          {user ? (
+            <button
+              onClick={logout}
+              className="w-full bg-red-600/10 text-red-600 p-5 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 border border-red-600/20 active:scale-[0.98] transition-all hover:bg-red-600/20 mt-8"
+            >
+              <LogOut size={16} />
+              DÉCONNEXION DU TERMINAL
+            </button>
+          ) : (
+            <button
+              onClick={() => window.location.reload()} // Simple way to go back to auth if they really want
+              className="w-full bg-[#c9964a]/10 text-[#c9964a] p-5 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 border border-[#c9964a]/20 active:scale-[0.98] transition-all hover:bg-[#c9964a]/20 mt-8"
+            >
+              <User size={16} />
+              CONNEXION (GOOGLE)
+            </button>
+          )}
         </div>
       </div>
 

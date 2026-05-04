@@ -19,18 +19,26 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#c9964a]/30 overflow-x-hidden">
-      <header className="fixed top-0 left-0 right-0 z-[60] bg-black/80 backdrop-blur-md border-b border-white/5 px-4 py-3 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-[#c9964a] rounded-full flex items-center justify-center text-black shadow-lg shadow-[#c9964a]/20">
-            <Trophy size={14} strokeWidth={3} />
+      <header className="fixed top-0 left-0 right-0 z-[60] bg-black/80 backdrop-blur-md border-b border-white/5 px-4 py-3 flex justify-between items-center h-16">
+        <div className="flex items-center gap-3">
+          <div className="flex items-baseline gap-1">
+            <h1 className="font-black italic text-3xl tracking-tighter uppercase leading-none bg-gradient-to-r from-white via-[#c9964a] to-[#c9964a]/80 bg-clip-text text-transparent">
+              THE<span className="text-white">CHOSE</span>
+            </h1>
+            <div className="bg-red-600 px-1 rounded-sm">
+              <span className="text-[8px] font-black text-white uppercase italic">V2</span>
+            </div>
           </div>
-          <h1 className="font-black italic text-lg tracking-tighter uppercase leading-none">
-            THE<span className="text-[#c9964a]">CHOSE</span>
-          </h1>
         </div>
         
-        <div className="bg-white/5 px-2 py-0.5 rounded border border-white/10">
-          <span className="text-[8px] font-mono tracking-widest text-[#c9964a] uppercase">SYS_LIVE</span>
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end">
+            <span className="text-[7px] font-black text-white/40 uppercase tracking-widest leading-none">Status</span>
+            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter animate-pulse">Connected</span>
+          </div>
+          <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center overflow-hidden bg-white/5">
+             <User size={16} className="text-white/40" />
+          </div>
         </div>
       </header>
 

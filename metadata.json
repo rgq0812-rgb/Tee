@@ -1,5 +1,5 @@
 {
   "name": "ONYX V2 - Tactical Golf",
   "description": "Système tactique de golf avec GPS live, vent et conseils de caddie IA.",
-  "requestFramePermissions": ["geolocation", "microphone"]
+  "requestFramePermissions": ["geolocation", "microphone", "camera"]
 }
