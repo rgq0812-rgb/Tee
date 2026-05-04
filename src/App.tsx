@@ -53,8 +53,8 @@ function AppContent() {
     }
   });
 
-  const [playerForm, setPlayerForm] = useState<'cold' | 'hot' | 'pure'>(() => {
-    return (localStorage.getItem('the-chose-player-form') as any) || 'hot';
+  const [playerForm, setPlayerForm] = useState<'cold' | 'forme' | 'pur'>(() => {
+    return (localStorage.getItem('the-chose-player-form') as any) || 'forme';
   });
 
   const [eliteXP, setEliteXP] = useState(() => {
@@ -160,6 +160,7 @@ function AppContent() {
             handicap={handicap}
             setHandicap={setHandicap}
             setTourSeen={setTourSeen}
+            setActiveTab={setActiveTab}
           />
         )}
       </AnimatePresence>

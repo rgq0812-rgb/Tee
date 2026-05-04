@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User, Settings, Shield, Award, Image as ImageIcon, ChevronRight, X, Clock, Box, Zap, Snowflake, Gem, Target, Plus, Upload, Loader2, AlertCircle, BookOpen } from 'lucide-react';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
 import RulesModal from './RulesModal';
+import SettingsModal from './SettingsModal';
 
-export default function Profile({ selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, handicap, setHandicap, setTourSeen }: { selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, key?: string }) {
+export default function Profile({ selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, handicap, setHandicap, setTourSeen, setActiveTab }: { selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, setActiveTab: (tab: string) => void, key?: string }) {
   const { user } = useAuth();
   const { playPing } = useAmbientSound();
   const [assets, setAssets] = useState<any[]>([]);
@@ -15,6 +16,18 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
   const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [units, setUnits] = useState(() => localStorage.getItem('onyx_units') || 'meters');
+
+  useEffect(() => {
+    const handleStorage = () => setUnits(localStorage.getItem('onyx_units') || 'meters');
+    window.addEventListener('storage', handleStorage);
+    const interval = setInterval(handleStorage, 2000);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(interval);
+    };
+  }, []);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [holeToUpload, setHoleToUpload] = useState<number>(1);
@@ -235,8 +248,8 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
                    <div className="flex items-center gap-2">
                       {[
                         { id: 'cold', label: 'Froid', icon: Snowflake, color: 'text-blue-400', bg: 'bg-blue-400/10' },
-                        { id: 'hot', label: 'Forme', icon: Zap, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-                        { id: 'pure', label: 'Pure', icon: Gem, color: 'text-purple-400', bg: 'bg-purple-400/10' }
+                        { id: 'forme', label: 'Forme', icon: Zap, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+                        { id: 'pur', label: 'Pur', icon: Gem, color: 'text-purple-400', bg: 'bg-purple-400/10' }
                       ].map(f => (
                         <button
                           key={f.id}
@@ -271,7 +284,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
                               }}
                               className="w-16 bg-black border border-white/10 rounded-lg p-2 text-center font-mono text-white text-xs focus:border-orange-500/50 outline-none"
                             />
-                            <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">M</span>
+                            <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">{units === 'yards' ? 'YDS' : 'M'}</span>
                          </div>
                       </div>
                    ))}
@@ -282,8 +295,8 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
           {[
             { label: 'Règles & Étiquette Golf', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-500/10', action: () => setShowRulesModal(true) },
             { label: 'Introduction ONYX (Elite Mode)', icon: Zap, color: 'text-emerald-500', bg: 'bg-emerald-500/10', action: () => { localStorage.removeItem('tourSeen'); setTourSeen(false); } },
-            { label: 'Succès & Badges', icon: Award, color: 'text-purple-600', bg: 'bg-purple-600/10' },
-            { label: 'Paramètres ONYX', icon: Settings, color: 'text-[#c9964a]', bg: 'bg-[#c9964a]/10' },
+            { label: 'Succès & Badges', icon: Award, color: 'text-purple-600', bg: 'bg-purple-600/10', action: () => setActiveTab('challenges') },
+            { label: 'Paramètres ONYX', icon: Settings, color: 'text-[#c9964a]', bg: 'bg-[#c9964a]/10', action: () => setShowSettingsModal(true) },
           ].map((item: any, i) => (
             <button
               key={i}
@@ -425,6 +438,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
         )}
 
         <RulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
+        <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
       </AnimatePresence>
     </div>
   );

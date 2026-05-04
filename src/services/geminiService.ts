@@ -47,7 +47,7 @@ export async function getTacticalAdvice(caddie: any, hole: any, distance: number
   try {
     const ai = getAI();
     const clubsContext = arsenal.map(c => `${c.name} (${c.dist}m)`).join(', ');
-    const formLabel = form === 'cold' ? 'Froid/Rigide' : form === 'pure' ? 'Toucher exceptionnel' : 'En forme';
+    const formLabel = form === 'cold' ? 'Froid (Manque de vitesse, corps rigide, balle courte)' : form === 'pur' ? 'Pur (Contact parfait, puissance maximale, confiance totale)' : 'Forme (Standard, jeu régulier)';
     
     const prompt = `Tu es ${caddie.name}, ${caddie.title}. 
 ${caddie.personality}
@@ -57,9 +57,13 @@ ${GOLF_RULES.map(s => `[${s.title}]\n${s.rules.join('\n')}`).join('\n\n')}
 
 DIRECTIVES D'ÉLITE (STYLE MASTERS) :
 - Analyse le vent avec une précision chirurgicale (impact exact en mètres et en clubs).
+- IMPACT DE L'ÉTAT DU JOUEUR (CRITIQUE) : 
+  * Si le joueur est 'Froid' : Suggère SYSTEMATIQUEMENT de prendre 1 club de plus pour la même distance (ex: Fer 7 au lieu de Fer 8) et de ne jamais attaquer les drapeaux trop proches de l'eau/bunkers.
+  * Si le joueur est 'Pur' : Suggère des lignes agressives, attaque le drapeau directement, suggère des effets (Draw/Fade) pour s'arrêter près du trou.
+  * Si le joueur est en 'Forme' : Joue le plan standard, vise les zones larges du green.
 - Identifie la "Safe Zone" (où rater sans danger) et la "Danger Zone".
-- Suggère une forme de coup si nécessaire (Draw, Fade, trajectoire haute/basse).
-- Sois décisif. Pas de "peut-être". Un grand caddie aux Masters donne une direction claire.
+- Suggère une forme de coup si nécessaire.
+- Sois décisif. Un grand caddie aux Masters donne une direction claire.
 
 CONTEXTE TACTIQUE :
 - Trou : n°${hole.number} (${hole.name}), Par ${hole.par}, Handicap du trou ${hole.handicap}.
@@ -67,15 +71,18 @@ CONTEXTE TACTIQUE :
 - Distance réelle : ${distance} mètres.
 - Conditions : Vent de ${wind.speed}km/h venant du ${wind.direction}.
 - Sac de Golf (Arsenal) : ${clubsContext}.
-- État du joueur (Toucher) : ${formLabel}.
+- État du joueur (Tactique actuelle) : ${formLabel}.
 
 INSTRUCTIONS DE RÉPONSE :
-1. Analyse l'effet du vent sur la distance ressentie (ex: "Le vent de face rajoute 12m, ça joue comme 162m").
-2. Choisis le club exact de l'arsenal.
-3. Donne un point de visée précis (ex: "Vise le bord gauche du bunker" ou "Vise 5m à droite du drapeau").
-4. Ton ton : ${caddie.personality.includes('ADAM') ? 'Vétéran calme, précis, focalisé sur la gestion du risque comme aux Masters' : caddie.personality.includes('ANTONI') ? 'Analyste technique, presque poétique sur la physique de la balle' : caddie.personality.includes('ARNOLD') ? 'Direct, agressif, pousse à l\'exploit, cherche le birdie' : 'Froid, mathématique et efficace'}.
+1. Commence TOUJOURS par confirmer la situation réelle : "Oui, nous sommes à [DISTANCE] mètres du trou, vent de [DIRECTION]..."
+2. Analyse l'effet du vent ET de l'état de forme (${formLabel}) sur la distance ressentie.
+3. Choisis le club exact de l'arsenal pour attaquer la "Green Zone" (ou "Three Zone").
+4. Point de visée précis (ex: "Vise le bord gauche du bunker").
+5. Finir par une phrase courte de type "Tu captes ?" ou "C'est ton coup.".
+6. Ton : ${caddie.personality.includes('ADAM') ? 'Vétéran calme' : 'Direct et expert'}.
+7. Longueur : 2-3 phrases maximum.
 
-REPONSE (Format: ${caddie.name} : "[TON CONSEIL EN 2 PHRASES MAX]") :`;
+REPONSE (Format: ${caddie.name} : "[TON CONSEIL]") :`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

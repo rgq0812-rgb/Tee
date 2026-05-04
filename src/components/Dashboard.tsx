@@ -40,6 +40,22 @@ export default function Dashboard({
   const [isEarPosition, setIsEarPosition] = useState(false);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [units, setUnits] = useState(() => localStorage.getItem('onyx_units') || 'meters');
+
+  // Sync units if changed in localStorage (e.g. from Profile menu)
+  useEffect(() => {
+    const handleStorage = () => {
+      const savedUnits = localStorage.getItem('onyx_units') || 'meters';
+      setUnits(savedUnits);
+    };
+    window.addEventListener('storage', handleStorage);
+    // Also poll occasionally or just rely on focus
+    const interval = setInterval(handleStorage, 2000);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(interval);
+    };
+  }, []);
   
   // Real-time listener for custom images
   useEffect(() => {
@@ -221,7 +237,7 @@ export default function Dashboard({
     
     // Preparation of context for the AI
     const clubsContext = arsenal.map((c: any) => `${c.name} (${c.dist}m)`).join(', ');
-    const formLabel = playerForm === 'cold' ? 'Froid/Rigide' : playerForm === 'pure' ? 'Toucher exceptionnel' : 'En forme';
+    const formLabel = playerForm === 'cold' ? 'Froid' : playerForm === 'pur' ? 'Pur' : 'Forme';
     
     let message = "";
     try {
@@ -378,7 +394,10 @@ export default function Dashboard({
             )}
             <motion.button 
               whileTap={{ scale: 0.9 }}
-              onClick={generateAdvice}
+              onClick={() => {
+                if (playPing) playPing(1200, 'sine', 0.05);
+                generateAdvice();
+              }}
               disabled={isSpeaking}
               className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all ${
                 isSpeaking ? 'bg-red-600 shadow-red-600/40 animate-pulse' : 'bg-[#c9964a] shadow-[#c9964a]/20'
@@ -617,8 +636,8 @@ export default function Dashboard({
         <div className="flex items-center gap-4 mb-6 bg-white/5 p-1 rounded-full border border-white/10">
           {[
             { id: 'cold', label: 'FROID', icon: '❄️', color: 'text-blue-400' },
-            { id: 'hot', label: 'FORME', icon: '⚡', color: 'text-emerald-400' },
-            { id: 'pure', label: 'PURE', icon: '💎', color: 'text-purple-400' }
+            { id: 'forme', label: 'FORME', icon: '⚡', color: 'text-emerald-400' },
+            { id: 'pur', label: 'PUR', icon: '💎', color: 'text-purple-400' }
           ].map(f => (
             <button
               key={f.id}
@@ -650,9 +669,9 @@ export default function Dashboard({
             animate={{ opacity: 1, scale: 1 }}
             className="text-[120px] font-black italic leading-none text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.1)] font-mono"
           >
-            {distance}
+            {units === 'yards' ? Math.round(distance * 1.09361) : distance}
           </motion.div>
-          <div className="text-[#c9964a] font-black tracking-[1em] text-xs uppercase -mt-2">METERS</div>
+          <div className="text-[#c9964a] font-black tracking-[1em] text-xs uppercase -mt-2">{units === 'yards' ? 'YARDS' : 'METERS'}</div>
           <p className="text-[10px] text-white/20 mt-4 uppercase font-black tracking-widest">Toucher pour enregistrer un coup ({scorecard[currentHole]?.strokes || 0})</p>
         </motion.button>
       </div>
