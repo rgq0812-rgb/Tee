@@ -6,7 +6,7 @@ import SplashScreen from './components/SplashScreen';
 import PathSelector from './components/PathSelector';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
-import Challenges from './components/Challenges';
+import Challenges from './Challenges';
 import ScorecardPage from './components/ScorecardPage';
 import InnerCircle from './components/InnerCircle';
 import Profile from './components/Profile';

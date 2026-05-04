@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Target, Zap, Shield, Sparkles, Trophy, Lock, X, ChevronRight, Brain } from 'lucide-react';
-import { CHALLENGES, CADDIES } from '../constants';
+import { CHALLENGES, CADDIES } from './constants';
 
 export default function Challenges() {
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
