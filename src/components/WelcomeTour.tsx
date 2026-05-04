@@ -4,40 +4,40 @@ import { ChevronRight, ChevronLeft, Shield, Zap, Target, Award, Volume2, VolumeX
 
 const SLIDES = [
   {
-    id: 'heritage',
-    title: "L'HÉRITAGE",
-    subtitle: "RENCONTRE L'INNOVATION",
-    description: "Une expérience conçue pour l'élite, où la tradition du golf s'allie à la précision chirurgicale de la technologie moderne.",
+    id: 'welcome',
+    title: "BIENVENUE",
+    subtitle: "VOTRE CADDIE IA",
+    description: "ONYX scanne le terrain par satellite pour vous donner la distance exacte au drapeau, au mètre près.",
     accent: "#D4AF37",
     icon: <Award className="w-8 h-8 text-[#D4AF37]" />,
     gradient: "from-black via-[#0a0a0a] to-[#1a1a0a]",
     bg: "https://images.unsplash.com/photo-1592919016322-309a473e6d6a?q=80&w=2670&auto=format&fit=crop"
   },
   {
-    id: 'precision',
-    title: "PRÉCISION",
-    subtitle: "MÉTHODE DE CALCUL",
-    description: "Algorithmes de balistique avancés intégrant position GPS, vent dynamique et dénivelé pour un conseil sans compromis.",
+    id: 'club',
+    title: "CONSEILS",
+    subtitle: "LE BON CLUB",
+    description: "L'IA calcule l'effet du vent et votre état de forme pour vous dire : 'Prends ton Fer 7, pas le 8'.",
     accent: "#10B981",
     icon: <Target className="w-8 h-8 text-emerald-500" />,
     gradient: "from-black via-[#0a1a14] to-black",
     bg: "https://images.unsplash.com/photo-1549419163-f2575797072a?q=80&w=2626&auto=format&fit=crop"
   },
   {
-    id: 'ethique',
-    title: "ÉTHIQUE",
-    subtitle: "RÈGLES & COURTOISIE",
-    description: "ONYX optimise votre consommation d'énergie et respecte l'étiquette. Moins de temps sur l'écran, plus de temps sur le jeu.",
+    id: 'strategy',
+    title: "STRATÉGIE",
+    subtitle: "BILAN TACTIQUE",
+    description: "Après vos 18 trous, Adam analyse vos coups manqués et vous donne 3 points clés pour progresser demain.",
     accent: "#3B82F6",
     icon: <Shield className="w-8 h-8 text-blue-500" />,
     gradient: "from-black via-[#0a141a] to-black",
     bg: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?q=80&w=2670&auto=format&fit=crop"
   },
   {
-    id: 'ai',
-    title: "INTELLIGENCE",
-    subtitle: "CADDIE AUGMENTÉ",
-    description: "Dopé à l'IA neurale, votre caddie Onyx apprend de votre jeu pour devenir l'extension logique de votre volonté sur le parcours.",
+    id: 'start',
+    title: "À VOUS",
+    subtitle: "DESTINATION GREEN",
+    description: "Ouvrez la carte, visez le milieu du green et laissez ONYX s'occuper du reste. Bon jeu !",
     accent: "#8B5CF6",
     icon: <Zap className="w-8 h-8 text-purple-500" />,
     gradient: "from-black via-[#140a1a] to-black",
@@ -67,21 +67,25 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
     
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'fr-FR';
-    utterance.rate = 0.8; // Plus lent, plus élégant
-    utterance.pitch = 0.8;
+    utterance.rate = 0.9; 
+    utterance.pitch = 0.85; // Un peu plus grave pour plus d'élégance
     
     const voices = window.speechSynthesis.getVoices();
-    // Priorité absolue aux voix masculines profondes
+    // Priorité absolue aux voix d'hommes françaises
     const maleVoices = voices.filter(v => 
       v.lang.startsWith('fr') && 
       (v.name.toLowerCase().includes('thomas') || 
        v.name.toLowerCase().includes('daniel') || 
-       v.name.toLowerCase().includes('paul') ||
-       v.name.toLowerCase().includes('google français'))
+       v.name.toLowerCase().includes('google français') ||
+       v.name.toLowerCase().includes('male'))
     );
+    
+    const anyFrench = voices.filter(v => v.lang.startsWith('fr'));
     
     if (maleVoices.length > 0) {
       utterance.voice = maleVoices[0];
+    } else if (anyFrench.length > 0) {
+      utterance.voice = anyFrench[0];
     }
     
     utterance.onend = () => {
@@ -281,7 +285,7 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
             >
               {[...Array(24)].map((_, i) => (
                 <motion.div
-                  key={i}
+                  key={`visualizer-bar-${i}`}
                   animate={{ height: [4, Math.random() * 24 + 4, 4], opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 0.4, repeat: Infinity, delay: i * 0.03 }}
                   className="w-1 rounded-full"
@@ -302,7 +306,7 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
             <div className="flex gap-6">
               {SLIDES.map((_, i) => (
                 <button
-                  key={i}
+                  key={`slide-dot-${i}`}
                   onClick={() => { setCurrentSlide(i); setIsAuto(false); }}
                   className={`relative h-1 transition-all duration-700 ${i === currentSlide ? 'w-16 bg-white' : 'w-4 bg-white/20 hover:bg-white/40'}`}
                 />

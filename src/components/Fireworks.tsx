@@ -18,7 +18,7 @@ export default function Fireworks({ onComplete }: ConfettiProps) {
       <div className="relative">
         {[...Array(5)].map((_, i) => (
           <motion.div
-            key={i}
+            key={`firework-particle-${i}`}
             initial={{ scale: 0, opacity: 1 }}
             animate={{ 
               scale: [0, 1.5, 0],

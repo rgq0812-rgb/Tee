@@ -23,7 +23,7 @@ export default function InnerCircle() {
       <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/5 sticky top-[72px] z-40 backdrop-blur-md">
         {['lobby', 'leaderboard', 'share'].map((t) => (
           <button
-            key={t}
+            key={`subtab-${t}`}
             onClick={() => setSubTab(t as any)}
             className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all ${
               subTab === t ? 'bg-brg-primary text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'
@@ -44,7 +44,7 @@ export default function InnerCircle() {
             className="space-y-4"
           >
             {exploits.map((exploit) => (
-              <div key={exploit.id} className="air-panel p-5 relative overflow-hidden group">
+              <div key={`exploit-${exploit.id}`} className="air-panel p-5 relative overflow-hidden group">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-brg-gold border border-white/5">
@@ -97,7 +97,7 @@ export default function InnerCircle() {
                  { user: "Nicolas P.", score: +1, pos: 3 },
                  { user: "Thomas L.", score: +4, pos: 4 },
                ].map((entry) => (
-                 <div key={entry.pos} className={`px-4 py-4 flex justify-between items-center ${entry.me ? 'bg-brg-gold/5' : ''}`}>
+                 <div key={`leaderboard-${entry.pos}`} className={`px-4 py-4 flex justify-between items-center ${entry.me ? 'bg-brg-gold/5' : ''}`}>
                     <div className="flex items-center gap-4">
                        <span className={`text-xs font-cockpit font-bold ${entry.pos === 1 ? 'text-brg-gold' : 'text-gray-500'}`}>{entry.pos}</span>
                        <span className={`font-bold text-sm ${entry.me ? 'text-brg-gold' : 'text-gray-200'}`}>{entry.user}</span>

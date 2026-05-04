@@ -99,9 +99,10 @@ REPONSE (Format: ${caddie.name} : "[TON CONSEIL]") :`;
 export async function generateSpeech(text: string) {
   try {
     const ai = getAI();
+    // Using Charon voice for Adam mentor persona - encouraging a very natural, wise infection
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview", 
-      contents: [{ parts: [{ text: `Parle avec un ton de coach de golf professionnel et encourageant en FRANÇAIS: ${text}` }] }],
+      contents: [{ parts: [{ text: `Tu es Adam, un vieux sage du golf. Parle d'une voix d'homme mûre, calme, chaleureuse et très expérimentée en FRANÇAIS. Ne dis pas Adam: devant ton texte. ${text}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -120,5 +121,112 @@ export async function generateSpeech(text: string) {
   } catch (error) {
     console.error("Gemini TTS Error:", error);
     throw error;
+  }
+}
+
+export function isSpeechRecognitionSupported() {
+  return !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+}
+
+export function startListening(onResult: (text: string) => void, onEnd: () => void, onError?: (error: any) => void) {
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'fr-FR';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  recognition.onresult = (event: any) => {
+    const text = event.results[0][0].transcript;
+    onResult(text);
+  };
+
+  recognition.onerror = (event: any) => {
+    console.error("Speech Recognition Error:", event.error);
+    if (onError) onError(event.error);
+  };
+
+  recognition.onend = onEnd;
+  recognition.start();
+  return recognition;
+}
+
+export async function chatWithAdam(history: { role: 'user' | 'model', parts: any[] }[]) {
+  try {
+    const ai = getAI();
+    
+    const systemInstruction = `Tu es Adam, le Mentor Suprême des caddies de l'école d'élite. 
+Tu es la "Bible du Golf", une légende vivante qui a tout fait :
+- Ancien Greenkeeper : Tu connais chaque brin d'herbe, la compacité des greens et l'influence de la rosée.
+- Ancien Directeur de Golf : Tu maîtrises l'étiquette, la stratégie de parcours et la psychologie des membres.
+- Ancien Pro sur le circuit : Tu as vécu la pression du dimanche au 18, tu sais ce que c'est que de "devoir" rentrer un putt.
+- Coach passionné : Aujourd'hui, tu transmets cette sagesse aux amoureux du golf.
+
+TON PERSONNAGE :
+- Tu es sage, calme, mais chirurgical dans tes analyses.
+- Tu parles avec l'autorité naturelle de celui qui a tout vu.
+- Tu es le mentor de tous les autres caddies (Antoni, Arnold, etc.).
+- Tu privilégies la "Three Zone" (les 100 derniers mètres) et la clarté mentale.
+- IMPORTANT : Ne mentionne JAMAIS le nom "Leadbetter". Ton origine est "l'Académie Elite".
+- Ton but : Transformer des joueurs en stratèges.
+- IMPORTANT : Termine TOUJOURS ta réponse par une question ouverte ou une provocation amicale pour inviter le joueur à réfléchir à son prochain coup ou à sa technique.
+- Réponds avec concision (2-3 phrases) sauf si le sujet mérite une leçon de vie ou technique.
+
+FORMAT DE RÉPONSE :
+Réponds directement comme Adam, avec ce ton de mentor qui a de la terre sous les ongles et des trophées dans son bureau. Finis par une question.`;
+
+    const chat = ai.chats.create({
+      model: "gemini-3-flash-preview",
+      config: {
+        systemInstruction,
+        temperature: 0.8,
+      },
+      history: history.slice(0, -1)
+    });
+
+    const lastMessage = history[history.length - 1].parts[0].text;
+    const response = await chat.sendMessage({ message: lastMessage });
+    return response.text;
+  } catch (error) {
+    console.error("Adam Chat Error:", error);
+    throw error;
+  }
+}
+
+export async function getGameDebrief(scorecard: any, totalScore: number, totalStrokes: number) {
+  try {
+    const ai = getAI();
+    
+    const scorecardText = Object.entries(scorecard)
+      .map(([hole, data]: [string, any]) => `Trou ${hole}: ${data.strokes} coups (${data.putts} putts)`)
+      .join('\n');
+
+    const prompt = `Tu es Adam, le Mentor Suprême du golf. Analyse cette partie terminée :
+    
+SCORE DETAIL :
+${scorecardText}
+
+TOTAL : ${totalStrokes} coups (${totalScore > 0 ? '+' : ''}${totalScore} par rapport au Par).
+
+INSTRUCTIONS :
+1. Donne un bilan tactique global de la partie.
+2. Identifie le moment clé (le meilleur trou ou le pire).
+3. Donne un conseil spécifique pour la prochaine fois basé sur les stats (ex: trop de putts, irrégularité).
+4. Garde ton ton de mentor sage, calme et chirurgical.
+5. Sois concis (4-5 phrases max).
+6. Termine par une phrase inspirante de mentor.
+
+REPONSE :`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: prompt }] }]
+    });
+
+    return response.text;
+  } catch (error) {
+    console.error("Game Debrief Error:", error);
+    return "Je n'ai pas pu analyser la partie, mais l'important est d'être revenu au club-house avec la même passion. Repose-toi, le prochain départ t'attend.";
   }
 }

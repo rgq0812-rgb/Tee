@@ -3,12 +3,12 @@ import { logout, db, handleFirestoreError, OperationType } from '../services/fir
 import { useAuth } from '../services/AuthProvider';
 import { collection, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, User, Settings, Shield, Award, Image as ImageIcon, ChevronRight, X, Clock, Box, Zap, Snowflake, Gem, Target, Plus, Upload, Loader2, AlertCircle, BookOpen } from 'lucide-react';
+import { LogOut, User, Settings, Shield, Award, Image as ImageIcon, ChevronRight, X, Clock, Box, Zap, Snowflake, Gem, Target, Plus, Upload, Loader2, AlertCircle, BookOpen, Brain } from 'lucide-react';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
 import RulesModal from './RulesModal';
 import SettingsModal from './SettingsModal';
 
-export default function Profile({ selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, handicap, setHandicap, setTourSeen, setActiveTab }: { selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, setActiveTab: (tab: string) => void, key?: string }) {
+export default function Profile({ selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, handicap, setHandicap, setTourSeen, setActiveTab, setShowMentorModal }: { selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, setActiveTab: (tab: string) => void, setShowMentorModal: (val: boolean) => void, key?: string }) {
   const { user } = useAuth();
   const { playPing } = useAmbientSound();
   const [assets, setAssets] = useState<any[]>([]);
@@ -156,7 +156,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
 
           {loading ? (
              <div className="grid grid-cols-3 gap-2">
-                {[1,2,3].map(i => <div key={i} className="aspect-square bg-white/5 rounded-xl animate-pulse" />)}
+                {[1,2,3].map(i => <div key={`vault-skeleton-${i}`} className="aspect-square bg-white/5 rounded-xl animate-pulse" />)}
              </div>
           ) : assets.length > 0 ? (
             <div className="grid grid-cols-3 gap-2">
@@ -252,7 +252,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
                         { id: 'pur', label: 'Pur', icon: Gem, color: 'text-purple-400', bg: 'bg-purple-400/10' }
                       ].map(f => (
                         <button
-                          key={f.id}
+                          key={`form-btn-${f.id}`}
                           onClick={() => setPlayerForm(f.id)}
                           className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${
                             playerForm === f.id ? `border-${f.color.split('-')[1]}-500/50 ${f.bg}` : 'border-white/5 bg-transparent opacity-40'
@@ -293,13 +293,14 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
           </div>
 
           {[
-            { label: 'Règles & Étiquette Golf', icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-500/10', action: () => setShowRulesModal(true) },
+            { label: 'Adam Live (AI Mentor)', icon: Brain, color: 'text-[#c9964a]', bg: 'bg-[#c9964a]/20', action: () => setShowMentorModal(true) },
+            { label: 'Règles & Étiquette Golf', icon: Shield, color: 'text-blue-500', bg: 'bg-blue-500/10', action: () => setShowRulesModal(true) },
             { label: 'Introduction ONYX (Elite Mode)', icon: Zap, color: 'text-emerald-500', bg: 'bg-emerald-500/10', action: () => { localStorage.removeItem('tourSeen'); setTourSeen(false); } },
             { label: 'Succès & Badges', icon: Award, color: 'text-purple-600', bg: 'bg-purple-600/10', action: () => setActiveTab('challenges') },
-            { label: 'Paramètres ONYX', icon: Settings, color: 'text-[#c9964a]', bg: 'bg-[#c9964a]/10', action: () => setShowSettingsModal(true) },
-          ].map((item: any, i) => (
+            { label: 'Paramètres ONYX', icon: Settings, color: 'text-white/40', bg: 'bg-white/5', action: () => setShowSettingsModal(true) },
+          ].map((item: any) => (
             <button
-              key={i}
+              key={`profile-action-${item.label}`}
               onClick={() => item.action && item.action()}
               className="w-full bg-white/5 p-5 rounded-2xl border border-white/10 flex items-center justify-between hover:bg-white/10 transition-colors group"
             >
@@ -384,7 +385,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
                   <div className="grid grid-cols-6 gap-2">
                     {Array.from({ length: 18 }, (_, i) => i + 1).map(h => (
                       <button
-                        key={h}
+                        key={`hole-sel-${h}`}
                         onClick={() => setHoleToUpload(h)}
                         type="button"
                         className={`aspect-square rounded-lg border font-mono text-xs flex items-center justify-center transition-all ${

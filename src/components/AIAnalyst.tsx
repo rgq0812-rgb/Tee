@@ -132,7 +132,7 @@ export default function AIAnalyst() {
                   <div className="space-y-3">
                     <h4 className="font-bold text-sm text-gray-900 uppercase tracking-widest">Key Focal Points</h4>
                     {result.focal_points?.map((point: string, i: number) => (
-                      <div key={i} className="flex gap-3 items-start group">
+                      <div key={`focal-point-${i}`} className="flex gap-3 items-start group">
                         <div className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-[10px] font-bold mt-0.5 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                           {i + 1}
                         </div>

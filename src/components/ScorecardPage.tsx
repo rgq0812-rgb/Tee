@@ -1,7 +1,9 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, ChevronDown, Check, Info, Target, MapPin, X, Plus, Minus, ArrowRight } from 'lucide-react';
+import { Trophy, ChevronDown, Check, Info, Target, MapPin, X, Plus, Minus, ArrowRight, Brain, Sparkles, Loader2 } from 'lucide-react';
 import { useScore, GameMode } from '../hooks/use-score';
+import { getGameDebrief, generateSpeech } from '../services/geminiService';
+import { playRawPcm } from '../lib/audioUtils';
 
 export default function ScorecardPage({ scorecard, setScorecard, selectedCourse, currentHole, setCurrentHole }: any) {
   const { calculateStableford } = useScore();
@@ -9,6 +11,10 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [editingHole, setEditingHole] = useState<number | null>(null);
   const [activeScoreField, setActiveScoreField] = useState<'strokes' | 'putts'>('strokes');
+  const [isLoadingDebrief, setIsLoadingDebrief] = useState(false);
+  const [debriefText, setDebriefText] = useState<string | null>(null);
+
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const scorecardData = useMemo(() => {
     return selectedCourse.holes.map((hole: any) => ({
@@ -27,13 +33,39 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
     return scorecardData.reduce((acc: number, h: any) => acc + (h.strokes || 0), 0);
   }, [scorecardData]);
 
+  const isGameFinished = useMemo(() => {
+    return scorecardData.filter((h: any) => h.strokes !== null).length >= 18;
+  }, [scorecardData]);
+
+  const handleAdamDebrief = async () => {
+    if (isLoadingDebrief) return;
+    setIsLoadingDebrief(true);
+    setDebriefText(null);
+    try {
+      const text = await getGameDebrief(scorecard, totalScore, totalStrokes);
+      setDebriefText(text);
+      
+      const isMuted = localStorage.getItem('onyx_voice') === 'false';
+      if (!isMuted) {
+        const audioData = await generateSpeech(text);
+        if (audioData) {
+          await playRawPcm(audioData);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoadingDebrief(false);
+    }
+  };
+
   const updateScore = (holeNum: number, strokes: number, putts?: number) => {
     const holeData = scorecard[holeNum] || { strokes: 0, putts: 0 };
     setScorecard({
       ...scorecard,
       [holeNum]: {
         ...holeData,
-        strokes,
+        strokes: strokes > 0 ? strokes : null,
         putts: putts !== undefined ? putts : holeData.putts
       }
     });
@@ -43,6 +75,51 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
     <div className="relative -mx-6 -mt-6 min-h-[calc(100vh-140px)] p-6 bg-black text-white font-sans overflow-x-hidden">
       {/* Background Dots */}
       <div className="absolute inset-0 z-0 pointer-events-none opacity-5" style={{ backgroundImage: 'radial-gradient(circle, #c9964a 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
+
+      {/* RAZ Confirmation Modal */}
+      <AnimatePresence>
+        {showResetConfirm && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[500] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#111] border border-red-600/30 p-8 rounded-[2.5rem] max-w-sm w-full text-center shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-red-600/10 rounded-full flex items-center justify-center mx-auto mb-6 text-red-600">
+                <X size={32} />
+              </div>
+              <h3 className="text-xl font-black italic uppercase text-white mb-2">REMISE À ZÉRO</h3>
+              <p className="text-xs text-white/40 uppercase tracking-widest leading-relaxed mb-8">
+                Voulez-vous vraiment effacer toutes les données tactiques de cette partie ?
+              </p>
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => {
+                    setScorecard({});
+                    setCurrentHole(1);
+                    setShowResetConfirm(false);
+                  }}
+                  className="w-full bg-red-600 text-white h-14 rounded-2xl font-black uppercase tracking-widest active:scale-95 transition-all shadow-[0_10px_20px_rgba(220,38,38,0.2)]"
+                >
+                  EFFACER TOUT
+                </button>
+                <button 
+                  onClick={() => setShowResetConfirm(false)}
+                  className="w-full bg-white/5 text-white/40 h-14 rounded-2xl font-black uppercase tracking-widest border border-white/10 active:scale-95 transition-all"
+                >
+                  ANNULER
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="relative z-10 space-y-8 pb-32">
         <div className="flex justify-between items-end border-b border-white/10 pb-6 pt-6">
@@ -56,12 +133,7 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
           </div>
           <div className="flex gap-2">
             <button 
-              onClick={() => {
-                if(window.confirm('Voulez-vous vraiment remettre à zéro tout le scorecard ?')) {
-                  setScorecard({});
-                  setCurrentHole(1);
-                }
-              }}
+              onClick={() => setShowResetConfirm(true)}
               className="bg-red-600/10 border border-red-600/30 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600/20 transition-all active:scale-95"
             >
               RAZ
@@ -96,6 +168,88 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
 
         {/* The Tactical Matrix */}
         <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-sm">
+          {/* Cinematic 19th Hole Button */}
+          {(isGameFinished || currentHole === 18) && (
+            <div className="p-6 border-b border-white/10 bg-gradient-to-r from-[#c9964a]/5 to-transparent flex flex-col gap-6">
+              <div className="flex items-center gap-3">
+                <Brain size={16} className="text-[#c9964a]" />
+                <h3 className="text-xs font-black text-white/60 uppercase tracking-widest">Le 19ème Trou — Conclusion</h3>
+              </div>
+              
+              {debriefText ? (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-black/60 border border-[#c9964a]/20 p-8 rounded-[2.5rem] relative overflow-hidden group backdrop-blur-xl"
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Sparkles size={60} className="text-[#c9964a]" />
+                  </div>
+                  <div className="relative z-10 flex flex-col gap-4">
+                    <div className="flex items-center gap-2">
+                       <div className="w-1.5 h-1.5 rounded-full bg-[#c9964a]" />
+                       <span className="text-[10px] font-black text-[#c9964a] uppercase tracking-widest">Analyse de Mentor</span>
+                    </div>
+                    <p className="text-lg text-white font-medium leading-relaxed italic">
+                      "{debriefText}"
+                    </p>
+                    <div className="mt-4 flex justify-end">
+                      <button 
+                        onClick={() => setDebriefText(null)}
+                        className="bg-white/5 border border-white/10 px-6 py-2 rounded-full text-[10px] font-black text-white/40 uppercase tracking-widest hover:text-white transition-colors"
+                      >
+                        Nouvelle Analyse
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.button 
+                  onClick={handleAdamDebrief}
+                  disabled={isLoadingDebrief}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="relative w-full h-56 rounded-[2.5rem] overflow-hidden group shadow-2xl transition-all disabled:opacity-50"
+                  id="btn-19th-hole"
+                >
+                  {/* Premium Background Image - Using a cinematic luxury bar atmosphere */}
+                  <img 
+                    src="https://images.unsplash.com/photo-1470337458703-46ad1756a187?q=80&w=2669&auto=format&fit=crop" 
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 opacity-70" 
+                    alt="19th Hole secret bar"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60" />
+                  <div className="absolute inset-0 border border-white/10 rounded-[2.5rem] pointer-events-none" />
+                  
+                  <div className="relative z-10 h-full p-8 flex flex-col justify-end items-start gap-3">
+                    <div className="flex items-center gap-2 bg-[#c9964a] text-black px-4 py-1.5 rounded-full shadow-[0_0_20px_rgba(201,150,74,0.4)]">
+                      <Sparkles size={14} />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">Accès Club Privé</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <h3 className="text-4xl font-black italic text-white uppercase tracking-tighter leading-[0.8] mb-1">
+                        19ÈME TROU &<br />BILAN D'ADAM
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <div className="h-[1px] w-8 bg-[#c9964a]/40" />
+                        <p className="text-[9px] font-black text-[#c9964a] uppercase tracking-[0.3em]">Débriefing tactique final</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {isLoadingDebrief && (
+                    <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                       <div className="flex flex-col items-center gap-4">
+                          <Loader2 size={40} className="text-[#c9964a] animate-spin" />
+                          <span className="text-[10px] font-black text-[#c9964a] uppercase tracking-[0.5em] animate-pulse">Adam analyse tes données...</span>
+                       </div>
+                    </div>
+                  )}
+                </motion.button>
+              )}
+            </div>
+          )}
+
           <div className="bg-white/5 px-6 py-4 flex text-[9px] font-black tracking-[0.3em] text-[#c9964a] uppercase border-b border-white/10">
             <span className="w-12 text-left">TROU</span>
             <span className="w-12 text-center">PAR</span>
@@ -105,7 +259,7 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
           <div className="divide-y divide-white/10">
             {scorecardData.map((h: any) => (
               <motion.button 
-                key={h.hole} 
+                key={`hole-item-${h.hole}`} 
                 whileTap={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}
                 onClick={() => setEditingHole(h.hole)}
                 className={`w-full px-6 py-4 flex items-center transition-colors text-left ${currentHole === h.hole ? 'bg-red-600/5' : ''}`}
@@ -238,7 +392,7 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
               <div className="grid grid-cols-4 gap-3 mb-6">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
                   <motion.button
-                    key={num}
+                    key={`num-pad-${num}`}
                     whileTap={{ scale: 0.9, backgroundColor: '#c9964a', color: '#000' }}
                     onClick={() => {
                         if (activeScoreField === 'strokes') {
@@ -355,7 +509,7 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
                  { id: GameMode.MATCHPLAY, name: 'MATCH PLAY', desc: 'Face-à-face tactique. Domination de trous.', color: 'border-red-600/30' },
                ].map((mode) => (
                  <motion.button
-                   key={mode.id}
+                   key={`gamemode-${mode.id}`}
                    whileTap={{ scale: 0.98 }}
                    onClick={() => { setSelectedMode(mode.id); setShowModeSelector(false); }}
                    className={`w-full bg-white/5 p-8 text-left rounded-[2rem] border transition-all ${mode.color} ${selectedMode === mode.id ? 'bg-white/10 scale-[1.02]' : ''}`}

@@ -33,13 +33,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[300] bg-black/90 backdrop-blur-2xl overflow-y-auto"
+          className="fixed inset-0 z-[300] bg-black overflow-y-auto"
         >
-          <div className="min-h-screen px-6 py-12">
-            <div className="max-w-md mx-auto relative pb-20">
+          <div className="min-h-screen px-6 py-12 flex flex-col">
+            <div className="max-w-md mx-auto w-full relative pb-20">
               <button 
                 onClick={onClose}
-                className="absolute -top-4 -right-2 p-2 text-white/40 hover:text-white"
+                className="absolute top-0 right-0 p-2 text-white/40 hover:text-white"
               >
                 <X size={28} />
               </button>
@@ -87,7 +87,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <Target size={14} className="text-[#c9964a]" />
                     <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest">Options Tactiques</h3>
                   </div>
-                  <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl overflow-hidden divide-y divide-white/5">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
                     <ToggleItem 
                       icon={Cpu} 
                       label="Moteur de Précision Onyx" 
@@ -118,7 +118,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <Volume2 size={14} className="text-[#c9964a]" />
                     <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest">Audio & Feedback</h3>
                   </div>
-                  <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl overflow-hidden divide-y divide-white/5">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
                     <ToggleItem 
                       icon={Bell} 
                       label="Sons Ambiants" 
@@ -149,7 +149,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <Shield size={14} className="text-red-500" />
                     <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest">Confidentialité</h3>
                   </div>
-                  <div className="bg-[#1a1a1a] border border-white/5 rounded-2xl overflow-hidden divide-y divide-white/5">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
                     <ToggleItem 
                       icon={Globe} 
                       label="Partage Inner Circle" 

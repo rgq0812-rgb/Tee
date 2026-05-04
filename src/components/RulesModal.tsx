@@ -40,7 +40,7 @@ export default function RulesModal({ isOpen, onClose }: RulesModalProps) {
               <div className="space-y-6">
                 {GOLF_RULES.map((section, idx) => (
                   <motion.div
-                    key={section.title}
+                    key={`rules-section-${section.title}`}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}
@@ -52,7 +52,7 @@ export default function RulesModal({ isOpen, onClose }: RulesModalProps) {
                     </div>
                     <ul className="space-y-3">
                       {section.rules.map((rule, ridx) => (
-                        <li key={ridx} className="flex gap-3">
+                        <li key={`rule-item-${ridx}`} className="flex gap-3">
                           <span className="text-[#c9964a] font-mono text-[10px] mt-1 shrink-0">{ridx + 1}.</span>
                           <p className="text-xs text-white/70 leading-relaxed font-medium">
                             {rule}

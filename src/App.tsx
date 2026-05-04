@@ -11,6 +11,8 @@ import ScorecardPage from './components/ScorecardPage';
 import InnerCircle from './components/InnerCircle';
 import Profile from './components/Profile';
 import WelcomeTour from './components/WelcomeTour';
+import AdamMentorModal from './components/AdamMentorModal';
+import { BookOpen, Sparkles } from 'lucide-react';
 
 import { AppPath, HoleScore, Club } from './types';
 import { INITIAL_CLUBS, COURSES, CHALLENGES } from './constants';
@@ -70,6 +72,7 @@ function AppContent() {
   });
 
   const [advice, setAdvice] = useState<string | null>(null);
+  const [showMentorModal, setShowMentorModal] = useState(false);
 
   // --- Persistence ---
   useEffect(() => {
@@ -114,7 +117,8 @@ function AppContent() {
   }
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+    <>
+      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
       <AnimatePresence mode="wait">
         {activeTab === 'dashboard' && (
           <Dashboard 
@@ -161,11 +165,31 @@ function AppContent() {
             setHandicap={setHandicap}
             setTourSeen={setTourSeen}
             setActiveTab={setActiveTab}
+            setShowMentorModal={setShowMentorModal}
           />
         )}
       </AnimatePresence>
+
+      {/* Floating Adam Help Button */}
+      <motion.button
+        initial={{ opacity: 0, scale: 0.8, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setShowMentorModal(true)}
+        className="fixed bottom-24 right-6 z-[300] w-12 h-12 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full flex items-center justify-center text-[#c9964a] shadow-2xl group"
+        id="floating-adam-btn"
+      >
+        <div className="absolute inset-0 bg-[#c9964a]/10 rounded-full blur-xl group-hover:bg-[#c9964a]/20 transition-all opacity-0 group-hover:opacity-100" />
+        <Sparkles size={20} className="relative z-10 animate-pulse" />
+        <span className="absolute right-full mr-3 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-[#c9964a] opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap">
+          Adam Mentoring
+        </span>
+      </motion.button>
     </Layout>
-  );
+    <AdamMentorModal isOpen={showMentorModal} onClose={() => setShowMentorModal(false)} />
+  </>
+);
 }
 
 export default function App() {
