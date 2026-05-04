@@ -1,0 +1,12 @@
+{
+  "name": "Golf Tracker Pro",
+  "description": "A professional performance tracking app for golfers featuring round management, advanced statistics, and AI-powered swing coaching.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "Data persistence",
+    "AI Insights"
+  ]
+}

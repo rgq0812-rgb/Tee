@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // Admin check - bootstrap user: rgq0812@gmail.com
+    function isAdmin() { 
+      return isSignedIn() && (request.auth.token.email == "rgq0812@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    // --- Entities Validators ---
+    
+    function isValidUser(data) {
+      return data.keys().hasAll(['displayName', 'handicap', 'createdAt', 'email', 'updatedAt']) &&
+             data.keys().size() == 5 &&
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.handicap is number && data.handicap >= -10 && data.handicap <= 54 &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time &&
+             data.email == request.auth.token.email;
+    }
+
+    function isValidRound(data) {
+      return data.keys().hasAll(['userId', 'courseId', 'courseName', 'date', 'status', 'createdAt', 'updatedAt']) &&
+             data.userId == request.auth.uid &&
+             isValidId(data.courseId) &&
+             data.courseName is string && data.courseName.size() <= 200 &&
+             data.date is string && 
+             data.status in ['in-progress', 'completed'] &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time;
+    }
+
+    function isValidHole(data) {
+      return data.keys().hasAll(['holeNumber', 'par', 'score']) &&
+             data.holeNumber >= 1 && data.holeNumber <= 18 &&
+             data.par >= 3 && data.par <= 6 &&
+             data.score >= 1 && data.score <= 15;
+    }
+
+    function isRoundUpdateValid(data) {
+       return data.updatedAt == request.time &&
+              data.userId == existing().userId &&
+              data.courseId == existing().courseId &&
+              data.createdAt == existing().createdAt;
+    }
+
+    // --- Path Rules ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isOwner(userId); // Stricter PII isolation
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'handicap', 'updatedAt']) &&
+        incoming().displayName is string && incoming().displayName.size() <= 100 &&
+        incoming().handicap is number &&
+        incoming().updatedAt == request.time
+      );
+    }
+
+    match /courses/{courseId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidId(courseId);
+    }
+
+    match /rounds/{roundId} {
+      allow get: if isOwner(resource.data.userId); // Strict read
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isVerified() && isValidId(roundId) && isValidRound(incoming());
+      allow update: if isOwner(existing().userId) && isRoundUpdateValid(incoming()) && (
+        (existing().status == 'in-progress' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'totalScore', 'totalPutts', 'gir', 'fairwaysHit', 'updatedAt'])) ||
+        (existing().status == 'in-progress' && incoming().status == 'completed' && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+      );
+      allow delete: if isOwner(existing().userId);
+    }
+
+    match /rounds/{roundId}/holes/{holeId} {
+      function canAccessRound() {
+        return get(/databases/$(database)/documents/rounds/$(roundId)).data.userId == request.auth.uid;
+      }
+      function isRoundActive() {
+        return get(/databases/$(database)/documents/rounds/$(roundId)).data.status == 'in-progress';
+      }
+
+      allow read: if canAccessRound();
+      allow create: if canAccessRound() && isRoundActive() && isValidId(holeId) && isValidHole(incoming());
+      allow update: if canAccessRound() && isRoundActive() && incoming().diff(existing()).affectedKeys().hasOnly(['score', 'putts', 'gir', 'fairwayHit', 'notes']);
+      allow delete: if canAccessRound() && isRoundActive();
+    }
+
+    match /swingAnalyses/{analysisId} {
+      allow read: if isOwner(resource.data.userId);
+      allow create: if isVerified() && incoming().userId == request.auth.uid && isValidId(analysisId);
+      allow update: if false; 
+      allow delete: if isOwner(resource.data.userId);
+    }
+
+    match /hole_assets/{assetId} {
+      function isValidHoleAsset(data) {
+        return data.keys().hasAll(['userId', 'courseId', 'holeNumber', 'imageData', 'updatedAt']) &&
+               data.userId == request.auth.uid &&
+               isValidId(data.courseId) &&
+               data.holeNumber >= 1 && data.holeNumber <= 18 &&
+               data.imageData is string && data.imageData.size() <= 1048576 && // 1MB limit for Base64 (roughly)
+               data.updatedAt is string;
+      }
+      allow read: if isSignedIn();
+      allow create, update: if isVerified() && isValidId(assetId) && isValidHoleAsset(incoming());
+      allow delete: if isOwner(resource.data.userId);
+    }
+  }
+}

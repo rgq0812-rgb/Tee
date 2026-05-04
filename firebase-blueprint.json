@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and golf preferences.",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "handicap": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "email": { "type": "string" }
+      },
+      "required": ["displayName", "handicap", "createdAt", "email"]
+    },
+    "Course": {
+      "title": "Golf Course",
+      "description": "Metadata about a golf course.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "par": { "type": "number" },
+        "difficulty": { "type": "string", "enum": ["Easy", "Moderate", "Hard"] }
+      },
+      "required": ["name", "par"]
+    },
+    "Round": {
+      "title": "Golf Round",
+      "description": "A single round of golf played by a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "courseName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "totalScore": { "type": "number" },
+        "totalPutts": { "type": "number" },
+        "gir": { "type": "number", "description": "Greens in Regulation" },
+        "fairwaysHit": { "type": "number" },
+        "status": { "type": "string", "enum": ["in-progress", "completed"] }
+      },
+      "required": ["userId", "courseId", "date", "status"]
+    },
+    "HoleData": {
+      "title": "Hole Performance",
+      "description": "Data for a single hole within a round.",
+      "type": "object",
+      "properties": {
+        "holeNumber": { "type": "number" },
+        "par": { "type": "number" },
+        "score": { "type": "number" },
+        "putts": { "type": "number" },
+        "gir": { "type": "boolean" },
+        "fairwayHit": { "type": "boolean" },
+        "notes": { "type": "string" }
+      },
+      "required": ["holeNumber", "par", "score"]
+    },
+    "SwingAnalysis": {
+      "title": "Swing Analysis",
+      "description": "AI-powered analysis of a user's swing.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "videoUrl": { "type": "string" },
+        "feedback": { "type": "string" },
+        "score": { "type": "number" }
+      },
+      "required": ["userId", "date", "feedback"]
+    },
+    "HoleAsset": {
+      "title": "Hole Tactical Asset",
+      "description": "Custom drawings or photos for a specific hole.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "holeNumber": { "type": "number" },
+        "imageData": { "type": "string", "description": "Base64 image data" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "courseId", "holeNumber", "imageData"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles."
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Global course database."
+    },
+    "/hole_assets/{assetId}": {
+      "schema": "HoleAsset",
+      "description": "Custom Tactical Blueprints per hole."
+    },
+    "/rounds/{roundId}": {
+      "schema": "Round",
+      "description": "Historical and active rounds."
+    },
+    "/rounds/{roundId}/holes/{holeId}": {
+      "schema": "HoleData",
+      "description": "Individual hole performance for a round."
+    },
+    "/swingAnalyses/{analysisId}": {
+      "schema": "SwingAnalysis",
+      "description": "AI swing coaching feedback."
+    }
+  }
+}
