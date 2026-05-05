@@ -3,7 +3,7 @@ import { signInWithGoogle } from '../services/firebase';
 import { motion } from 'motion/react';
 import { Trophy, ChevronRight } from 'lucide-react';
 
-export default function AuthScreen() {
+export default function AuthScreen({ onGuest }: { onGuest: () => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
@@ -12,7 +12,12 @@ export default function AuthScreen() {
       await signInWithGoogle();
     } catch (err: any) {
       console.error("Login error:", err);
-      setError(err.message || "Échec de la connexion. Veuillez réessayer.");
+      // Simplify error message for certain domains
+      if (err.message?.includes('unauthorized domain')) {
+        setError("Domaine non autorisé pour Google Auth. Utilisez le mode invité ci-dessous.");
+      } else {
+        setError(err.message || "Échec de la connexion. Veuillez réessayer.");
+      }
     }
   };
 
@@ -86,24 +91,33 @@ export default function AuthScreen() {
         </p>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-bold uppercase tracking-wider text-center w-full">
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-[10px] font-black uppercase tracking-wider text-center w-full">
             {error}
           </div>
         )}
 
-        <button
-          onClick={handleLogin}
-          className="w-full bg-[#c9964a] text-black py-5 px-6 rounded-2xl font-black uppercase text-sm tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-[0.98] group shadow-[0_15px_40px_rgba(201,150,74,0.3)] hover:shadow-[#c9964a]/40 hover:-translate-y-1"
-        >
-          <img src="https://www.google.com/favicon.ico" className="w-5 h-5 brightness-0" alt="Google" referrerPolicy="no-referrer" />
-          Continuer avec Google
-          <motion.span
-            animate={{ x: [0, 6, 0] }}
-            transition={{ repeat: Infinity, duration: 1.5 }}
+        <div className="w-full space-y-4">
+          <button
+            onClick={handleLogin}
+            className="w-full bg-[#c9964a] text-black py-5 px-6 rounded-2xl font-black uppercase text-sm tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-[0.98] group shadow-[0_15px_40px_rgba(201,150,74,0.3)] hover:shadow-[#c9964a]/40 hover:-translate-y-1"
           >
-            <ChevronRight size={20} />
-          </motion.span>
-        </button>
+            <img src="https://www.google.com/favicon.ico" className="w-5 h-5 brightness-0" alt="Google" referrerPolicy="no-referrer" />
+            Continuer avec Google
+            <motion.span
+              animate={{ x: [0, 6, 0] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+            >
+              <ChevronRight size={20} />
+            </motion.span>
+          </button>
+
+          <button
+            onClick={onGuest}
+            className="w-full bg-white/5 border border-white/10 text-[#c9964a]/80 py-4 px-6 rounded-2xl font-black uppercase text-[10px] tracking-[0.4em] hover:bg-[#c9964a]/10 hover:text-[#c9964a] transition-all active:scale-[0.98] border-dashed"
+          >
+            S'authentifier en Invité (Bypass)
+          </button>
+        </div>
 
         <p className="mt-10 text-[10px] text-white/30 uppercase tracking-[0.4em] font-black">Tactical Performance Matrix v2.0</p>
       </motion.div>

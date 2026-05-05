@@ -20,7 +20,12 @@ import { INITIAL_CLUBS, COURSES, CHALLENGES } from './constants';
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const [isGuest, setIsGuest] = useState(() => sessionStorage.getItem('guestMode') === 'true');
   
+  const handleGuestMode = () => {
+    setIsGuest(true);
+    sessionStorage.setItem('guestMode', 'true');
+  };
   // --- Global State from Bible ---
   const [splashSeen, setSplashSeen] = useState(() => sessionStorage.getItem('splashSeen') === 'true');
   const [tourSeen, setTourSeen] = useState(() => localStorage.getItem('tourSeen') === 'true');
@@ -110,8 +115,8 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <AuthScreen />;
+  if (!user && !isGuest) {
+    return <AuthScreen onGuest={handleGuestMode} />;
   }
 
   if (!splashSeen) {
