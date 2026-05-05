@@ -244,10 +244,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </div>
                   <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
                     {[
-                      { id: 'adam', name: 'Adam', title: 'Le Mentor Sage', voice: 'Charon' },
-                      { id: 'antoni', name: 'Antoni', title: 'Le Stratège Précis', voice: 'Aoede' },
-                      { id: 'arnold', name: 'Arnold', title: 'L\'Autorité Tactique', voice: 'Fenrir' },
-                      { id: 'josh', name: 'Josh', title: 'L\'Analyse Directe', voice: 'Puck' }
+                      { id: 'strat', name: 'Adam', title: 'Le Mentor Sage', voice: 'Charon' },
+                      { id: 'mage', name: 'Antoni', title: 'Le Stratège Précis', voice: 'Aoede' },
+                      { id: 'pred', name: 'Arnold', title: 'L\'Autorité Tactique', voice: 'Fenrir' },
+                      { id: 'clock', name: 'Josh', title: 'L\'Analyse Directe', voice: 'Puck' }
                     ].map(c => (
                       <div key={`voice-prev-${c.id}`} className="p-5 flex items-center justify-between">
                         <div className="flex flex-col">
@@ -256,12 +256,20 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         </div>
                         <button 
                           onClick={async () => {
-                            const { generateSpeech } = await import('../services/geminiService');
-                            const { playRawPcm } = await import('../lib/audioUtils');
-                            const res = await generateSpeech(`Bonjour, je suis ${c.name}. Je suis prêt pour la partie.`, c);
-                            if (typeof res === 'string') playRawPcm(res);
+                            try {
+                              const { generateSpeech, speakWithBrowser } = await import('../services/geminiService');
+                              const { playRawPcm } = await import('../lib/audioUtils');
+                              const res = await generateSpeech(`Bonjour, je suis ${c.name}. Je suis prêt pour la partie.`, c);
+                              if (typeof res === 'object' && res.fallback) {
+                                speakWithBrowser(res.text);
+                              } else if (typeof res === 'string') {
+                                playRawPcm(res);
+                              }
+                            } catch (e) {
+                              console.error("Test speech error", e);
+                            }
                           }}
-                          className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[8px] font-black uppercase tracking-widest text-[#c9964a]"
+                          className="px-4 py-2 bg-white/5 hover:bg-[#c9964a]/20 border border-white/10 rounded-xl text-[8px] font-black uppercase tracking-widest text-[#c9964a] transition-colors"
                         >
                           Tester
                         </button>

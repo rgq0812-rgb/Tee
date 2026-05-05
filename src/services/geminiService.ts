@@ -118,13 +118,12 @@ export async function generateSpeech(text: string, caddie?: any) {
 
     const caddieName = caddie?.name || 'Adam';
     const voiceName = voiceMap[caddie?.id] || 'Charon';
-    const caddieRole = caddie?.title || 'Mentor de golf';
 
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview", 
       contents: [{ 
         parts: [{ 
-          text: `Tu es ${caddieName}, ${caddieRole}. Exprime-toi avec ton tempérament propre : ${text}` 
+          text: text.trim() 
         }] 
       }],
       config: {
@@ -139,6 +138,9 @@ export async function generateSpeech(text: string, caddie?: any) {
 
     const candidates = response.candidates;
     if (!candidates || candidates.length === 0) {
+      if (response.promptFeedback) {
+        console.warn("Gemini TTS Blocked by Safety Filters:", response.promptFeedback);
+      }
       throw new Error("No candidates returned from Gemini TTS");
     }
 
