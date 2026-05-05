@@ -88,11 +88,17 @@ INSTRUCTIONS DE RÉPONSE :
 REPONSE (Format: ${caddie.name} : "[TON CONSEIL]") :`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: [{ parts: [{ text: prompt }] }]
     });
 
-    return response.text || `${caddie.name} : "Calcul tactique impossible. Vise le milieu."`;
+    const adviceText = response.text;
+    if (!adviceText || adviceText.trim().length < 5) {
+      console.error("Gemini returned empty or too short advice:", adviceText);
+      return `${caddie.name} : "Calcul tactique impossible. Vise le milieu du green en sécurité."`;
+    }
+
+    return adviceText;
   } catch (err) {
     console.error("AI Advice Error:", err);
     return `${caddie.name} : "Calcul tactique impossible. Vise le milieu."`;
@@ -111,7 +117,7 @@ export async function generateSpeech(text: string, caddie?: any) {
     // Voice mapping based on caddie ID from constants.ts
     const voiceMap: Record<string, string> = {
       'strat': 'Charon', // Adam: Calme, sage (Charon est profond et stable)
-      'mage': 'Aoede',   // Antoni: Esthète, lyrique (Aoede est plus mélodique)
+      'mage': 'Kore',    // Antoni: Esthète, lyrique (Kore est plus mélodique)
       'pred': 'Fenrir',  // Arnold: Puissant, autoritaire (Fenrir est plus intense)
       'clock': 'Puck'    // Josh: Sec, analytique (Puck est plus vif/technique)
     };
@@ -119,15 +125,24 @@ export async function generateSpeech(text: string, caddie?: any) {
     const caddieName = caddie?.name || 'Adam';
     const voiceName = voiceMap[caddie?.id] || 'Charon';
 
+    // IMPORTANT: Strip caddie name "Adam : " from the text for speech
+    const speechText = text.includes(':') ? text.split(':').slice(1).join(':').trim() : text.trim();
+
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview", 
       contents: [{ 
         parts: [{ 
-          text: `Prononce ce message avec ta voix : "${text.trim()}"` 
+          text: speechText 
         }] 
       }],
       config: {
         responseModalities: [Modality.AUDIO],
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+        ],
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: voiceName } 
@@ -180,11 +195,13 @@ export function speakWithBrowser(text: string, onEnd?: () => void) {
   
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'fr-FR';
-  utterance.rate = 0.9;
-  utterance.pitch = 0.85;
+  utterance.rate = 0.95;
+  utterance.pitch = 0.9;
   
   const voices = window.speechSynthesis.getVoices();
-  const maleFrench = voices.find(v => v.lang.startsWith('fr') && (v.name.includes('Thomas') || v.name.includes('Daniel') || v.name.includes('Male')));
+  // Prefer high quality Google or Microsoft voices if available
+  const maleFrench = voices.find(v => v.lang.startsWith('fr') && (v.name.includes('Google') || v.name.includes('Premium') || v.name.includes('Microsoft'))) || 
+                     voices.find(v => v.lang.startsWith('fr') && (v.name.includes('Thomas') || v.name.includes('Daniel') || v.name.includes('Male')));
   if (maleFrench) utterance.voice = maleFrench;
   
   if (onEnd) utterance.onend = onEnd;

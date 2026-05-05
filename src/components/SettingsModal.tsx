@@ -236,6 +236,30 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </div>
                 </section>
 
+                {/* MAINTENANCE SYSTÈME */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-2">
+                    <Shield size={14} className="text-red-600" />
+                    <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest">Maintenance Système</h3>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                    <p className="text-[10px] text-white/40 uppercase leading-relaxed tracking-wider">
+                      Si la voix est métallique ou si le caddie ne répond plus, lancez une réinitialisation des services neuraux.
+                    </p>
+                    <button 
+                      onClick={() => {
+                        window.speechSynthesis.cancel();
+                        localStorage.removeItem('onyx_voice_stuck');
+                        // Reload the page to clear all memory states
+                        window.location.reload();
+                      }}
+                      className="w-full bg-red-600/10 hover:bg-red-600/20 border border-red-600/30 text-red-500 font-black uppercase text-[10px] py-4 rounded-xl tracking-[0.2em] transition-all"
+                    >
+                      Réinitialiser Services Neuraux
+                    </button>
+                  </div>
+                </section>
+
                 {/* VOIX DES CADDIES */}
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 px-2">
@@ -245,7 +269,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
                     {[
                       { id: 'strat', name: 'Adam', title: 'Le Mentor Sage', voice: 'Charon' },
-                      { id: 'mage', name: 'Antoni', title: 'Le Stratège Précis', voice: 'Aoede' },
+                      { id: 'mage', name: 'Antoni', title: 'Le Stratège Précis', voice: 'Kore' },
                       { id: 'pred', name: 'Arnold', title: 'L\'Autorité Tactique', voice: 'Fenrir' },
                       { id: 'clock', name: 'Josh', title: 'L\'Analyse Directe', voice: 'Puck' }
                     ].map(c => (
