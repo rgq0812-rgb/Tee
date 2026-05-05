@@ -1,8 +1,21 @@
+import React, { useState } from 'react';
 import { signInWithGoogle } from '../services/firebase';
 import { motion } from 'motion/react';
 import { Trophy, ChevronRight } from 'lucide-react';
 
 export default function AuthScreen() {
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    try {
+      setError(null);
+      await signInWithGoogle();
+    } catch (err: any) {
+      console.error("Login error:", err);
+      setError(err.message || "Échec de la connexion. Veuillez réessayer.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
       {/* Background Image with Blur */}
@@ -72,8 +85,14 @@ export default function AuthScreen() {
           Maîtrisez le jeu.
         </p>
 
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-bold uppercase tracking-wider text-center w-full">
+            {error}
+          </div>
+        )}
+
         <button
-          onClick={signInWithGoogle}
+          onClick={handleLogin}
           className="w-full bg-[#c9964a] text-black py-5 px-6 rounded-2xl font-black uppercase text-sm tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-[0.98] group shadow-[0_15px_40px_rgba(201,150,74,0.3)] hover:shadow-[#c9964a]/40 hover:-translate-y-1"
         >
           <img src="https://www.google.com/favicon.ico" className="w-5 h-5 brightness-0" alt="Google" referrerPolicy="no-referrer" />

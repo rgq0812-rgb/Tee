@@ -7,8 +7,29 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const signInWithGoogle = async () => {
+  console.log("Starting Google Sign-In with popup...");
+  try {
+    // Explicitly set language
+    auth.languageCode = 'fr';
+    const result = await signInWithPopup(auth, googleProvider);
+    console.log("Sign-In successful:", result.user.email);
+    return result;
+  } catch (error: any) {
+    console.error("Firebase Sign-In Error:", error.code, error.message);
+    if (error.code === 'auth/popup-blocked') {
+      throw new Error("Le pop-up a été bloqué par votre navigateur. Veuillez autoriser les pop-ups pour ce site.");
+    }
+    if (error.code === 'auth/unauthorized-domain') {
+      throw new Error("Ce domaine n'est pas autorisé pour l'authentification Google. Veuillez contacter l'administrateur.");
+    }
+    throw error;
+  }
+};
 export const logout = () => signOut(auth);
 
 async function testConnection() {
