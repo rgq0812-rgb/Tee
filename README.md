@@ -42,10 +42,13 @@
 ### 🚀 INSTALLATION & DEPLOYMENT
 
 1.  **Environment Config**:
-    Create a `.env` file with:
+    Create a `.env.local` file with:
     ```env
-    GEMINI_API_KEY=your_key_here
+    VITE_GEMINI_API_KEY=your_key_here
     ```
+
+2.  **Vercel Deployment**:
+    Lorsque vous déployez sur Vercel, ajoutez `VITE_GEMINI_API_KEY` dans vos variables d'environnement. Sans le préfixe `VITE_`, la clé ne sera pas accessible au navigateur.
 2.  **Dependencies**:
     ```bash
     npm install
