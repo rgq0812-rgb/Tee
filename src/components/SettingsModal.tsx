@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Settings, Volume2, Wind, Target, Ruler, Bell, Eye, Shield, Globe, Cpu, Music, CheckCircle2, Youtube, Smartphone, Plus, Trash2 } from 'lucide-react';
+import { X, Settings, Volume2, Wind, Target, Ruler, Bell, Eye, Shield, Globe, Cpu, Music, CheckCircle2, Youtube, Smartphone, Plus, Trash2, Brain } from 'lucide-react';
 import { get, set } from 'idb-keyval';
 
 interface SettingsModalProps {
@@ -233,6 +233,40 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       active={voiceActivation}
                       onToggle={setVoiceActivation}
                     />
+                  </div>
+                </section>
+
+                {/* VOIX DES CADDIES */}
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 px-2">
+                    <Brain size={14} className="text-[#c9964a]" />
+                    <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest">Voix des Caddies</h3>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
+                    {[
+                      { id: 'adam', name: 'Adam', title: 'Le Mentor Sage', voice: 'Charon' },
+                      { id: 'antoni', name: 'Antoni', title: 'Le Stratège Précis', voice: 'Aoede' },
+                      { id: 'arnold', name: 'Arnold', title: 'L\'Autorité Tactique', voice: 'Fenrir' },
+                      { id: 'josh', name: 'Josh', title: 'L\'Analyse Directe', voice: 'Puck' }
+                    ].map(c => (
+                      <div key={`voice-prev-${c.id}`} className="p-5 flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-white uppercase tracking-tight mb-1">{c.name}</span>
+                          <span className="text-[8px] text-white/30 uppercase tracking-widest">{c.title} ({c.voice})</span>
+                        </div>
+                        <button 
+                          onClick={async () => {
+                            const { generateSpeech } = await import('../services/geminiService');
+                            const { playRawPcm } = await import('../lib/audioUtils');
+                            const res = await generateSpeech(`Bonjour, je suis ${c.name}. Je suis prêt pour la partie.`, c);
+                            if (typeof res === 'string') playRawPcm(res);
+                          }}
+                          className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[8px] font-black uppercase tracking-widest text-[#c9964a]"
+                        >
+                          Tester
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </section>
 

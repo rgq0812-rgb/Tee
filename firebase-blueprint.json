@@ -81,6 +81,20 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "courseId", "holeNumber", "imageData"]
+    },
+    "TacticalAdvice": {
+      "title": "Tactical Advice",
+      "description": "Historical AI advice generated for a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "caddieName": { "type": "string" },
+        "holeNumber": { "type": "number" },
+        "courseName": { "type": "string" },
+        "advice": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "caddieName", "advice", "createdAt"]
     }
   },
   "firestore": {
@@ -95,6 +109,10 @@
     "/hole_assets/{assetId}": {
       "schema": "HoleAsset",
       "description": "Custom Tactical Blueprints per hole."
+    },
+    "/tactical_advice/{adviceId}": {
+      "schema": "TacticalAdvice",
+      "description": "History of AI advice."
     },
     "/rounds/{roundId}": {
       "schema": "Round",

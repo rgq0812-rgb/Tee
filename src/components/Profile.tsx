@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { logout, db, handleFirestoreError, OperationType } from '../services/firebase';
 import { useAuth } from '../services/AuthProvider';
-import { collection, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, setDoc, doc, orderBy, limit } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { LogOut, User, Settings, Shield, Award, Image as ImageIcon, ChevronRight, X, Clock, Box, Zap, Snowflake, Gem, Target, Plus, Upload, Loader2, AlertCircle, BookOpen, Brain, Video } from 'lucide-react';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
@@ -16,8 +16,32 @@ import SwingCoachModal from './SwingCoachModal';
   export default function Profile({ selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, handicap, setHandicap, setTourSeen, setActiveTab, setShowMentorModal }: { selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, setActiveTab: (tab: string) => void, setShowMentorModal: (val: boolean) => void, key?: string }) {
   const { user } = useAuth();
   const { playPing } = useAmbientSound();
-  const { assets, loading, quotaExceeded } = useHoleAssets();
+  const { assets, loading: assetsLoading, quotaExceeded } = useHoleAssets();
+  const [advices, setAdvices] = useState<any[]>([]);
+  const [advicesLoading, setAdvicesLoading] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
+  
+  // Tactical history fetch
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'tactical_advice'),
+      where('userId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(10)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setAdvices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setAdvicesLoading(false);
+    }, (error) => {
+      console.error("Advice history error:", error);
+      setAdvicesLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -143,7 +167,7 @@ import SwingCoachModal from './SwingCoachModal';
             </div>
           </div>
 
-          {loading ? (
+          {assetsLoading ? (
              <div className="grid grid-cols-3 gap-2">
                 {[1,2,3].map(i => <div key={`profile-vault-skeleton-${i}`} className="aspect-square bg-white/5 rounded-xl animate-pulse" />)}
              </div>
@@ -170,6 +194,34 @@ import SwingCoachModal from './SwingCoachModal';
               <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Aucune photo tactique enregistrée</p>
             </div>
           )}
+        </div>
+
+        {/* Tactical Advice History */}
+        <div className="space-y-4">
+           <div className="flex items-center gap-2 px-2">
+              <Brain size={16} className="text-[#c9964a]" />
+              <h3 className="text-xs font-black tracking-[0.3em] uppercase text-white">HISTORIQUE TACTIQUE (CADDIE)</h3>
+           </div>
+           
+           <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden divide-y divide-white/5">
+              {advicesLoading ? (
+                 <div className="p-6 flex justify-center"><Loader2 className="animate-spin text-white/20" /></div>
+              ) : advices.length > 0 ? (
+                advices.map((adv) => (
+                  <div key={adv.id} className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[8px] font-black text-[#c9964a] uppercase tracking-widest">{adv.caddieName} — TROU {adv.holeNumber}</span>
+                      <span className="text-[8px] font-mono text-white/20 uppercase">
+                        {adv.createdAt?.toDate ? adv.createdAt.toDate().toLocaleTimeString() : '...'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/60 leading-relaxed italic">"{adv.advice}"</p>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-[10px] font-black text-white/20 uppercase tracking-widest">Aucun conseil récent</div>
+              )}
+           </div>
         </div>
 
         {/* Action Menu */}

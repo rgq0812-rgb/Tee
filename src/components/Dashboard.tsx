@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { collection, query, where, orderBy, getDocs, limit, setDoc, doc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, limit, setDoc, doc, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../services/firebase';
 import { useAuth } from '../services/AuthProvider';
 import { motion, AnimatePresence } from 'motion/react';
@@ -142,8 +142,24 @@ export default function Dashboard({
       const message = await getTacticalAdvice(activeCaddie, currentHoleData, distance, wind, arsenal, playerForm, handicap);
       setAdvice(message);
       
+      // Save to Firestore history
+      if (user) {
+        try {
+          await addDoc(collection(db, 'tactical_advice'), {
+            userId: user.uid,
+            caddieName: activeCaddie.name,
+            holeNumber: currentHole,
+            courseName: selectedCourse.name,
+            advice: message,
+            createdAt: serverTimestamp()
+          });
+        } catch (e) {
+          console.error("Failed to save tactical advice to history", e);
+        }
+      }
+      
       if (!isMuted) {
-        const result = await generateSpeech(message);
+        const result = await generateSpeech(message, activeCaddie);
         if (typeof result === 'object' && result.fallback) {
           speakWithBrowser(result.text, () => setIsSpeaking(false));
         } else if (typeof result === 'string') {

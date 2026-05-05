@@ -99,7 +99,7 @@ REPONSE (Format: ${caddie.name} : "[TON CONSEIL]") :`;
   }
 }
 
-export async function generateSpeech(text: string) {
+export async function generateSpeech(text: string, caddie?: any) {
   if (!text || text.trim().length === 0) {
     console.warn("generateSpeech called with empty text");
     throw new Error("No text provided for speech generation");
@@ -107,19 +107,31 @@ export async function generateSpeech(text: string) {
 
   try {
     const ai = getAI();
-    // Using Charon voice for Adam mentor persona
+    
+    // Voice mapping based on caddie
+    const voiceMap: Record<string, string> = {
+      'adam': 'Charon',
+      'antoni': 'Aoede',
+      'arnold': 'Fenrir',
+      'josh': 'Puck'
+    };
+
+    const caddieName = caddie?.name || 'Adam';
+    const voiceName = voiceMap[caddie?.id] || 'Charon';
+    const caddieRole = caddie?.title || 'Mentor de golf';
+
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview", 
       contents: [{ 
         parts: [{ 
-          text: `Tu es Adam, un mentor de golf sage et expérimenté. Parle d'une voix calme et chaleureuse. Prononce ceci : ${text}` 
+          text: `Tu es ${caddieName}, ${caddieRole}. Parle d'une voix qui correspond à ta personnalité. Prononce ceci : ${text}` 
         }] 
       }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Charon' } 
+            prebuiltVoiceConfig: { voiceName: voiceName } 
           },
         },
       },
