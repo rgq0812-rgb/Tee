@@ -108,12 +108,12 @@ export async function generateSpeech(text: string, caddie?: any) {
   try {
     const ai = getAI();
     
-    // Voice mapping based on caddie
+    // Voice mapping based on caddie ID from constants.ts
     const voiceMap: Record<string, string> = {
-      'adam': 'Charon',
-      'antoni': 'Aoede',
-      'arnold': 'Fenrir',
-      'josh': 'Puck'
+      'strat': 'Charon', // Adam: Calme, sage (Charon est profond et stable)
+      'mage': 'Aoede',   // Antoni: Esthète, lyrique (Aoede est plus mélodique)
+      'pred': 'Fenrir',  // Arnold: Puissant, autoritaire (Fenrir est plus intense)
+      'clock': 'Puck'    // Josh: Sec, analytique (Puck est plus vif/technique)
     };
 
     const caddieName = caddie?.name || 'Adam';
@@ -124,7 +124,7 @@ export async function generateSpeech(text: string, caddie?: any) {
       model: "gemini-3.1-flash-tts-preview", 
       contents: [{ 
         parts: [{ 
-          text: `Tu es ${caddieName}, ${caddieRole}. Parle d'une voix qui correspond à ta personnalité. Prononce ceci : ${text}` 
+          text: `Tu es ${caddieName}, ${caddieRole}. Exprime-toi avec ton tempérament propre : ${text}` 
         }] 
       }],
       config: {

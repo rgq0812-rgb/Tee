@@ -3,7 +3,7 @@ import { logout, db, handleFirestoreError, OperationType } from '../services/fir
 import { useAuth } from '../services/AuthProvider';
 import { collection, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, setDoc, doc, orderBy, limit } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, User, Settings, Shield, Award, Image as ImageIcon, ChevronRight, X, Clock, Box, Zap, Snowflake, Gem, Target, Plus, Upload, Loader2, AlertCircle, BookOpen, Brain, Video } from 'lucide-react';
+import { LogOut, User, Settings, Shield, Award, Image as ImageIcon, ChevronRight, X, Clock, Box, Zap, Snowflake, Gem, Target, Plus, Upload, Loader2, AlertCircle, BookOpen, Brain, Video, Volume2 } from 'lucide-react';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
 import RulesModal from './RulesModal';
 import SettingsModal from './SettingsModal';
@@ -12,6 +12,7 @@ import SwingCoachModal from './SwingCoachModal';
   import { useHoleAssets } from '../hooks/useHoleAssets';
   import { assetService } from '../services/assetService';
   import { Trash2 } from 'lucide-react';
+  import { CADDIES } from '../constants';
 
   export default function Profile({ selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, handicap, setHandicap, setTourSeen, setActiveTab, setShowMentorModal }: { selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, setActiveTab: (tab: string) => void, setShowMentorModal: (val: boolean) => void, key?: string }) {
   const { user } = useAuth();
@@ -208,12 +209,38 @@ import SwingCoachModal from './SwingCoachModal';
                  <div className="p-6 flex justify-center"><Loader2 className="animate-spin text-white/20" /></div>
               ) : advices.length > 0 ? (
                 advices.map((adv) => (
-                  <div key={adv.id} className="p-4 space-y-2">
+                  <div key={adv.id} className="p-4 space-y-2 group">
                     <div className="flex items-center justify-between">
-                      <span className="text-[8px] font-black text-[#c9964a] uppercase tracking-widest">{adv.caddieName} — TROU {adv.holeNumber}</span>
-                      <span className="text-[8px] font-mono text-white/20 uppercase">
-                        {adv.createdAt?.toDate ? adv.createdAt.toDate().toLocaleTimeString() : '...'}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-[#c9964a] uppercase tracking-widest">{adv.caddieName} — TROU {adv.holeNumber}</span>
+                        <span className="text-[7px] font-mono text-white/10 uppercase">{adv.courseName}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-mono text-white/20 uppercase">
+                          {adv.createdAt?.toDate ? adv.createdAt.toDate().toLocaleTimeString() : '...'}
+                        </span>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const { generateSpeech, speakWithBrowser } = await import('../services/geminiService');
+                              const { playRawPcm } = await import('../lib/audioUtils');
+                              // Find caddie id for voice mapping
+                              const caddie = Object.values(CADDIES).find(c => c.name === adv.caddieName) || CADDIES.strat;
+                              const res = await generateSpeech(adv.advice, caddie);
+                              if (typeof res === 'object' && res.fallback) {
+                                speakWithBrowser(res.text);
+                              } else if (typeof res === 'string') {
+                                playRawPcm(res);
+                              }
+                            } catch (e) {
+                              console.error("Playback error", e);
+                            }
+                          }}
+                          className="p-2 bg-white/5 hover:bg-[#c9964a]/20 rounded-lg transition-colors"
+                        >
+                          <Volume2 size={10} className="text-[#c9964a]" />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-xs text-white/60 leading-relaxed italic">"{adv.advice}"</p>
                   </div>
