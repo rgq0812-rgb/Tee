@@ -123,7 +123,7 @@ export async function generateSpeech(text: string, caddie?: any) {
       model: "gemini-3.1-flash-tts-preview", 
       contents: [{ 
         parts: [{ 
-          text: text.trim() 
+          text: `Prononce ce message avec ta voix : "${text.trim()}"` 
         }] 
       }],
       config: {
@@ -139,9 +139,9 @@ export async function generateSpeech(text: string, caddie?: any) {
     const candidates = response.candidates;
     if (!candidates || candidates.length === 0) {
       if (response.promptFeedback) {
-        console.warn("Gemini TTS Blocked by Safety Filters:", response.promptFeedback);
+        console.warn("Gemini TTS Blocked by Safety Filters:", JSON.stringify(response.promptFeedback));
       }
-      throw new Error("No candidates returned from Gemini TTS");
+      throw new Error("No candidates returned from Gemini TTS (Safety filter or model error)");
     }
 
     const firstCandidate = candidates[0];

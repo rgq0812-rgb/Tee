@@ -1,5 +1,5 @@
 {
-  "name": "ONYX V2 - Tactical Golf",
-  "description": "Système tactique de golf avec GPS live, vent et conseils de caddie IA.",
+  "name": "THE CHOSE (ONYX V2)",
+  "description": "Tactical Performance Matrix for elite golfers. AI Caddie Mentorship, Swing Analysis, and Course Strategy by Onyx Squadron.",
   "requestFramePermissions": ["geolocation", "microphone", "camera"]
 }

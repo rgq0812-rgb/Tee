@@ -1,6 +1,6 @@
 {
-  "name": "Golf Tracker Pro",
-  "description": "A professional performance tracking app for golfers featuring round management, advanced statistics, and AI-powered swing coaching.",
+  "name": "THE CHOSE (ONYX V2)",
+  "description": "Tactical Performance Matrix for elite golfers. AI Caddie Mentorship, Swing Analysis, and Course Strategy by Onyx Squadron.",
   "requestFramePermissions": [
     "camera",
     "geolocation"
