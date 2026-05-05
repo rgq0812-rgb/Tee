@@ -6,13 +6,14 @@ export function useHoleAssets() {
   const [assets, setAssets] = useState<HoleAsset[]>(assetService.getAssets());
   const [loading, setLoading] = useState(assetService.getAssets().length === 0);
   const [error, setError] = useState<FirestoreError | null>(null);
-  const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [quotaExceeded, setQuotaExceeded] = useState(assetService.isQuotaExceeded());
 
   useEffect(() => {
     const unsubscribe = assetService.subscribe(
       (newAssets) => {
         setAssets(newAssets);
         setLoading(false);
+        setQuotaExceeded(false);
       },
       (err) => {
         setError(err);

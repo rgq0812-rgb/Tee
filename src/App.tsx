@@ -6,11 +6,11 @@ import SplashScreen from './components/SplashScreen';
 import PathSelector from './components/PathSelector';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
-import Challenges from './Challenges';
+import Challenges from './lib/Challenges';
 import ScorecardPage from './components/ScorecardPage';
 import InnerCircle from './components/InnerCircle';
 import Profile from './components/Profile';
-import WelcomeTour from './components/WelcomeTour';
+import WelcomeTour from './utils/WelcomeTour';
 import AdamMentorModal from './components/AdamMentorModal';
 import LieScanner from './components/LieScanner';
 import { BookOpen, Sparkles } from 'lucide-react';
@@ -73,6 +73,20 @@ function AppContent() {
   });
 
   const [advice, setAdvice] = useState<string | null>(null);
+  const adviceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (advice) {
+      if (adviceTimeoutRef.current) clearTimeout(adviceTimeoutRef.current);
+      adviceTimeoutRef.current = setTimeout(() => {
+        setAdvice(null);
+      }, 10000);
+    }
+    return () => {
+      if (adviceTimeoutRef.current) clearTimeout(adviceTimeoutRef.current);
+    };
+  }, [advice]);
+
   const [showMentorModal, setShowMentorModal] = useState(false);
   const [showLieScanner, setShowLieScanner] = useState(false);
 
@@ -190,7 +204,12 @@ function AppContent() {
         </span>
       </motion.button>
     </Layout>
-    <AdamMentorModal isOpen={showMentorModal} onClose={() => setShowMentorModal(false)} />
+    <AdamMentorModal 
+      isOpen={showMentorModal} 
+      onClose={() => setShowMentorModal(false)} 
+      selectedCourse={selectedCourse}
+      currentHole={currentHole}
+    />
     <LieScanner 
       isOpen={showLieScanner} 
       onClose={() => setShowLieScanner(false)} 

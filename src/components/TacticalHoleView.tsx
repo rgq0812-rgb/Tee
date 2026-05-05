@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Target, MapPin, Volume2, Loader2 } from 'lucide-react';
 import { Hole } from '../types';
-import { generateSpeech } from '../services/geminiService';
+import { generateSpeech, speakWithBrowser } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
 
 export default function TacticalHoleView({ hole, customImage, userLocation }: { hole: Hole, customImage?: string, userLocation?: {lat: number, lng: number} | null }) {
@@ -64,8 +64,12 @@ export default function TacticalHoleView({ hole, customImage, userLocation }: { 
     setPlaying(true);
     try {
       const text = hole.tip || hole.description;
-      const base64Audio = await generateSpeech(`Conseil stratégique pour le trou ${hole.number}: ${text}`);
-      await playRawPcm(base64Audio);
+      const resultData = await generateSpeech(`Conseil stratégique pour le trou ${hole.number}: ${text}`);
+      if (typeof resultData === 'object' && resultData.fallback) {
+        speakWithBrowser(resultData.text);
+      } else if (typeof resultData === 'string') {
+        await playRawPcm(resultData);
+      }
     } catch (err) {
       console.error("Audio playback error:", err);
     } finally {

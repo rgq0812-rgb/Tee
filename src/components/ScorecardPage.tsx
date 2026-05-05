@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trophy, ChevronDown, Check, Info, Target, MapPin, X, Plus, Minus, ArrowRight, Brain, Sparkles, Loader2 } from 'lucide-react';
 import { useScore, GameMode } from '../hooks/use-score';
-import { getGameDebrief, generateSpeech } from '../services/geminiService';
+import { getGameDebrief, generateSpeech, speakWithBrowser } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
 
 export default function ScorecardPage({ scorecard, setScorecard, selectedCourse, currentHole, setCurrentHole }: any) {
@@ -47,9 +47,11 @@ export default function ScorecardPage({ scorecard, setScorecard, selectedCourse,
       
       const isMuted = localStorage.getItem('onyx_voice') === 'false';
       if (!isMuted) {
-        const audioData = await generateSpeech(text);
-        if (audioData) {
-          await playRawPcm(audioData);
+        const resultData = await generateSpeech(text);
+        if (typeof resultData === 'object' && resultData.fallback) {
+          speakWithBrowser(resultData.text);
+        } else if (typeof resultData === 'string') {
+          await playRawPcm(resultData);
         }
       }
     } catch (error) {

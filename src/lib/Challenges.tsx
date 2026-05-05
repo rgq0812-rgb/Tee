@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Target, Zap, Shield, Sparkles, Trophy, Lock, X, ChevronRight, Brain } from 'lucide-react';
-import { CHALLENGES, CADDIES } from './constants';
+import { CHALLENGES, CADDIES } from '../constants';
 
 export default function Challenges() {
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
@@ -24,7 +24,7 @@ export default function Challenges() {
         <div className="space-y-4">
           {CHALLENGES.map((c) => (
             <motion.button
-              key={c.id}
+              key={`challenge-item-${c.id}`}
               whileTap={{ scale: 0.98 }}
               onClick={() => setSelectedChallenge(c)}
               className="w-full text-left bg-white/5 border border-white/10 p-6 rounded-[2rem] relative overflow-hidden group backdrop-blur-sm"

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { GOLF_RULES } from "../constants";
+import { GOLF_RULES, COURSES } from "../constants";
 
 let genAI: GoogleGenAI | null = null;
 
@@ -67,6 +67,9 @@ DIRECTIVES D'ÉLITE (STYLE MASTERS) :
 
 CONTEXTE TACTIQUE :
 - Trou : n°${hole.number} (${hole.name}), Par ${hole.par}, Handicap du trou ${hole.handicap}.
+- Description : ${hole.description}
+- Conseil du Pro (Vault) : ${hole.tip}
+- Dangers identifiés : ${hole.hazards.join(', ')}
 - Index (Handicap) du Joueur : ${handicap}.
 - Distance réelle : ${distance} mètres.
 - Conditions : Vent de ${wind.speed}km/h venant du ${wind.direction}.
@@ -150,9 +153,28 @@ export async function generateSpeech(text: string) {
 
     return base64Audio;
   } catch (error) {
-    console.error("Gemini TTS Error:", error);
-    throw error;
+    console.error("Gemini TTS Error, falling back to Browser TTS:", error);
+    // Fallback: This will return null or special signal so the caller knows to use Browser TTS
+    // Actually, it's better to implement the browser fallback here or return a indicator
+    return { fallback: true, text };
   }
+}
+
+export function speakWithBrowser(text: string, onEnd?: () => void) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'fr-FR';
+  utterance.rate = 0.9;
+  utterance.pitch = 0.85;
+  
+  const voices = window.speechSynthesis.getVoices();
+  const maleFrench = voices.find(v => v.lang.startsWith('fr') && (v.name.includes('Thomas') || v.name.includes('Daniel') || v.name.includes('Male')));
+  if (maleFrench) utterance.voice = maleFrench;
+  
+  if (onEnd) utterance.onend = onEnd;
+  window.speechSynthesis.speak(utterance);
 }
 
 export function isSpeechRecognitionSupported() {
@@ -183,16 +205,26 @@ export function startListening(onResult: (text: string) => void, onEnd: () => vo
   return recognition;
 }
 
-export async function chatWithAdam(history: { role: 'user' | 'model', parts: any[] }[]) {
+export async function chatWithAdam(history: { role: 'user' | 'model', parts: any[] }[], selectedCourse?: any, currentHole?: number) {
   try {
     const ai = getAI();
     
+    const course = selectedCourse || COURSES[0]; // Pont Royal par défaut
+    const holeTactiques = course.holes.map((h: any) => `Trou ${h.number} (${h.name}): ${h.description}. Conseil: ${h.tip}. Dangers: ${h.hazards.join(', ')}.`).join('\n');
+    const playerContext = currentHole ? `Le joueur se trouve sur le trou n°${currentHole} du parcours ${course.name}.` : `Le joueur est sur le parcours ${course.name}.`;
+
     const systemInstruction = `Tu es Adam, le Mentor Suprême des caddies de l'école d'élite. 
 Tu es la "Bible du Golf", une légende vivante qui a tout fait :
-- Ancien Greenkeeper : Tu connais chaque brin d'herbe, la compacité des greens et l'influence de la rosée.
-- Ancien Directeur de Golf : Tu maîtrises l'étiquette, la stratégie de parcours et la psychologie des membres.
-- Ancien Pro sur le circuit : Tu as vécu la pression du dimanche au 18, tu sais ce que c'est que de "devoir" rentrer un putt.
-- Coach passionné : Aujourd'hui, tu transmets cette sagesse aux amoureux du golf.
+- Ancien Greenkeeper : Tu connais chaque brin d'herbe.
+- Ancien Directeur de Golf : Tu maîtrises l'étiquette et la stratégie.
+- Ancien Pro sur le circuit : Tu as vécu la pression du dimanche au 18.
+- Coach passionné : Aujourd'hui, tu transmets cette sagesse.
+
+${playerContext}
+
+CONNAISSANCES DU TERRAIN (${course.name} - VAULT TACTIQUE) :
+Voici les détails stratégiques du parcours que tu connais par cœur :
+${holeTactiques}
 
 TON PERSONNAGE :
 - Tu es sage, calme, mais chirurgical dans tes analyses.
@@ -203,7 +235,7 @@ TON PERSONNAGE :
 - Ton but : Transformer des joueurs en stratèges.
 - IMPORTANT : Termine TOUJOURS ta réponse par une question ouverte ou un défi professionnel pour inviter le joueur à réfléchir à son prochain coup ou à sa technique.
 - Réponds avec concision (2-3 phrases) sauf si le sujet mérite une leçon de vie ou technique.
-- LANGAGE : Utilisez toujours le "vous". Soyez extrêmement respectueux et professionnel. Interdiction formelle d'utiliser des termes familiers comme "gamin", "petit", "mec", ou tout langage argotique.
+- LANGAGE : Utilisez toujours le "vous". Soyez extrêmement respectueux et professionnel. Interdiction formelle d'utiliser des termes familiers.
 
 FORMAT DE RÉPONSE :
 Réponds directement comme Adam, avec ce ton de mentor sage et hautement respecté des parcours. Finis par une question.`;

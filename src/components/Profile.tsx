@@ -3,14 +3,17 @@ import { logout, db, handleFirestoreError, OperationType } from '../services/fir
 import { useAuth } from '../services/AuthProvider';
 import { collection, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, User, Settings, Shield, Award, Image as ImageIcon, ChevronRight, X, Clock, Box, Zap, Snowflake, Gem, Target, Plus, Upload, Loader2, AlertCircle, BookOpen, Brain } from 'lucide-react';
+import { LogOut, User, Settings, Shield, Award, Image as ImageIcon, ChevronRight, X, Clock, Box, Zap, Snowflake, Gem, Target, Plus, Upload, Loader2, AlertCircle, BookOpen, Brain, Video } from 'lucide-react';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
 import RulesModal from './RulesModal';
 import SettingsModal from './SettingsModal';
+import SwingCoachModal from './SwingCoachModal';
 
-import { useHoleAssets } from '../hooks/useHoleAssets';
+  import { useHoleAssets } from '../hooks/useHoleAssets';
+  import { assetService } from '../services/assetService';
+  import { Trash2 } from 'lucide-react';
 
-export default function Profile({ selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, handicap, setHandicap, setTourSeen, setActiveTab, setShowMentorModal }: { selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, setActiveTab: (tab: string) => void, setShowMentorModal: (val: boolean) => void, key?: string }) {
+  export default function Profile({ selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, handicap, setHandicap, setTourSeen, setActiveTab, setShowMentorModal }: { selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, setActiveTab: (tab: string) => void, setShowMentorModal: (val: boolean) => void, key?: string }) {
   const { user } = useAuth();
   const { playPing } = useAmbientSound();
   const { assets, loading, quotaExceeded } = useHoleAssets();
@@ -76,6 +79,8 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
     reader.readAsDataURL(file);
   };
 
+  const [showSwingCoach, setShowSwingCoach] = useState(false);
+
   return (
     <div className="relative -mx-6 -mt-6 min-h-[calc(100vh-140px)] p-6 bg-black text-white font-sans overflow-y-auto">
       {/* Background with Cinematic Overlay */}
@@ -140,13 +145,13 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
 
           {loading ? (
              <div className="grid grid-cols-3 gap-2">
-                {[1,2,3].map(i => <div key={`vault-skeleton-${i}`} className="aspect-square bg-white/5 rounded-xl animate-pulse" />)}
+                {[1,2,3].map(i => <div key={`profile-vault-skeleton-${i}`} className="aspect-square bg-white/5 rounded-xl animate-pulse" />)}
              </div>
           ) : assets.length > 0 ? (
             <div className="grid grid-cols-3 gap-2">
                {assets.map((asset) => (
                  <motion.button
-                   key={asset.id}
+                   key={`profile-vault-asset-${asset.id}`}
                    whileTap={{ scale: 0.95 }}
                    onClick={() => setSelectedAsset(asset)}
                    className="relative aspect-square rounded-xl overflow-hidden border border-white/5 group"
@@ -278,6 +283,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
 
           {[
             { label: 'Adam Live (AI Mentor)', icon: Brain, color: 'text-[#c9964a]', bg: 'bg-[#c9964a]/20', action: () => setShowMentorModal(true) },
+            { label: 'Coach de Swing IA', icon: Video, color: 'text-emerald-500', bg: 'bg-emerald-500/10', action: () => setShowSwingCoach(true) },
             { label: 'Règles & Étiquette Golf', icon: Shield, color: 'text-blue-500', bg: 'bg-blue-500/10', action: () => setShowRulesModal(true) },
             { label: 'Introduction ONYX (Elite Mode)', icon: Zap, color: 'text-emerald-500', bg: 'bg-emerald-500/10', action: () => { localStorage.removeItem('tourSeen'); setTourSeen(false); } },
             { label: 'Succès & Badges', icon: Award, color: 'text-purple-600', bg: 'bg-purple-600/10', action: () => setActiveTab('challenges') },
@@ -344,6 +350,17 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
                       <Clock size={10} /> {new Date(selectedAsset.updatedAt).toLocaleDateString()}
                     </p>
                   </div>
+                  <button 
+                    onClick={async () => {
+                      if (confirm("Supprimer ce plan tactique ?")) {
+                        const success = await assetService.deleteAsset(selectedAsset.id);
+                        if (success) setSelectedAsset(null);
+                      }
+                    }}
+                    className="w-12 h-12 rounded-full bg-red-600/20 border border-red-600/30 flex items-center justify-center text-red-600 hover:bg-red-600 transition-colors"
+                  >
+                    <Trash2 size={20} />
+                  </button>
                </div>
             </div>
             
@@ -436,6 +453,7 @@ export default function Profile({ selectedCourse, arsenal, setArsenal, playerFor
 
         <RulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
         <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
+        <SwingCoachModal isOpen={showSwingCoach} onClose={() => setShowSwingCoach(false)} />
       </AnimatePresence>
     </div>
   );

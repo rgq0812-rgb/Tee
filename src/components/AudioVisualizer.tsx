@@ -12,7 +12,7 @@ export default function AudioVisualizer({ isActive, color = '#c9964a', count = 1
     <div className="flex items-center justify-center gap-1 h-12">
       {Array.from({ length: count }).map((_, i) => (
         <motion.div
-          key={`bar-${i}`}
+          key={`audio-bar-${i}`}
           animate={{
             height: isActive ? [8, Math.random() * 32 + 8, 8] : 4,
             opacity: isActive ? 1 : 0.3

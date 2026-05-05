@@ -12,7 +12,7 @@ import { useAmbientSound } from '../hooks/use-ambient-sound';
 import { COURSES, CADDIES } from '../constants';
 import TacticalHoleView from './TacticalHoleView';
 import { getHaversineDistance } from '../utils/geo';
-import { generateSpeech, getTacticalAdvice } from '../services/geminiService';
+import { generateSpeech, getTacticalAdvice, speakWithBrowser } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
 import RulesModal from './RulesModal';
 import LieScanner from './LieScanner';
@@ -143,9 +143,11 @@ export default function Dashboard({
       setAdvice(message);
       
       if (!isMuted) {
-        const audioData = await generateSpeech(message);
-        if (audioData) {
-          const source = await playRawPcm(audioData);
+        const result = await generateSpeech(message);
+        if (typeof result === 'object' && result.fallback) {
+          speakWithBrowser(result.text, () => setIsSpeaking(false));
+        } else if (typeof result === 'string') {
+          const source = await playRawPcm(result);
           if (source) {
             source.onended = () => setIsSpeaking(false);
           } else {
@@ -231,8 +233,12 @@ export default function Dashboard({
 
       // Voice confirmation of connection
       try {
-        const audioData = await generateSpeech("Système Onyx activé. Connexion établie. Bonne partie.");
-        await playRawPcm(audioData);
+        const welcomeResult = await generateSpeech("Système Onyx activé. Connexion établie. Bonne partie.");
+        if (typeof welcomeResult === 'object' && welcomeResult.fallback) {
+          speakWithBrowser(welcomeResult.text);
+        } else if (typeof welcomeResult === 'string') {
+          await playRawPcm(welcomeResult);
+        }
       } catch (e) {
         console.error("Welcome speech failed", e);
       }
@@ -246,6 +252,16 @@ export default function Dashboard({
       window.removeEventListener('touchstart', unlockAudio);
     };
   }, []);
+
+  // Auto-clear advice after 10 seconds
+  useEffect(() => {
+    if (advice) {
+      const timer = setTimeout(() => {
+        setAdvice(null);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [advice, setAdvice]);
 
   const navigateHole = (direction: 'next' | 'prev') => {
     if (playPing) playPing(direction === 'next' ? 880 : 440, 'sine', 0.05);
@@ -270,6 +286,14 @@ export default function Dashboard({
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black/95" />
       </div>
+
+      {globalQuotaExceeded && (
+        <div className="relative z-[100] bg-red-600/20 border-b border-red-600/50 p-2 text-center backdrop-blur-md">
+          <p className="text-[8px] font-black uppercase text-red-500 flex items-center justify-center gap-2">
+            <AlertCircle size={10} /> Quota Firestore Atteint - Mode Dégradé
+          </p>
+        </div>
+      )}
 
       <div className="relative z-20 p-6 pt-12 flex flex-col gap-4 border-b border-red-600 bg-black/40 backdrop-blur-md">
         <div className="flex justify-between items-center">
@@ -421,14 +445,41 @@ export default function Dashboard({
         <button onClick={() => setShowSyncMenu(true)} className="bg-black/80 p-3 rounded-full border border-white/10 text-white/40 hover:text-[#c9964a] transition-all"><Cloud size={20} /></button>
       </div>
 
-      {advice && (
-        <div className="fixed bottom-32 left-6 right-6 z-20">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-black/90 p-4 border-l-4 border-[#c9964a] shadow-2xl">
-            <div className="text-[8px] font-black text-[#c9964a] uppercase mb-1">CONSEIL D'ADAM</div>
-            <p className="text-[10px] font-mono text-white/90 italic">{advice}</p>
-          </motion.div>
-        </div>
-      )}
+      <AnimatePresence>
+        {advice && (
+          <div className="fixed bottom-32 left-6 right-6 z-[60]">
+            <motion.div 
+              key={`advice-box-${advice.substring(0, 50)}`}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: 10 }}
+              className="bg-black/95 p-5 border border-[#c9964a]/30 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#c9964a] to-transparent opacity-50" />
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 rounded-full bg-[#c9964a]/20 border border-[#c9964a]/40 flex items-center justify-center flex-shrink-0">
+                  <Brain size={16} className="text-[#c9964a]" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[8px] font-black text-[#c9964a] uppercase tracking-widest">Adam Mentor Logic</span>
+                    <button onClick={() => setAdvice(null)} className="text-white/20 hover:text-white"><X size={12} /></button>
+                  </div>
+                  <p className="text-[11px] font-medium leading-relaxed text-white/90 italic">"{advice}"</p>
+                </div>
+              </div>
+              
+              {/* Progress bar for the 10s disappearance */}
+              <motion.div 
+                initial={{ scaleX: 1 }}
+                animate={{ scaleX: 0 }}
+                transition={{ duration: 10, ease: "linear" }}
+                className="absolute bottom-0 left-0 h-0.5 bg-[#c9964a] w-full origin-left"
+              />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showSyncMenu && (

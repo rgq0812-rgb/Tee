@@ -1,12 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Send, BookOpen, Sparkles, User, Loader2, Volume2, VolumeX, Mic, Brain } from 'lucide-react';
-import { chatWithAdam, generateSpeech, startListening, isSpeechRecognitionSupported } from '../services/geminiService';
+import { chatWithAdam, generateSpeech, isSpeechRecognitionSupported, speakWithBrowser } from '../services/geminiService';
 import AudioVisualizer from './AudioVisualizer';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
 import { playRawPcm } from '../lib/audioUtils';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 
-interface Message {
+interface SafeMessage {
+  id: string;
   role: 'user' | 'model';
   parts: [{ text: string }];
 }
@@ -14,23 +16,50 @@ interface Message {
 interface AdamMentorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  selectedCourse?: any;
+  currentHole?: number;
 }
 
-export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProps) {
+export default function AdamMentorModal({ isOpen, onClose, selectedCourse, currentHole }: AdamMentorModalProps) {
   const { playPing } = useAmbientSound();
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<SafeMessage[]>([
     {
+      id: 'msg-init',
       role: 'model',
-      parts: [{ text: "Bienvenue à l'Académie Elite. Je suis Adam. J'écoute tes requêtes tactiques ou tes questions sur le jeu. Tapote tes écouteurs pour me parler." }]
+      parts: [{ text: "Bonjour. Je suis Adam. Je vous écoute." }]
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isMuted, setIsMuted] = useState(() => localStorage.getItem('onyx_voice') === 'false');
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const currentAudioSource = useRef<AudioBufferSourceNode | null>(null);
+  const micTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Use the new voice input hook
+  const { isListening, startListening, stopListening } = useVoiceInput((text) => {
+    if (micTimeoutRef.current) {
+      clearTimeout(micTimeoutRef.current);
+      micTimeoutRef.current = null;
+    }
+    if (playPing) playPing(800, 'sine', 0.05); // "Received" beep
+    handleSend(text);
+  });
+
+  const startAutoMic = useCallback(() => {
+    if (micTimeoutRef.current) clearTimeout(micTimeoutRef.current);
+    
+    // On force le mode auto-restart pour que le micro ne se coupe pas s'il y a un silence
+    startListening(true);
+    
+    // On programme la coupure dans 20 secondes pile
+    micTimeoutRef.current = setTimeout(() => {
+      stopListening();
+      micTimeoutRef.current = null;
+    }, 20000);
+  }, [startListening, stopListening]);
 
   useEffect(() => {
     if ('mediaSession' in navigator && isOpen) {
@@ -48,7 +77,17 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
   }, [isOpen]);
 
   const triggerMic = () => {
-    if (isListening || isLoading) return;
+    if (micTimeoutRef.current) {
+      clearTimeout(micTimeoutRef.current);
+      micTimeoutRef.current = null;
+    }
+
+    if (isListening) {
+      stopListening();
+      return;
+    }
+
+    if (isLoading) return;
 
     // Interrupt Adam if he is speaking
     if (isSpeaking && currentAudioSource.current) {
@@ -68,20 +107,14 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
     // Clearer tactical "listening" beep
     if (playPing) playPing(1200, 'sine', 0.05);
 
-    setIsListening(true);
-    startListening(
-      (text) => {
-        if (playPing) playPing(800, 'sine', 0.05); // "Received" beep
-        handleSend(text);
-      },
-      () => setIsListening(false),
-      (error) => {
-        setIsListening(false);
-        if (error === 'not-allowed') {
-          alert("Microphone refusé. Active l'accès micro dans tes réglages.");
-        }
-      }
-    );
+    // Démarrage en mode Continu pour le chat fluide
+    startListening(true);
+
+    // On programme aussi la coupure automatique pour le déclenchement manuel
+    micTimeoutRef.current = setTimeout(() => {
+      stopListening();
+      micTimeoutRef.current = null;
+    }, 20000);
   };
 
   useEffect(() => {
@@ -95,44 +128,80 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
     }
   }, [isOpen]);
 
+  const wasListeningRef = useRef(false);
+
   const speakText = async (text: string) => {
     if (isMuted) return;
+    
+    // Pause listening while Adam speaks
+    if (isListening) {
+      wasListeningRef.current = true;
+      stopListening();
+    }
+
     setIsSpeaking(true);
     try {
-      const base64Audio = await generateSpeech(text);
-      if (base64Audio) {
-        const source = await playRawPcm(base64Audio);
+      const result = await generateSpeech(text);
+      
+      if (typeof result === 'object' && result.fallback) {
+        speakWithBrowser(result.text, () => {
+          setIsSpeaking(false);
+          startAutoMic();
+        });
+        return;
+      }
+      
+      if (typeof result === 'string') {
+        const source = await playRawPcm(result);
         if (source) {
           currentAudioSource.current = source;
           source.onended = () => {
             setIsSpeaking(false);
             currentAudioSource.current = null;
+            startAutoMic();
           };
         } else {
           setIsSpeaking(false);
+          startAutoMic();
         }
       } else {
         setIsSpeaking(false);
+        startAutoMic();
       }
     } catch (error) {
       console.error(error);
       setIsSpeaking(false);
+      startAutoMic();
     }
   };
 
   const handleSend = async (textOverride?: string) => {
+    if (micTimeoutRef.current) {
+      clearTimeout(micTimeoutRef.current);
+      micTimeoutRef.current = null;
+    }
     const textToSend = textOverride || input;
     if (!textToSend.trim() || isLoading) return;
 
     if (playPing) playPing(600, 'sine', 0.03); // "Sent" feedback
-    const userMessage: Message = { role: 'user', parts: [{ text: textToSend }] };
+    const userMessage: SafeMessage = { 
+      id: `user-${Date.now()}-${Math.random()}`,
+      role: 'user', 
+      parts: [{ text: textToSend }] 
+    };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     try {
-      const responseText = await chatWithAdam([...messages, userMessage]);
-      const adamMessage: Message = { role: 'model', parts: [{ text: responseText || "..." }] };
+      // Cast the history for the API which expects Message[]
+      const historyForApi = [...messages, userMessage].map(m => ({ role: m.role, parts: m.parts }));
+      const responseText = await chatWithAdam(historyForApi, selectedCourse, currentHole);
+      const adamMessage: SafeMessage = { 
+        id: `adam-${Date.now()}-${Math.random()}`,
+        role: 'model', 
+        parts: [{ text: responseText || "..." }] 
+      };
       setMessages(prev => [...prev, adamMessage]);
       if (responseText) speakText(responseText);
     } catch (error) {
@@ -175,7 +244,7 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
                   <h2 className="text-2xl font-black italic text-white uppercase tracking-tighter">ADAM LIVE</h2>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.3em]">Neural Mentoring Sysem</p>
+                    <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.3em]">Neural Mentoring System</p>
                   </div>
                 </div>
               </div>
@@ -188,8 +257,8 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
             </div>
 
             <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto px-8 py-10 space-y-8 scrollbar-hide">
-              {messages.map((msg, i) => (
-                <motion.div key={`adam-msg-${i}`} initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {messages.map((msg) => (
+                <motion.div key={msg.id} initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse text-right' : ''}`}>
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${msg.role === 'user' ? 'bg-white/10 text-white/40' : 'bg-[#c9964a]/20 text-[#c9964a]'}`}>
                       {msg.role === 'user' ? <Mic size={18} /> : <Sparkles size={18} />}
@@ -206,7 +275,7 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
             <div className="relative z-10 p-8 pb-safe bg-black/40 border-t border-white/5 backdrop-blur-3xl">
               <div className="flex items-center gap-4">
                 <motion.button 
-                  whileTap={{ scale: 0.9 }} onClick={triggerMic} disabled={isListening || isSpeaking || isLoading}
+                  whileTap={{ scale: 0.9 }} onClick={triggerMic} disabled={isSpeaking || isLoading}
                   className={`w-16 h-16 rounded-full flex items-center justify-center transition-all shadow-xl ${isListening ? 'bg-red-500 animate-pulse shadow-red-500/20' : 'bg-[#c9964a] shadow-[#c9964a]/20'} text-black`}
                 >
                   <Mic size={28} />
@@ -214,7 +283,7 @@ export default function AdamMentorModal({ isOpen, onClose }: AdamMentorModalProp
                 <div className="flex-1 relative">
                   <input
                     type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder="Pose ta question..." className="w-full bg-white/5 border border-white/10 rounded-[1.5rem] px-6 py-5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#c9964a]/50 transition-all font-medium"
+                    placeholder="Posez votre question..." className="w-full bg-white/5 border border-white/10 rounded-[1.5rem] px-6 py-5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#c9964a]/50 transition-all font-medium"
                   />
                   {input.trim() && (
                     <button onClick={() => handleSend()} className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-[#c9964a] text-black rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><Send size={18} /></button>

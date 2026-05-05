@@ -44,7 +44,7 @@ export default function Layout({ children, activeTab, setActiveTab }: LayoutProp
 
       <main className="pt-16 pb-32 max-w-md mx-auto relative z-10 min-h-screen">
         <motion.div
-          key={activeTab}
+          key={`tab-container-${activeTab}`}
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}

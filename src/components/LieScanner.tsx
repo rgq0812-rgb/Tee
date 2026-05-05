@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Camera, X, RefreshCw, CheckCircle2, AlertCircle, Loader2, Sparkles, Brain, Shield, Target, Waves } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { analyzeLie, analyzeGreen, generateSpeech } from '../services/geminiService';
+import { analyzeLie, analyzeGreen, generateSpeech, speakWithBrowser } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
 
 interface LieScannerProps {
@@ -135,9 +135,11 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
       setResult(data);
       
       if (!isMuted) {
-        const audioData = await generateSpeech(textToSpeak);
-        if (audioData) {
-          await playRawPcm(audioData);
+        const resultData = await generateSpeech(textToSpeak);
+        if (typeof resultData === 'object' && resultData.fallback) {
+          speakWithBrowser(resultData.text);
+        } else if (typeof resultData === 'string') {
+          await playRawPcm(resultData);
         }
       }
     } catch (err) {
@@ -218,7 +220,7 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
       </div>
 
       {/* Mode Toggle */}
-      <div className="absolute top-28 left-0 right-0 z-50 flex justify-center px-6">
+      <div className="absolute top-28 left-0 right-0 z-50 flex justify-center px-6" key="mode-toggle-container">
         <div className="bg-zinc-900/40 backdrop-blur-3xl border border-white/10 rounded-2xl p-1.5 flex gap-1.5 w-full max-w-xs shadow-2xl">
           <button 
             onClick={() => setScanMode('LIE')}
@@ -272,7 +274,7 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
               {/* Side Data Panels */}
               <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-8">
                  {[...Array(4)].map((_, i) => (
-                   <div key={`data-${i}`} className="flex flex-col">
+                   <div key={`hud-lie-data-${i}`} className="flex flex-col">
                      <div className="w-4 h-[1px] bg-[#c9964a]/40 mb-1" />
                      <span className="text-[6px] font-mono text-[#c9964a]/40">0x00{i}F</span>
                    </div>
@@ -373,7 +375,7 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
 
                     <div className="grid grid-cols-3 gap-2">
                        {[1, 2, 3].map(i => (
-                         <div key={`stat-${i}`} className="h-1 bg-white/5 relative overflow-hidden rounded-full">
+                         <div key={`scanner-analyzing-stat-${i}`} className="h-1 bg-white/5 relative overflow-hidden rounded-full">
                            <motion.div 
                             initial={{ x: '-100%' }}
                             animate={{ x: '100%' }}
