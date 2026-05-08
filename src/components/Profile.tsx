@@ -12,8 +12,12 @@ import SwingCoachModal from './SwingCoachModal';
 
 import { useHoleAssets } from '../hooks/useHoleAssets';
 import { assetService } from '../services/assetService';
-import { Trash2 } from 'lucide-react';
+import { Trash2, CreditCard, HelpCircle } from 'lucide-react';
 import { CADDIES } from '../constants';
+import LegalPage from './LegalPage';
+import { loadStripe } from '@stripe/stripe-js';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder');
 
 export default function Profile({ 
   selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, 
@@ -167,6 +171,38 @@ export default function Profile({
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     if (playPing) playPing(1000, 'sine', 0.05);
+  };
+
+  const [showLegal, setShowLegal] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+
+  const handlePayment = async () => {
+    if (!user) {
+      alert("Veuillez vous connecter pour procéder au paiement.");
+      return;
+    }
+    setIsPaying(true);
+    try {
+      const resp = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid })
+      });
+      const data = await resp.json();
+      if (data.id) {
+        const stripe = await stripePromise;
+        if (stripe) {
+          await (stripe as any).redirectToCheckout({ sessionId: data.id });
+        }
+      } else {
+        throw new Error(data.error || "Session creation failed");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erreur de paiement: ${err.message}. Verifiez que STRIPE_SECRET_KEY est configurée sur le serveur.`);
+    } finally {
+      setIsPaying(false);
+    }
   };
 
   return (
@@ -492,6 +528,29 @@ export default function Profile({
         {/* Action Menu */}
         <div className="space-y-6 pt-4 border-t border-white/5 uppercase">
            <h3 className={`text-xs font-black tracking-[0.3em] px-2 ${isSolar ? 'text-black' : 'text-white'}`}>REGLAGES SYSTÈME</h3>
+          
+          {/* UPGRADE BUTTON */}
+          <button
+            onClick={handlePayment}
+            disabled={isPaying}
+            className={`w-full p-6 rounded-[2rem] border-2 flex items-center justify-between transition-all group overflow-hidden relative ${
+              isSolar ? 'bg-white border-black shadow-lg' : 'bg-[#c9964a]/10 border-[#c9964a]/50 shadow-[0_0_30px_rgba(201,150,74,0.1)]'
+            }`}
+          >
+            <div className={`absolute inset-0 opacity-10 bg-[url('https://images.unsplash.com/photo-1593005517304-1935c162ebbc?q=80&w=2670&auto=format&fit=crop')] bg-cover bg-center pointer-events-none`} />
+            <div className="relative flex items-center gap-5">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border-2 ${isSolar ? 'bg-black text-white border-black' : 'bg-[#c9964a] text-black border-black/20'}`}>
+                {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard size={28} />}
+              </div>
+              <div className="text-left">
+                <p className={`text-[10px] font-black uppercase tracking-[0.3em] mb-1 ${isSolar ? 'text-zinc-400' : 'text-white/40'}`}>SÉCURISÉ PAR STRIPE</p>
+                <h4 className={`text-lg font-black italic uppercase tracking-tighter leading-none ${isSolar ? 'text-black' : 'text-white'}`}>ONYX ACCESS (Full Pass)</h4>
+                <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isSolar ? 'text-zinc-600' : 'text-[#c9964a]'}`}>19.00€ — ACCÈS ILLIMITÉ</p>
+              </div>
+            </div>
+            <ArrowRight size={24} className={isSolar ? 'text-black' : 'text-[#c9964a]'} />
+          </button>
+
           {[
             { label: 'Adam Live (AI Mentor)', icon: Brain, color: isSolar ? 'text-black' : 'text-[#c9964a]', bg: isSolar ? 'bg-zinc-100' : 'bg-[#c9964a]/20', action: () => setShowMentorModal(true) },
             { label: 'Modifier Parcours / Tee', icon: Target, color: isSolar ? 'text-zinc-600' : 'text-white/40', bg: isSolar ? 'bg-zinc-100' : 'bg-white/10', action: () => {
@@ -500,8 +559,9 @@ export default function Profile({
               }
             }},
             { label: 'Coach de Swing IA', icon: Video, color: 'text-emerald-600', bg: isSolar ? 'bg-emerald-50' : 'bg-emerald-500/10', action: () => setShowSwingCoach(true) },
+            { label: 'Conditions & Confidentialité', icon: Shield, color: 'text-zinc-500', bg: isSolar ? 'bg-zinc-100' : 'bg-white/5', action: () => setShowLegal(true) },
             { label: 'Ouvrir les Paramètres', icon: Settings, color: isSolar ? 'text-black' : 'text-white', bg: isSolar ? 'bg-zinc-100' : 'bg-white/10', action: () => setShowSettingsModal(true) },
-            { label: 'Règles du Golf', icon: Shield, color: 'text-blue-600', bg: isSolar ? 'bg-blue-50' : 'bg-blue-500/10', action: () => setShowRulesModal(true) },
+            { label: 'Règles du Golf', icon: BookOpen, color: 'text-blue-600', bg: isSolar ? 'bg-blue-50' : 'bg-blue-500/10', action: () => setShowRulesModal(true) },
             { label: 'Relancer le Tutoriel', icon: Zap, color: 'text-emerald-600', bg: isSolar ? 'bg-emerald-50' : 'bg-emerald-500/10', action: () => { localStorage.removeItem('tourSeen'); setTourSeen(false); } },
           ].map((item, idx) => (
             <button
@@ -675,6 +735,12 @@ export default function Profile({
         <RulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
         <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
         <SwingCoachModal isOpen={showSwingCoach} onClose={() => setShowSwingCoach(false)} />
+        
+        <AnimatePresence>
+          {showLegal && (
+            <LegalPage onClose={() => setShowLegal(false)} displayMode={displayMode} />
+          )}
+        </AnimatePresence>
         
         {/* ARSENAL MENU OVERLAY */}
         <AnimatePresence>

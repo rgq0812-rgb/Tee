@@ -180,6 +180,14 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
     }
   }, [isHandsFree, stopListening, playPing]);
 
+  const startAutoMic = useCallback(() => {
+    if (isHandsFree || wasListeningRef.current) {
+      startListening(true, isHandsFree ? 45000 : 20000);
+      if (isHandsFree) resetHandsFreeTimer();
+      wasListeningRef.current = false;
+    }
+  }, [isHandsFree, startListening, resetHandsFreeTimer]);
+
   const toggleHandsFree = () => {
     if (isHandsFree) {
       setIsHandsFree(false);
@@ -501,39 +509,42 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                 <div className={`absolute inset-0 ${isSolar ? 'bg-white/98' : 'bg-gradient-to-b from-black/60 via-transparent to-black'}`} />
               </div>
 
-              <div className="relative z-10 p-5 pt-14 sm:pt-6 flex items-center justify-between">
+              <div className="relative z-10 p-4 pt-10 sm:pt-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center overflow-hidden shadow-2xl ${isSolar ? 'border-black bg-white' : 'border-[#c9964a] bg-black shadow-[#c9964a]/20'}`}>
+                    <img src="/logo.svg" alt="ONYX Logo" className="w-8 h-8 object-contain" />
+                  </div>
                   <div>
-                    <h2 className={`text-xl font-black italic uppercase tracking-tighter ${isSolar ? 'text-black' : 'text-white'}`}>ADAM <span className={isSolar ? 'text-[#856424]' : 'text-[#c9964a]'}>ONYX</span></h2>
-                    <div className="flex items-center gap-2 mt-1">
-                       <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]" />
-                       <span className={`text-[9px] font-mono uppercase tracking-widest font-bold ${isSolar ? 'text-zinc-500' : 'text-[#c9964a]'}`}>Système Tactique Actif</span>
+                    <h2 className={`text-lg font-black italic uppercase tracking-tighter ${isSolar ? 'text-black' : 'text-white'}`}>ADAM <span className={isSolar ? 'text-[#856424]' : 'text-[#c9964a]'}>ONYX</span></h2>
+                    <div className="flex items-center gap-2 mt-0.5">
+                       <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]" />
+                       <span className={`text-[8px] font-mono uppercase tracking-widest font-bold ${isSolar ? 'text-zinc-500' : 'text-[#c9964a]'}`}>Tactique Actif</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button 
                     onClick={toggleHandsFree}
-                    className={`p-3 rounded-xl border-2 transition-all flex items-center gap-2 ${isHandsFree ? 'bg-emerald-500 border-emerald-400 text-black shadow-lg shadow-emerald-500/20' : (isSolar ? 'bg-zinc-100 border-zinc-200 text-zinc-400' : 'bg-zinc-900 border-white/10 text-white/40')}`}
+                    className={`p-2.5 rounded-xl border-2 transition-all flex items-center gap-2 ${isHandsFree ? 'bg-emerald-500 border-emerald-400 text-black shadow-lg shadow-emerald-500/20' : (isSolar ? 'bg-zinc-100 border-zinc-200 text-zinc-400' : 'bg-zinc-900 border-white/10 text-white/40')}`}
                   >
-                    <Mic size={18} className={isHandsFree ? 'animate-pulse' : ''} />
-                    <span className="text-[9px] font-black tracking-widest hidden sm:inline">HANDS-FREE</span>
+                    <Mic size={16} className={isHandsFree ? 'animate-pulse' : ''} />
+                    <span className="text-[8px] font-black tracking-widest hidden sm:inline">HUD</span>
                   </button>
                   <button 
                     onClick={() => setIsMuted(!isMuted)} 
-                    className={`p-3 rounded-xl border-2 transition-all ${isMuted ? 'bg-red-500/20 border-red-500 text-red-500' : (isSolar ? 'bg-black text-white border-black shadow-lg shadow-black/20' : 'bg-[#c9964a]/20 border-[#c9964a] text-[#c9964a]')} backdrop-blur-md shadow-lg`}
+                    className={`p-2.5 rounded-xl border-2 transition-all ${isMuted ? 'bg-red-500/20 border-red-500 text-red-500' : (isSolar ? 'bg-black text-white border-black shadow-lg shadow-black/20' : 'bg-[#c9964a]/20 border-[#c9964a] text-[#c9964a]')} backdrop-blur-md shadow-lg`}
                   >
-                    {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                   </button>
-                  <button onClick={handleClose} className={`p-3 rounded-xl border-2 transition-colors shadow-lg ${isSolar ? 'bg-white border-zinc-950 text-black' : 'bg-zinc-800 border-white/20 text-white hover:bg-zinc-700'}`}>
-                    <X size={24} strokeWidth={3} />
+                  <button onClick={handleClose} className={`p-2.5 rounded-xl border-2 transition-colors shadow-lg ${isSolar ? 'bg-white border-zinc-950 text-black' : 'bg-zinc-800 border-white/20 text-white hover:bg-zinc-700'}`}>
+                    <X size={20} strokeWidth={3} />
                   </button>
                 </div>
               </div>
 
-              {/* Tactical Pillars - Modern Bento Style */}
-              <div className="relative z-10 grid grid-cols-3 gap-3 px-5 pb-5">
+              {/* Tactical Pillars - More Compact */}
+              <div className="relative z-10 grid grid-cols-3 gap-2 px-4 pb-4">
                  {lastScoreUpdate ? (
                    <motion.div 
                      initial={{ y: -20, opacity: 0 }} 
@@ -566,11 +577,11 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                             setCurrentSpeaker(label as any);
                             handleSend(`[PROTOCOLE] Activation de l'unité ${label}.`);
                           }}
-                          className={`flex flex-col items-center justify-center py-4 rounded-2xl border-2 transition-all duration-500 group relative overflow-hidden ${
+                          className={`flex flex-col items-center justify-center py-2.5 rounded-xl border-2 transition-all duration-500 group relative overflow-hidden ${
                             activeTacticalMode === mode.mode 
                                 ? (isSolar ? 'border-black bg-white shadow-xl translate-y-[-1px]' : `border-[#c9964a] bg-gradient-to-b ${mode.color} to-zinc-900 shadow-[0_0_20px_rgba(201,150,74,0.3)]`) 
                                 : (isSolar ? 'border-zinc-200 bg-zinc-50 grayscale-0 opacity-100 hover:border-zinc-400' : 'border-white/20 bg-zinc-900 opacity-60 grayscale')
-                          } ${currentSpeaker === mode.label && isSpeaking ? (isSolar ? 'ring-4 ring-black scale-105' : 'ring-4 ring-[#c9964a] scale-105 shadow-[0_0_30px_#c9964a]') : ''}`}
+                          } ${currentSpeaker === mode.label && isSpeaking ? (isSolar ? 'ring-2 ring-black scale-105' : 'ring-2 ring-[#c9964a] scale-105 shadow-[0_0_30px_#c9964a]') : ''}`}
                         >
                           {currentSpeaker === mode.label && isSpeaking && (
                             <motion.div 
@@ -579,11 +590,11 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                             />
                           )}
                           <div className={`absolute inset-0 ${isSolar ? 'bg-zinc-200' : 'bg-[#c9964a]/10'} translate-y-full group-hover:translate-y-0 transition-transform duration-500`} />
-                          <div className={`mb-1 transition-colors relative z-10 ${activeTacticalMode === mode.mode ? (isSolar ? 'text-black' : 'text-[#c9964a]') : (isSolar ? 'text-black/60' : 'text-white')}`}>{mode.icon}</div>
-                          <span className={`text-[12px] font-black tracking-widest relative z-10 ${activeTacticalMode === mode.mode ? (isSolar ? 'text-black' : 'text-white') : (isSolar ? 'text-black/80' : 'text-white')}`}>{mode.label}</span>
-                          <span className={`text-[7px] font-bold uppercase tracking-widest relative z-10 opacity-60 ${activeTacticalMode === mode.mode ? (isSolar ? 'text-black' : 'text-white') : (isSolar ? 'text-black/60' : 'text-white')}`}>{mode.sub}</span>
+                          <div className={`mb-0.5 transition-colors relative z-10 ${activeTacticalMode === mode.mode ? (isSolar ? 'text-black' : 'text-[#c9964a]') : (isSolar ? 'text-black/60' : 'text-white')}`}>{mode.icon}</div>
+                          <span className={`text-[10px] font-black tracking-widest relative z-10 ${activeTacticalMode === mode.mode ? (isSolar ? 'text-black' : 'text-white') : (isSolar ? 'text-black/80' : 'text-white')}`}>{mode.label}</span>
+                          <span className={`text-[6px] font-bold uppercase tracking-widest relative z-10 opacity-60 ${activeTacticalMode === mode.mode ? (isSolar ? 'text-black' : 'text-white') : (isSolar ? 'text-black/60' : 'text-white')}`}>{mode.sub}</span>
                           {activeTacticalMode === mode.mode && (
-                            <div className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full animate-pulse ${isSolar ? 'bg-black' : 'bg-[#c9964a]'}`} />
+                            <div className={`absolute top-0.5 right-0.5 w-1 h-1 rounded-full animate-pulse ${isSolar ? 'bg-black' : 'bg-[#c9964a]'}`} />
                           )}
                         </button>
                       ))}
@@ -592,10 +603,9 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
               </div>
 
               {/* TACTICAL QUICK SELECTORS - FIXED BELOW PILLARS */}
-              <div className="px-5 pb-5 grid grid-cols-2 gap-3 relative z-10">
+              <div className="px-4 pb-3 grid grid-cols-2 gap-2 relative z-10">
                 <div className="space-y-1">
-                  <span className={`text-[8px] font-black uppercase tracking-widest ml-1 ${isSolar ? 'text-zinc-500' : 'text-[#c9964a]'}`}>TACTIQUE</span>
-                  <div className={`flex rounded-xl p-1 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200 shadow-inner' : 'bg-zinc-900/80 border-white/10'}`}>
+                  <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
                     {['AGRESSIF', 'SÉCURITÉ', 'CRÉATIF'].map(t => (
                       <button 
                         key={t}
@@ -603,7 +613,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                           setSelectedTactic(t as any);
                           if (playPing) playPing(1000, 'sine', 0.05);
                         }}
-                        className={`flex-1 py-1.5 rounded-lg text-[8px] font-black transition-all ${selectedTactic === t ? (isSolar ? 'bg-black text-white shadow-md' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/20') : (isSolar ? 'text-zinc-400 hover:text-black' : 'text-white/40 hover:text-white')}`}
+                        className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${selectedTactic === t ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-400' : 'text-white/40')}`}
                       >
                         {t}
                       </button>
@@ -611,8 +621,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <span className={`text-[8px] font-black uppercase tracking-widest ml-1 ${isSolar ? 'text-zinc-500' : 'text-red-600'}`}>ÉTAT DE FORME</span>
-                  <div className={`flex rounded-xl p-1 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200 shadow-inner' : 'bg-zinc-900/80 border-white/10'}`}>
+                  <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
                     {['FROID', 'FORME', 'PUR'].map(f => (
                       <button 
                         key={f}
@@ -620,7 +629,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                           setCurrentForm(f as any);
                           if (playPing) playPing(1200, 'sine', 0.05);
                         }}
-                        className={`flex-1 py-1.5 rounded-lg text-[8px] font-black transition-all ${currentForm === f ? (isSolar ? 'bg-red-600 text-white shadow-md' : 'bg-red-600 text-white shadow-lg shadow-red-600/20') : (isSolar ? 'text-zinc-500 hover:text-black' : 'text-white/40 hover:text-white')}`}
+                        className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${currentForm === f ? (isSolar ? 'bg-red-600 text-white' : 'bg-red-600 text-white') : (isSolar ? 'text-zinc-500' : 'text-white/40')}`}
                       >
                         {f}
                       </button>
@@ -637,7 +646,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
               {messages.map((msg) => (
                 <motion.div key={msg.id} initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }} animate={{ opacity: 1, x: 0 }} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}>
                   <div className={`max-w-[85%] ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                      <div className={`inline-block p-4 rounded-2xl text-[15px] font-bold leading-relaxed shadow-2xl ${
+                      <div className={`inline-block p-3 rounded-xl text-[14px] font-bold leading-relaxed shadow-2xl ${
                         msg.role === 'user' 
                           ? (isSolar ? 'bg-white border-2 border-zinc-950 text-black shadow-zinc-200' : 'bg-zinc-800 text-white rounded-tr-none border-2 border-white/20 shadow-black/50') 
                           : (isSolar 
@@ -654,7 +663,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                                   : msg.speaker === 'LOGIC' 
                                     ? 'border-blue-500 ring-blue-500/20 shadow-blue-500/20' 
                                     : 'border-emerald-500 ring-emerald-500/20 shadow-emerald-500/20'
-                              }`)
+                                }`)
                       }`}>
                         {msg.parts.map((part: any, pIdx) => {
                           if ('text' in part) return (
@@ -698,17 +707,17 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
             </div>
 
             {/* TACTICAL INPUT CONSOLE - Robust for Sunlight */}
-            <div className={`relative z-30 p-6 pb-10 border-t-2 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] ${isSolar ? 'bg-white border-zinc-950' : 'bg-black border-red-600'}`}>
+            <div className={`relative z-30 p-4 pb-6 border-t-2 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] ${isSolar ? 'bg-white border-zinc-950' : 'bg-black border-red-600'}`}>
                {attachedImage && (
                  <motion.div 
                    initial={{ y: 20, opacity: 0 }}
                    animate={{ y: 0, opacity: 1 }}
-                   className="mb-4 relative group"
+                   className="mb-3 relative group"
                  >
-                   <div className={`relative rounded-2xl overflow-hidden border-2 shadow-2xl ${isSolar ? 'bg-zinc-100 border-zinc-950' : 'bg-zinc-900 border-[#c9964a] shadow-[0_0_30px_rgba(201,150,74,0.3)]'}`}>
+                   <div className={`relative rounded-xl overflow-hidden border-2 shadow-2xl ${isSolar ? 'bg-zinc-100 border-zinc-950' : 'bg-zinc-900 border-[#c9964a] shadow-[0_0_30px_rgba(201,150,74,0.3)]'}`}>
                      <img 
                        src={`data:${attachedImage.mimeType};base64,${attachedImage.data}`} 
-                       className={`w-full h-48 object-cover ${isSolar ? 'opacity-90' : 'opacity-60'}`} 
+                       className={`w-full h-32 object-cover ${isSolar ? 'opacity-90' : 'opacity-60'}`} 
                        alt="Capture"
                      />
                      
@@ -762,74 +771,75 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                    </div>
                  </motion.div>
                )}
-               <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <motion.button 
-                      whileTap={{ scale: 0.9 }}
-                      onClick={triggerMic}
-                      disabled={isLoading || isSpeaking}
-                      className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-2xl border-2 ${isHandsFree ? 'bg-emerald-500 border-emerald-400 text-black animate-pulse' : isListening ? 'bg-red-600 border-white text-white shadow-red-600/40' : (isSolar ? 'bg-black border-black text-white shadow-zinc-300' : 'bg-[#c9964a] border-[#c9964a]/50 text-black shadow-[#c9964a]/20')}`}
-                    >
-                      {isHandsFree ? <Brain size={28} /> : <Mic size={28} />}
-                    </motion.button>
-                    
-                    <AnimatePresence>
-                      {error && (
-                        <motion.div 
-                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.8, y: 10 }}
-                          className="absolute bottom-full left-0 mb-4 w-60 bg-red-600 text-white text-[10px] font-black p-3 rounded-xl shadow-2xl z-50 border-2 border-white/20"
-                        >
-                          <div className="flex items-center gap-2">
-                            <VolumeX size={12} />
-                            <span>{error}</span>
-                          </div>
-                          <div className="absolute top-full left-6 w-3 h-3 bg-red-600 rotate-45 -translate-y-1.5 border-r border-b border-white/10" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                  
-                  <div className={`flex-1 flex items-center gap-3 border-2 rounded-2xl px-4 group transition-all shadow-inner h-16 ${isSolar ? 'bg-white border-zinc-950 focus-within:ring-2 ring-black' : 'bg-zinc-900 border-white/20 focus-within:border-red-600/80 shadow-inner'}`}>
-                    <motion.button 
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => fileInputRef.current?.click()} 
-                      className={`relative p-2 rounded-xl transition-all ${activeTacticalMode === 'ENTRAÎNEMENT' ? (isSolar ? 'text-black' : 'text-emerald-500') : (isSolar ? 'text-zinc-300' : 'text-white')}`}
-                    >
-                       <Camera size={24} />
-                       {activeTacticalMode === 'ENTRAÎNEMENT' && (
-                         <div className={`absolute inset-0 border-2 rounded-xl animate-ping opacity-50 ${isSolar ? 'border-black' : 'border-emerald-500'}`} />
-                       )}
-                    </motion.button>
-                    <input
-                      ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange}
-                    />
-                    <input 
-                      type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.keyCode === 13) {
-                          e.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                      autoComplete="off"
-                      placeholder="COMMANDE..." 
-                      className={`flex-1 bg-transparent py-4 text-base font-bold placeholder:text-zinc-400 focus:outline-none uppercase ${isSolar ? 'text-black' : 'text-white'}`}
-                    />
-                  </div>
-
-                  <button 
-                    onClick={() => handleSend()} 
-                    disabled={!input.trim() && !attachedImage}
-                    className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-2xl border-2 ${
-                      (!input.trim() && !attachedImage) 
-                        ? 'bg-red-600/20 text-white/30 border-red-900/20 grayscale pointer-events-none' 
-                        : 'bg-red-600 text-white border-red-400 hover:scale-105 active:scale-90 shadow-red-600/40'
-                    }`}
-                  >
-                    <Send size={28} className={(!input.trim() && !attachedImage) ? '' : 'animate-pulse'} />
-                  </button>
+               
+               <div className="flex items-center gap-2">
+                 <div className="relative">
+                   <motion.button 
+                     whileTap={{ scale: 0.9 }}
+                     onClick={triggerMic}
+                     disabled={isLoading || isSpeaking}
+                     className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-2xl border-2 ${isHandsFree ? 'bg-emerald-500 border-emerald-400 text-black animate-pulse' : isListening ? 'bg-red-600 border-white text-white shadow-red-600/40' : (isSolar ? 'bg-black border-black text-white shadow-zinc-300' : 'bg-[#c9964a] border-[#c9964a]/50 text-black shadow-[#c9964a]/20')}`}
+                   >
+                     {isHandsFree ? <Brain size={22} /> : <Mic size={22} />}
+                   </motion.button>
+                   
+                   <AnimatePresence>
+                     {error && (
+                       <motion.div 
+                         initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                         animate={{ opacity: 1, scale: 1, y: 0 }}
+                         exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                         className="absolute bottom-full left-0 mb-4 w-60 bg-red-600 text-white text-[10px] font-black p-3 rounded-xl shadow-2xl z-50 border-2 border-white/20"
+                       >
+                         <div className="flex items-center gap-2">
+                           <VolumeX size={12} />
+                           <span>{error}</span>
+                         </div>
+                         <div className="absolute top-full left-6 w-3 h-3 bg-red-600 rotate-45 -translate-y-1.5 border-r border-b border-white/10" />
+                       </motion.div>
+                     )}
+                   </AnimatePresence>
+                 </div>
+                 
+                 <div className={`flex-1 flex items-center gap-2 border-2 rounded-xl px-3 group transition-all shadow-inner h-12 ${isSolar ? 'bg-white border-zinc-950 focus-within:ring-2 ring-black' : 'bg-zinc-900 border-white/10 focus-within:border-red-600/80 shadow-inner'}`}>
+                   <motion.button 
+                     whileHover={{ scale: 1.1 }}
+                     whileTap={{ scale: 0.9 }}
+                     onClick={() => fileInputRef.current?.click()} 
+                     className={`relative p-1.5 rounded-lg transition-all ${activeTacticalMode === 'ENTRAÎNEMENT' ? (isSolar ? 'text-black' : 'text-emerald-500') : (isSolar ? 'text-zinc-300' : 'text-white')}`}
+                   >
+                     <Camera size={20} />
+                     {activeTacticalMode === 'ENTRAÎNEMENT' && (
+                       <div className={`absolute inset-0 border-2 rounded-xl animate-ping opacity-50 ${isSolar ? 'border-black' : 'border-emerald-500'}`} />
+                     )}
+                   </motion.button>
+                   <input
+                     ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange}
+                   />
+                   <input 
+                     type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => {
+                       if (e.key === 'Enter' || e.keyCode === 13) {
+                         e.preventDefault();
+                         handleSend();
+                       }
+                     }}
+                     autoComplete="off"
+                     placeholder="COMMANDE..." 
+                     className={`flex-1 bg-transparent py-2 text-sm font-bold placeholder:text-zinc-400 focus:outline-none uppercase ${isSolar ? 'text-black' : 'text-white'}`}
+                   />
+                   
+                   <button 
+                     onClick={() => handleSend()} 
+                     disabled={!input.trim() && !attachedImage}
+                     className={`p-2 rounded-lg transition-all flex items-center justify-center ${
+                       (!input.trim() && !attachedImage) 
+                         ? 'opacity-20 grayscale' 
+                         : (isSolar ? 'bg-black text-white shadow-lg' : 'bg-red-600 text-white shadow-lg shadow-red-600/20')
+                     }`}
+                   >
+                     <Send size={18} strokeWidth={3} className={(!input.trim() && !attachedImage) ? '' : 'animate-pulse'} />
+                   </button>
+                 </div>
                </div>
 
                {/* BOTTOM VALIDATION BAR - MOVED HERE BELOW COMMANDS AS REQUESTED */}
@@ -837,14 +847,14 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                  <motion.div 
                    initial={{ y: 20, opacity: 0 }}
                    animate={{ y: 0, opacity: 1 }}
-                   className="mt-6"
+                   className="mt-4"
                  >
                    <button 
-                     onClick={() => handleSend(`[COMMANDE TACTIQUE] ${selectedTactic} / ${currentForm}.`)}
-                     className={`w-full py-5 rounded-2xl font-black uppercase text-[12px] tracking-[0.2em] flex items-center justify-center gap-4 transition-all active:scale-95 border-2 bg-red-600 text-white border-red-500 shadow-xl shadow-red-600/40 hover:bg-red-700 hover:scale-[1.01]`}
+                     onClick={() => (input.trim() || attachedImage) ? handleSend() : handleSend(`[COMMANDE TACTIQUE] ${selectedTactic} / ${currentForm}.`)}
+                     className={`w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-95 border-2 bg-red-600 text-white border-red-500 shadow-xl shadow-red-600/40 hover:bg-red-700 hover:scale-[1.01]`}
                    >
-                     <Check size={24} strokeWidth={4} />
-                     <span>VALIDER LA TACTIQUE</span>
+                     <Check size={20} strokeWidth={4} />
+                     <span>{(input.trim() || attachedImage) ? "VALIDER LA COMMANDE" : "VALIDER LA TACTIQUE"}</span>
                    </button>
                  </motion.div>
                )}

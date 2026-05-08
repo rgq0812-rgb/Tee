@@ -142,7 +142,11 @@ function AppContent() {
         timestamp: Date.now()
       }
     }));
-  }, [selectedCourse]);
+    // Advance to next hole if current hole was recorded
+    if (holeNum === currentHole && holeNum < 18) {
+      setCurrentHole(holeNum + 1);
+    }
+  }, [selectedCourse, currentHole]);
 
   // --- Persistence ---
   useEffect(() => {

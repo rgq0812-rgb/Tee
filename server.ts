@@ -6,11 +6,54 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+import Stripe from 'stripe';
+
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripeClient = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  // Stripe Checkout Session
+  app.post('/api/create-checkout-session', async (req, res) => {
+    if (!stripeClient) {
+      return res.status(503).json({ error: 'Stripe service unavailable - check environment variables' });
+    }
+
+    try {
+      const host = req.headers.host;
+      const protocol = req.headers['x-forwarded-proto'] || 'http';
+      const origin = `${protocol}://${host}`;
+
+      const session = await stripeClient.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'eur',
+              product_data: {
+                name: 'ONYX ACCESS (Full Pass)',
+                description: 'Accès illimité au moteur tactique ONYX et Adam Counselor.',
+              },
+              unit_amount: 1900, // 19.00€
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        success_url: `${origin}/profile?payment_status=success`,
+        cancel_url: `${origin}/profile?payment_status=cancel`,
+      });
+
+      res.json({ id: session.id });
+    } catch (err: any) {
+      console.error('[STRIPE ERROR]', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // Spotify Auth URL Construction
   app.get('/api/auth/spotify/url', (req, res) => {

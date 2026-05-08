@@ -1,8 +1,18 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" fill="black"/>
-  <path d="M360 150C335 125 300 110 260 110C180 110 115 175 115 256C115 337 180 402 260 402C300 402 335 387 360 362" stroke="#c9964a" stroke-width="40" stroke-linecap="round"/>
-  <circle cx="260" cy="256" r="180" stroke="#c9964a" stroke-width="2" stroke-dasharray="10 10" opacity="0.3"/>
-  <line x1="260" y1="110" x2="260" y2="70" stroke="#c9964a" stroke-width="2"/>
-  <line x1="260" y1="402" x2="260" y2="442" stroke="#c9964a" stroke-width="2"/>
-  <line x1="115" y1="256" x2="75" y2="256" stroke="#c9964a" stroke-width="2"/>
+  <rect width="512" height="512" rx="128" fill="black"/>
+  <!-- Pentagonal/Hexagonal Technical Base -->
+  <path d="M256 80L410 160V352L256 432L102 352V160L256 80Z" stroke="#c9964a" stroke-width="24" stroke-linejoin="round"/>
+  <!-- Stylized X / Radar lines -->
+  <path d="M180 180L332 332" stroke="#c9964a" stroke-width="12" stroke-linecap="round"/>
+  <path d="M332 180L180 332" stroke="#c9964a" stroke-width="12" stroke-linecap="round"/>
+  <!-- Inner Core (The "Eye" of Onyx) -->
+  <circle cx="256" cy="256" r="40" fill="black" stroke="#c9964a" stroke-width="8"/>
+  <circle cx="256" cy="256" r="10" fill="#c9964a">
+    <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite" />
+  </circle>
+  <!-- Technical Accents -->
+  <path d="M256 120V140" stroke="#c9964a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M256 372V392" stroke="#c9964a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M140 180H160" stroke="#c9964a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M352 180H372" stroke="#c9964a" stroke-width="8" stroke-linecap="round"/>
 </svg>

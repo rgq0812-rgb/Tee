@@ -1,5 +1,5 @@
-import { collection, onSnapshot, query, FirestoreError, deleteDoc, doc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './firebase';
+import { collection, onSnapshot, query, FirestoreError, deleteDoc, doc, where } from 'firebase/firestore';
+import { db, auth, handleFirestoreError, OperationType } from './firebase';
 
 export interface HoleAsset {
   id: string;
@@ -35,7 +35,17 @@ class AssetService {
     }
 
     if (!this.unsubscribe && !this.isInitializing && !this.quotaExceeded) {
-      this.init();
+       // Wait for auth before init
+       if (auth.currentUser) {
+         this.init();
+       } else {
+         const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+           if (user && !this.unsubscribe && !this.isInitializing) {
+             this.init();
+             unsubscribeAuth();
+           }
+         });
+       }
     }
 
     return () => {
@@ -45,8 +55,14 @@ class AssetService {
   }
 
   private init() {
+    if (!auth.currentUser) return;
     this.isInitializing = true;
-    const q = query(collection(db, 'hole_assets'));
+    
+    // CRITICAL: Filter by userId to save quota and respect privacy
+    const q = query(
+      collection(db, 'hole_assets'), 
+      where('userId', '==', auth.currentUser.uid)
+    );
     
     this.unsubscribe = onSnapshot(q, (snapshot) => {
       this.assets = snapshot.docs.map(doc => ({

@@ -1,10 +1,51 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Users, Award, Share2, Star, ChevronRight } from 'lucide-react';
+import { Trophy, Users, Award, Share2, Star, ChevronRight, Download } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 export default function InnerCircle({ displayMode }: { key?: string; displayMode?: 'tactical' | 'solar' }) {
   const isSolar = displayMode === 'solar';
   const [subTab, setSubTab] = useState<'lobby' | 'leaderboard' | 'share'>('lobby');
+  const certRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!certRef.current) return;
+    setIsExporting(true);
+    try {
+      // Small delay to ensure everything is rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const dataUrl = await toPng(certRef.current, { 
+        quality: 1, 
+        pixelRatio: 2,
+        backgroundColor: isSolar ? '#ffffff' : '#000000'
+      });
+      
+      const link = document.createElement('a');
+      link.download = `ONYX_Performance_${new Date().toISOString().split('T')[0]}.png`;
+      link.href = dataUrl;
+      link.click();
+      
+      if (navigator.share) {
+        try {
+          const blob = await (await fetch(dataUrl)).blob();
+          const file = new File([blob], 'ONYX_Rank.png', { type: 'image/png' });
+          await navigator.share({
+            files: [file],
+            title: 'ONYX Performance Rank',
+            text: 'Check out my Elite Gold performance on THE CHOSE!'
+          });
+        } catch (shareErr) {
+          console.log('Share canceled or not available');
+        }
+      }
+    } catch (err) {
+      console.error('Export failed', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const exploits = [
     { id: 1, user: "Jean-Michel", type: "BIRDIE", hole: 4, course: "Saint-Nom-la-Bretèche", score: -1, time: "Il y a 12m" },
@@ -124,12 +165,15 @@ export default function InnerCircle({ displayMode }: { key?: string; displayMode
             animate={{ opacity: 1, scale: 1 }}
             className="space-y-6"
           >
-            <div className={`aspect-[4/3] w-full p-8 relative overflow-hidden flex flex-col justify-between border shadow-2xl rounded-3xl ${isSolar ? 'bg-white border-zinc-200 shadow-zinc-200' : 'air-panel border-brg-gold/20'}`}>
+            <div 
+              ref={certRef}
+              className={`aspect-[4/3] w-full p-8 relative overflow-hidden flex flex-col justify-between border shadow-2xl rounded-3xl ${isSolar ? 'bg-white border-zinc-200 shadow-zinc-200' : 'air-panel border-brg-gold/20'}`}
+            >
                <div className={`absolute inset-0 pointer-events-none ${isSolar ? 'bg-gradient-to-br from-black/5 to-transparent' : 'bg-gradient-to-br from-brg-primary/10 to-transparent'}`} />
-               <div className="z-10 flex justify-between items-start">
-                  <div>
-                    <h1 className="font-cinzel text-2xl font-bold tracking-tighter">THE<span className={isSolar ? 'text-black' : 'text-brg-primary'}>CHOSE</span></h1>
-                    <p className={`text-[8px] font-mono tracking-widest uppercase ${isSolar ? 'text-zinc-400 font-bold' : 'text-gray-500'}`}>Round Certificate — 2026</p>
+               <div className="z-10 flex justify-between items-start text-left">
+                  <div className="text-left">
+                    <h1 className="font-cinzel text-2xl font-bold tracking-tighter text-left">THE<span className={isSolar ? 'text-black' : 'text-brg-primary'}>CHOSE</span></h1>
+                    <p className={`text-[8px] font-mono tracking-widest uppercase text-left ${isSolar ? 'text-zinc-400 font-bold' : 'text-gray-500'}`}>Round Certificate — 2026</p>
                   </div>
                   <div className="text-right">
                     <p className={`text-[8px] font-mono uppercase ${isSolar ? 'text-zinc-400 font-bold' : 'text-gray-500'}`}>Date</p>
@@ -154,9 +198,17 @@ export default function InnerCircle({ displayMode }: { key?: string; displayMode
                </div>
             </div>
 
-            <button className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-transform uppercase tracking-widest text-xs ${isSolar ? 'bg-black text-white' : 'bg-brg-gold text-black shadow-yellow-900/20'}`}>
-               <Share2 size={18} />
-               Exporter Magazine 8K (PNG)
+            <button 
+              onClick={handleExport}
+              disabled={isExporting}
+              className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-transform uppercase tracking-widest text-xs disabled:opacity-50 ${isSolar ? 'bg-black text-white' : 'bg-brg-gold text-black shadow-yellow-900/20'}`}
+            >
+               {isExporting ? (
+                 <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+               ) : (
+                 <Download size={18} />
+               )}
+               {isExporting ? 'GÉNÉRATION...' : 'Exporter Magazine 8K (PNG)'}
             </button>
           </motion.div>
         )}

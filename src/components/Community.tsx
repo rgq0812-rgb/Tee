@@ -4,9 +4,11 @@ import {
   Users, Trophy, Share2, Heart, MessageSquare, Send, 
   Award, Zap, Star, Layout as LayoutIcon, Globe,
   UserPlus, Flame, Target, Shield, ChevronRight, Search,
-  Instagram, Twitter, Facebook, Link as LinkIcon, Info, Brain, X, Plus, Image as ImageIcon, Camera, Loader2, Sparkles
+  Instagram, Twitter, Facebook, Link as LinkIcon, Info, Brain, X, Plus, Image as ImageIcon, Camera, Loader2, Sparkles, Download
 } from 'lucide-react';
 import { useAuth } from '../services/AuthProvider';
+import { toPng } from 'html-to-image';
+import { useRef } from 'react';
 
 interface Challenge {
   id: string;
@@ -43,6 +45,36 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
   const [selectedPostForShare, setSelectedPostForShare] = useState<Post | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleExportHQ = async () => {
+    if (!cardRef.current) return;
+    setIsExporting(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const dataUrl = await toPng(cardRef.current, { quality: 1, pixelRatio: 2, backgroundColor: '#000000' });
+      
+      const link = document.createElement('a');
+      link.download = `ONYX_Network_${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+
+      if (navigator.share) {
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], 'ONYX_Network.png', { type: 'image/png' });
+        await navigator.share({
+          files: [file],
+          title: 'ONYX Network Post',
+          text: selectedPostForShare?.content || 'Check this out on THE CHOSE!'
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const [posts, setPosts] = useState<Post[]>([
     { 
@@ -112,9 +144,9 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
   ];
 
   const shareCapabilities = [
-    { name: 'Instagram', icon: Instagram, color: 'hover:text-pink-500', action: () => alert('Exportation Instagram 8K en cours...') },
-    { name: 'Twitter', icon: Twitter, color: 'hover:text-sky-400', action: () => alert('Publication Twitter sécurisée...') },
-    { name: 'Facebook', icon: Facebook, color: 'hover:text-blue-600', action: () => alert('Transfert Facebook Profile...') },
+    { name: 'Instagram', icon: Instagram, color: 'hover:text-pink-500', action: handleExportHQ },
+    { name: 'Twitter', icon: Twitter, color: 'hover:text-sky-400', action: handleExportHQ },
+    { name: 'Facebook', icon: Facebook, color: 'hover:text-blue-600', action: handleExportHQ },
     { name: 'Copy Link', icon: LinkIcon, color: 'hover:text-emerald-500', action: () => {
       navigator.clipboard.writeText(window.location.href);
       alert('Lien copié dans le presse-papier !');
@@ -431,6 +463,7 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
 
             <motion.div 
               id="the-chose-8k-card"
+              ref={cardRef}
               initial={{ scale: 0.8, y: 50 }}
               animate={{ scale: 1, y: 0 }}
               className="w-full max-w-sm aspect-[9/16] bg-black border-[3px] border-[#c9964a]/40 rounded-[3.5rem] relative overflow-hidden shadow-[0_0_80px_rgba(201,150,74,0.15)] flex flex-col"
@@ -502,13 +535,12 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
                  ))}
                </div>
                <button 
-                 onClick={() => {
-                   alert("Fichier 8K Ultra-Prêt pour exportation. (Simulation d'enregistrement HQ)");
-                   setShowShare8K(false);
-                 }}
-                 className="w-full h-16 rounded-full bg-white text-black font-black text-xs uppercase tracking-[0.4em] shadow-[0_0_30px_rgba(255,255,255,0.1)] active:scale-[0.98] transition-all"
+                 onClick={handleExportHQ}
+                 disabled={isExporting}
+                 className="w-full h-16 rounded-full bg-white text-black font-black text-xs uppercase tracking-[0.4em] shadow-[0_0_30px_rgba(255,255,255,0.1)] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
                >
-                 TÉLÉCHARGER EXPORT HQ
+                 {isExporting ? <Loader2 className="animate-spin" /> : <Download size={18} />}
+                 {isExporting ? 'EXPORTATION...' : 'TÉLÉCHARGER EXPORT HQ'}
                </button>
             </div>
           </motion.div>
