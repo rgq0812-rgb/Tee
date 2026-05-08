@@ -1,12 +1,25 @@
+let sharedAudioContext: AudioContext | null = null;
+
 /**
  * Plays raw PCM audio data returned by Gemini TTS (24000Hz)
  */
 export async function playRawPcm(base64Data: string, sampleRate = 24000) {
   try {
-    const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
-    const audioContext = new AudioContextClass({
-      sampleRate
-    });
+    if (!sharedAudioContext) {
+      const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+      sharedAudioContext = new AudioContextClass({
+        sampleRate
+      });
+    } else if (sharedAudioContext.sampleRate !== sampleRate) {
+      // In case sample rate changes (rare for TTS)
+      await sharedAudioContext.close();
+      const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+      sharedAudioContext = new AudioContextClass({
+        sampleRate
+      });
+    }
+
+    const audioContext = sharedAudioContext;
 
     if (audioContext.state === 'suspended') {
       await audioContext.resume();

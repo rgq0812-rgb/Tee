@@ -10,13 +10,16 @@ import Challenges from './lib/Challenges';
 import ScorecardPage from './components/ScorecardPage';
 import InnerCircle from './components/InnerCircle';
 import Profile from './components/Profile';
+import Community from './components/Community';
+import MissionControl from './components/MissionControl';
+import TacticalMap from './components/TacticalMap';
 import WelcomeTour from './utils/WelcomeTour';
 import AdamMentorModal from './components/AdamMentorModal';
 import LieScanner from './components/LieScanner';
 import { BookOpen, Sparkles } from 'lucide-react';
 
 import { AppPath, HoleScore, Club } from './types';
-import { INITIAL_CLUBS, COURSES, CHALLENGES } from './constants';
+import { INITIAL_CLUBS, COURSES, CHALLENGES, CADDIES } from './constants';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -30,6 +33,12 @@ function AppContent() {
   const [splashSeen, setSplashSeen] = useState(() => sessionStorage.getItem('splashSeen') === 'true');
   const [tourSeen, setTourSeen] = useState(() => localStorage.getItem('tourSeen') === 'true');
   const [appPath, setAppPath] = useState<AppPath | null>(() => localStorage.getItem('app_path') as AppPath);
+  const [missionStarted, setMissionStarted] = useState(() => {
+    // If there's already a scorecard, consider mission started
+    const saved = localStorage.getItem('the-chose-scorecard');
+    if (saved && saved !== '{}') return true;
+    return localStorage.getItem('onyx_mission_active') === 'true';
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
   
   const [scorecard, setScorecard] = useState<Record<number, HoleScore>>(() => {
@@ -65,6 +74,14 @@ function AppContent() {
     return (localStorage.getItem('the-chose-player-form') as any) || 'forme';
   });
 
+  const [displayMode, setDisplayMode] = useState<'tactical' | 'solar'>(() => {
+    return (localStorage.getItem('the-chose-display-mode') as any) || 'tactical';
+  });
+
+  const [selectedTee, setSelectedTee] = useState<'black' | 'white' | 'yellow' | 'blue' | 'red'>(() => {
+    return (localStorage.getItem('the-chose-selected-tee') as any) || 'white';
+  });
+
   const [eliteXP, setEliteXP] = useState(() => {
     try {
       return Number(localStorage.getItem('the-chose-elite-xp')) || 0;
@@ -74,7 +91,22 @@ function AppContent() {
   });
 
   const [handicap, setHandicap] = useState<number>(() => {
-    return Number(localStorage.getItem('the-chose-handicap')) || 18;
+    const saved = localStorage.getItem('the-chose-handicap');
+    if (saved) {
+      const val = parseFloat(saved);
+      return isNaN(val) ? 18 : val;
+    }
+    return 18;
+  });
+
+  const [activeCaddie, setActiveCaddie] = useState(() => {
+    const saved = localStorage.getItem('the-chose-active-caddie');
+    const caddiesMap = CADDIES as any;
+    return caddiesMap[saved || 'strat'] || CADDIES.strat;
+  });
+
+  const [selectedMode, setSelectedMode] = useState<any>(() => {
+    return localStorage.getItem('the-chose-game-mode') || 'STROKE';
   });
 
   const [advice, setAdvice] = useState<string | null>(null);
@@ -93,11 +125,29 @@ function AppContent() {
   }, [advice]);
 
   const [showMentorModal, setShowMentorModal] = useState(false);
+  const [mentorInitialMessage, setMentorInitialMessage] = useState<string | undefined>(undefined);
   const [showLieScanner, setShowLieScanner] = useState(false);
+
+  const updateScore = useCallback((holeNum: number, strokes: number, putts: number) => {
+    const holeData = selectedCourse.holes.find(h => h.number === holeNum);
+    setScorecard(prev => ({
+      ...prev,
+      [holeNum]: {
+        hole: holeNum,
+        par: holeData?.par || 4,
+        strokes,
+        putts,
+        fairwayHit: prev[holeNum]?.fairwayHit ?? null,
+        gir: prev[holeNum]?.gir ?? null,
+        timestamp: Date.now()
+      }
+    }));
+  }, [selectedCourse]);
 
   // --- Persistence ---
   useEffect(() => {
     if (appPath) localStorage.setItem('app_path', appPath);
+    localStorage.setItem('onyx_mission_active', String(missionStarted));
     localStorage.setItem('the-chose-scorecard', JSON.stringify(scorecard));
     localStorage.setItem('the-chose-current-hole', String(currentHole));
     localStorage.setItem('the-chose-selected-course', selectedCourse.id);
@@ -105,7 +155,11 @@ function AppContent() {
     localStorage.setItem('the-chose-arsenal', JSON.stringify(arsenal));
     localStorage.setItem('the-chose-player-form', playerForm);
     localStorage.setItem('the-chose-handicap', handicap.toString());
-  }, [appPath, scorecard, currentHole, selectedCourse, eliteXP, arsenal, playerForm, handicap]);
+    localStorage.setItem('the-chose-active-caddie', activeCaddie.id);
+    localStorage.setItem('the-chose-game-mode', selectedMode);
+    localStorage.setItem('the-chose-display-mode', displayMode);
+    localStorage.setItem('the-chose-selected-tee', selectedTee);
+  }, [appPath, scorecard, currentHole, selectedCourse, eliteXP, arsenal, playerForm, handicap, activeCaddie, selectedMode, displayMode, selectedTee]);
 
   if (loading) {
     return (
@@ -137,9 +191,36 @@ function AppContent() {
     return <PathSelector onSelect={(path) => setAppPath(path)} />;
   }
 
+  if (appPath === 'player' && !missionStarted) {
+    return (
+      <MissionControl 
+        onStart={() => setMissionStarted(true)}
+        selectedCourse={selectedCourse}
+        setSelectedCourse={setSelectedCourse}
+        handicap={handicap}
+        setHandicap={setHandicap}
+        playerForm={playerForm}
+        setPlayerForm={setPlayerForm}
+        activeCaddie={activeCaddie}
+        setActiveCaddie={setActiveCaddie}
+        arsenal={arsenal}
+        selectedMode={selectedMode}
+        setSelectedMode={setSelectedMode}
+        selectedTee={selectedTee}
+        setSelectedTee={setSelectedTee}
+        displayMode={displayMode}
+      />
+    );
+  }
+
   return (
     <>
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+      <Layout 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab}
+        displayMode={displayMode}
+        setDisplayMode={setDisplayMode}
+      >
       <AnimatePresence mode="wait">
         {activeTab === 'dashboard' && (
           <Dashboard 
@@ -156,25 +237,63 @@ function AppContent() {
             setEliteXP={setEliteXP}
             arsenal={arsenal}
             setArsenal={setArsenal}
+            selectedMode={selectedMode}
+            setSelectedMode={setSelectedMode}
             playerForm={playerForm}
             setPlayerForm={setPlayerForm}
             handicap={handicap}
             setActiveTab={setActiveTab}
             setShowLieScanner={setShowLieScanner}
+            activeCaddie={activeCaddie}
+            setActiveCaddie={setActiveCaddie}
+            setMissionStarted={setMissionStarted}
+            displayMode={displayMode}
+            selectedTee={selectedTee}
           />
         )}
-        {activeTab === 'challenges' && <Challenges key="challenges" />}
+        {activeTab === 'community' && (
+          <Community 
+            key="community"
+            displayMode={displayMode}
+          />
+        )}
+        {activeTab === 'tactical' && (
+          <TacticalMap 
+            key="tactical"
+            selectedCourse={selectedCourse}
+            currentHole={currentHole}
+            activeCaddie={activeCaddie}
+            displayMode={displayMode}
+            selectedTee={selectedTee}
+          />
+        )}
         {activeTab === 'scorecard' && (
           <ScorecardPage 
             key="scorecard" 
+            user={user}
             scorecard={scorecard} 
             setScorecard={setScorecard}
             selectedCourse={selectedCourse}
+            setSelectedCourse={setSelectedCourse}
             currentHole={currentHole}
             setCurrentHole={setCurrentHole}
+            activeCaddie={activeCaddie}
+            setActiveCaddie={setActiveCaddie}
+            selectedMode={selectedMode}
+            setSelectedMode={setSelectedMode}
+            handicap={handicap}
+            setHandicap={setHandicap}
+            arsenal={arsenal}
+            setArsenal={setArsenal}
+            setShowMentorModal={setShowMentorModal}
+            setMentorInitialMessage={setMentorInitialMessage}
+            setMissionStarted={setMissionStarted}
+            displayMode={displayMode}
+            setActiveTab={setActiveTab}
+            selectedTee={selectedTee}
           />
         )}
-        {activeTab === 'circle' && <InnerCircle key="circle" />}
+        {activeTab === 'circle' && <InnerCircle key="circle" displayMode={displayMode} />}
         {activeTab === 'profile' && (
           <Profile 
             key="profile" 
@@ -188,6 +307,10 @@ function AppContent() {
             setTourSeen={setTourSeen}
             setActiveTab={setActiveTab}
             setShowMentorModal={setShowMentorModal}
+            setMentorInitialMessage={setMentorInitialMessage}
+            setMissionStarted={setMissionStarted}
+            setAppPath={setAppPath}
+            displayMode={displayMode}
           />
         )}
       </AnimatePresence>
@@ -205,16 +328,27 @@ function AppContent() {
         <div className="absolute inset-0 bg-[#c9964a]/10 rounded-full blur-xl group-hover:bg-[#c9964a]/20 transition-all opacity-0 group-hover:opacity-100" />
         <Sparkles size={20} className="relative z-10 animate-pulse" />
         <span className="absolute right-full mr-3 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-[#c9964a] opacity-0 group-hover:opacity-100 transition-all pointer-events-none whitespace-nowrap">
-          Adam Mentoring
+          Mentorat ONYX
         </span>
       </motion.button>
     </Layout>
-    <AdamMentorModal 
-      isOpen={showMentorModal} 
-      onClose={() => setShowMentorModal(false)} 
-      selectedCourse={selectedCourse}
-      currentHole={currentHole}
-    />
+      <AdamMentorModal 
+        isOpen={showMentorModal} 
+        onClose={() => {
+          setShowMentorModal(false);
+          setMentorInitialMessage(undefined);
+        }} 
+        selectedCourse={selectedCourse}
+        currentHole={currentHole}
+        scorecard={scorecard}
+        arsenal={arsenal}
+        initialMessage={mentorInitialMessage}
+        handicap={handicap}
+        playerForm={playerForm}
+        onUpdateScore={updateScore}
+        displayMode={displayMode}
+        selectedTee={selectedTee}
+      />
     <LieScanner 
       isOpen={showLieScanner} 
       onClose={() => setShowLieScanner(false)} 

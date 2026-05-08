@@ -1,46 +1,56 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronRight, ChevronLeft, Shield, Zap, Target, Award, Volume2, VolumeX } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Shield, Zap, Target, Award, Volume2, VolumeX, Brain, Share2 } from 'lucide-react';
 
 const SLIDES = [
   {
-    id: 'welcome',
-    title: "BIENVENUE",
-    subtitle: "VOTRE CADDIE IA",
-    description: "ONYX scanne le terrain par satellite pour vous donner la distance exacte au drapeau, au mètre près.",
-    accent: "#D4AF37",
-    icon: <Award className="w-8 h-8 text-[#D4AF37]" />,
+    id: 'hud',
+    title: "VOTRE HUD TACTIQUE",
+    subtitle: "VISER & ANALYSER",
+    description: "Appuyez sur la carte satellite pour viser. ONYX calcule instantanément la distance exacte au drapeau.",
+    accent: "#c9964a",
+    icon: <Target className="w-8 h-8 text-[#c9964a]" />,
     gradient: "from-black via-[#0a0a0a] to-[#1a1a0a]",
     bg: "https://images.unsplash.com/photo-1592919016322-309a473e6d6a?q=80&w=2670&auto=format&fit=crop"
   },
   {
-    id: 'club',
-    title: "CONSEILS",
-    subtitle: "LE BON CLUB",
-    description: "L'IA calcule l'effet du vent et votre état de forme pour vous dire : 'Prends ton Fer 7, pas le 8'.",
-    accent: "#10B981",
-    icon: <Target className="w-8 h-8 text-emerald-500" />,
+    id: 'adam',
+    title: "CONSEILS D'ELITE",
+    subtitle: "ADAM : CADDIE IA",
+    description: "Appuyez sur le cerveau d'Adam. Il analyse votre position, le vent et votre forme pour vous suggérer le club parfait.",
+    accent: "#c9964a",
+    icon: <Brain className="w-8 h-8 text-[#c9964a]" />,
     gradient: "from-black via-[#0a1a14] to-black",
     bg: "https://images.unsplash.com/photo-1549419163-f2575797072a?q=80&w=2626&auto=format&fit=crop"
   },
   {
-    id: 'strategy',
-    title: "STRATÉGIE",
-    subtitle: "BILAN TACTIQUE",
-    description: "Après vos 18 trous, Adam analyse vos coups manqués et vous donne 3 points clés pour progresser demain.",
-    accent: "#3B82F6",
-    icon: <Shield className="w-8 h-8 text-blue-500" />,
+    id: 'vault',
+    title: "SÉCURITÉ",
+    subtitle: "VOTRE VAULT PRIVÉ",
+    description: "Capturez vos plans de jeu et photos tactiques. Tout est stocké dans votre profil pour vos prochaines missions.",
+    accent: "#c9964a",
+    icon: <Shield className="w-8 h-8 text-[#c9964a]" />,
     gradient: "from-black via-[#0a141a] to-black",
     bg: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?q=80&w=2670&auto=format&fit=crop"
   },
   {
-    id: 'start',
-    title: "À VOUS",
-    subtitle: "DESTINATION GREEN",
-    description: "Ouvrez la carte, visez le milieu du green et laissez ONYX s'occuper du reste. Bon jeu !",
-    accent: "#8B5CF6",
-    icon: <Zap className="w-8 h-8 text-purple-500" />,
+    id: 'share',
+    title: "NOTORIÉTÉ",
+    subtitle: "PARTAGE 8K STYLÉ",
+    description: "Publiez vos exploits sur le Réseau. ONYX génère des cartes d'identité tactique en haute fidélité pour vos réseaux.",
+    accent: "#c9964a",
+    icon: <Share2 className="w-8 h-8 text-[#c9964a]" />,
     gradient: "from-black via-[#140a1a] to-black",
+    bg: "https://images.unsplash.com/photo-1593111774240-d529f12cf4bb?q=80&w=2000&auto=format&fit=crop"
+  },
+  {
+    id: 'ready',
+    title: "OPÉRATIONNEL",
+    subtitle: "PRÊT POUR L'EXFIL",
+    description: "Le système est calibré. Ouvrez le Centre de Commande et démarrez votre partie. Bonne chance, Operative.",
+    accent: "#c9964a",
+    icon: <Zap className="w-8 h-8 text-[#c9964a]" />,
+    gradient: "from-black via-[#0a0a0a] to-black",
     bg: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?q=80&w=2670&auto=format&fit=crop"
   }
 ];
@@ -169,9 +179,9 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
             transition={{ duration: 1 }}
           >
             <h1 className="text-[10px] font-black tracking-[1em] text-white/40 uppercase mb-8">
-              ONYX AI • EXCLUSIVE EXPERIENCE
+              BRIEFING TACTIQUE • ONYX V2
             </h1>
-            <div className="w-24 h-[1px] bg-emerald-500/50 mx-auto" />
+            <div className="w-24 h-[1px] bg-[#c9964a]/50 mx-auto" />
           </motion.div>
 
           <motion.button
@@ -181,11 +191,11 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
               setHasStarted(true);
               playSubtleSound(200, 'sine');
             }}
-            className="group relative px-12 py-5 bg-transparent border border-white/20 rounded-full overflow-hidden transition-all hover:border-emerald-500/50"
+            className="group relative px-12 py-5 bg-transparent border border-white/20 rounded-full overflow-hidden transition-all hover:border-[#c9964a]/50"
           >
             <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             <span className="relative text-white font-black tracking-[0.3em] text-xs">
-              DÉMARRER L'EXPÉRIENCE
+              LANCER LE TUTORIEL
             </span>
           </motion.button>
         </div>
@@ -259,7 +269,7 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.5, duration: 0.8 }}
               >
-                <h2 className="text-[11px] font-black tracking-[1.2em] text-emerald-500/80 uppercase mb-4">
+                <h2 className="text-[11px] font-black tracking-[1.2em] text-[#c9964a]/80 uppercase mb-4">
                   {SLIDES[currentSlide].title}
                 </h2>
                 <h1 className="text-5xl md:text-7xl font-black text-white leading-none tracking-tighter uppercase">
@@ -315,7 +325,7 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
 
             <button 
               onClick={() => { next(); setIsAuto(false); }}
-              className="p-6 rounded-full bg-white text-black hover:bg-emerald-500 transition-all shadow-[0_0_50px_rgba(16,185,129,0.3)] flex items-center justify-center translate-y-0 hover:-translate-y-1"
+              className="p-6 rounded-full bg-white text-black hover:bg-[#c9964a] transition-all shadow-[0_0_50px_rgba(201,150,74,0.3)] flex items-center justify-center translate-y-0 hover:-translate-y-1"
             >
               <ChevronRight className="w-10 h-10" />
             </button>
@@ -332,7 +342,7 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
               onClick={() => { stopSpeech(); onComplete(); }}
               className="text-[11px] font-black tracking-[0.6em] text-white/30 hover:text-white transition-colors uppercase pt-1"
             >
-              PASSER L'INTRODUCTION
+              IGNORER LE BRIEFING
             </button>
           </div>
         </motion.div>

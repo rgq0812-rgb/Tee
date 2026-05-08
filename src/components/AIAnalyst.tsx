@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { analyzeSwing, generateSpeech, chatWithAdam, speakWithBrowser } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
 import { motion, AnimatePresence } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
 import { Upload, Video, Sparkles, AlertCircle, ChevronRight, CheckCircle2, Volume2, Loader2, Mic, Send, X, Brain } from 'lucide-react';
 import { useVoiceInput } from '../hooks/useVoiceInput';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
@@ -43,13 +44,14 @@ export default function AIAnalyst() {
 
     try {
       const historyForApi = newHistory.map(m => ({ role: m.role, parts: m.parts }));
-      const response = await chatWithAdam(historyForApi);
-      const adamMsg = { id: `adam-${Date.now()}-${Math.random()}`, role: 'model', parts: [{ text: response }] };
+      const { text } = await chatWithAdam(historyForApi);
+      const responseText = text || "...";
+      const adamMsg = { id: `adam-${Date.now()}-${Math.random()}`, role: 'model', parts: [{ text: responseText }] };
       setChatHistory(prev => [...prev, adamMsg]);
       
       // Auto-speak the response
-      if (response) {
-        const result = await generateSpeech(response);
+      if (responseText) {
+        const result = await generateSpeech(responseText);
         if (typeof result === 'object' && result.fallback) {
           speakWithBrowser(result.text);
         } else if (typeof result === 'string') {
@@ -248,7 +250,9 @@ export default function AIAnalyst() {
                         {chatHistory.map((msg) => (
                            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                               <div className={`max-w-[85%] p-4 rounded-2xl text-xs leading-relaxed ${msg.role === 'user' ? 'bg-white/10 text-white' : 'bg-[#c9964a]/10 text-[#c9964a] italic border border-[#c9964a]/20'}`}>
-                                {msg.parts[0].text}
+                                <div className="markdown-body prose prose-invert max-w-none prose-p:leading-relaxed prose-xs">
+                                  <ReactMarkdown>{msg.parts[0].text}</ReactMarkdown>
+                                </div>
                               </div>
                            </div>
                         ))}

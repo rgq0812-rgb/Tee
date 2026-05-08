@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { User, GraduationCap, Trophy } from 'lucide-react';
+import { User, GraduationCap, Trophy, ChevronRight, Target, Cpu } from 'lucide-react';
 import { AppPath } from '../types';
 
 interface PathSelectorProps {
@@ -9,69 +9,100 @@ interface PathSelectorProps {
 
 export default function PathSelector({ onSelect }: PathSelectorProps) {
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, #c9964a 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+    <div className="min-h-screen bg-black flex flex-col p-8 md:p-20 relative overflow-hidden font-sans text-white">
+      {/* Immersive Background */}
+      <div className="absolute inset-0 z-0 select-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,_#222_0%,_transparent_50%)]" />
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '100px 100px' }} />
+      </div>
       
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="relative z-10 text-center mb-16"
-      >
-        <h2 className="text-[#c9964a] font-black tracking-[0.5em] text-xs uppercase mb-4">SÉLECTION DU PROTOCOLE</h2>
-        <h1 className="text-5xl font-black italic tracking-tighter uppercase text-white">THE CHOSE</h1>
-        <div className="h-1 w-24 bg-red-600 mx-auto mt-4" />
-      </motion.div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl relative z-10">
-        {/* THE PLAYER */}
-        <motion.button
-          whileHover={{ scale: 1.02, translateY: -5 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => onSelect('player')}
-          className="bg-white/5 border border-white/10 p-10 text-left rounded-[3rem] group relative overflow-hidden backdrop-blur-xl hover:border-red-600/50 transition-all"
-        >
-          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity text-red-600">
-            <Trophy size={140} />
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-red-600/10 flex items-center justify-center text-red-600 mb-6 border border-red-600/20">
-            <User size={24} />
-          </div>
-          <h3 className="text-3xl font-black italic mb-4 text-white uppercase tracking-tight">THE PLAYER</h3>
-          <p className="text-white/40 text-sm mb-10 leading-relaxed font-medium uppercase tracking-wide">
-            L'Âme des Légendes. Stratégie de parcours, Caddie IA tactique et défis de terrain. Focus sur la performance pure.
-          </p>
-          <div className="flex items-center gap-3 text-red-600 font-black text-[10px] uppercase tracking-[0.3em] mt-auto group-hover:gap-5 transition-all">
-            ACTIVER LE MODE <div className="w-12 h-[1px] bg-red-600" />
-          </div>
-        </motion.button>
-
-        {/* THE STUDENT */}
-        <motion.button
-          whileHover={{ scale: 1.02, translateY: -5 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={() => onSelect('student')}
-          className="bg-white/5 border border-white/10 p-10 text-left rounded-[3rem] group relative overflow-hidden backdrop-blur-xl hover:border-[#c9964a]/50 transition-all"
-        >
-          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity text-[#c9964a]">
-            <GraduationCap size={140} />
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-[#c9964a]/10 flex items-center justify-center text-[#c9964a] mb-6 border border-[#c9964a]/20">
-            <GraduationCap size={24} />
-          </div>
-          <h3 className="text-3xl font-black italic mb-4 text-white uppercase tracking-tight">THE STUDENT</h3>
-          <p className="text-white/40 text-sm mb-10 leading-relaxed font-medium uppercase tracking-wide">
-            L'École de Golf. Accès aux Mentors, analyse biomécanique et coaching technique avancé. Maîtrisez chaque coup.
-          </p>
-          <div className="flex items-center gap-3 text-[#c9964a] font-black text-[10px] uppercase tracking-[0.3em] mt-auto group-hover:gap-5 transition-all">
-            ACCÉDER À L'ÉLITE <div className="w-12 h-[1px] bg-[#c9964a]" />
-          </div>
-        </motion.button>
+      {/* Large Floating Text */}
+      <div className="absolute bottom-[-5%] left-[-5%] z-0 leading-none select-none pointer-events-none">
+        <h1 className="text-[25vw] font-black italic uppercase tracking-tighter text-white/[0.03]">SELECT</h1>
       </div>
 
-      <div className="absolute bottom-12 text-[10px] text-white/20 font-black tracking-[0.5em] uppercase z-10">
-        ONYX TACTICAL SYSTEM — EST 1992
+      <header className="relative z-10 mb-20 flex flex-col items-start">
+        <div className="flex items-center gap-3 mb-6">
+           <div className="h-[2px] w-12 bg-red-600" />
+           <span className="text-[10px] font-black uppercase tracking-[0.6em] text-red-500">ONYX TACTICAL SYSTEM v2</span>
+        </div>
+        <h1 className="text-7xl font-black italic tracking-tighter uppercase text-white leading-[0.8]">
+          CHOISISSEZ VOTRE <br />
+          <span className="text-white/40">IDENTITÉ</span>
+        </h1>
+      </header>
+
+      <div className="relative z-10 flex flex-col md:flex-row gap-8 flex-1 max-h-[600px]">
+        {/* THE PLAYER Profile */}
+        <motion.div
+           onClick={() => onSelect('player')}
+           initial={{ opacity: 0, x: -50 }}
+           animate={{ opacity: 1, x: 0 }}
+           transition={{ delay: 0.1 }}
+           className="flex-1 group cursor-pointer"
+        >
+          <div className="h-full border-l-2 border-white/10 group-hover:border-red-600 p-8 flex flex-col transition-all duration-500 relative bg-gradient-to-r from-white/[0.02] to-transparent hover:from-white/5">
+            <div className="flex items-center justify-between mb-8">
+              <div className="text-[10px] font-mono font-black text-white/40 group-hover:text-red-500 transition-colors tracking-widest">PROP01_OPERATIVE</div>
+              <Target size={20} className="text-white/20 group-hover:text-red-600 transition-colors" />
+            </div>
+            
+            <div className="mb-auto">
+              <h3 className="text-5xl font-black italic uppercase tracking-tighter mb-4 text-white group-hover:translate-x-2 transition-transform duration-500">THE PLAYER</h3>
+              <p className="text-sm font-bold uppercase tracking-widest leading-loose text-white/30 group-hover:text-white/60 transition-colors max-w-sm">
+                OPTIMISEZ CHAQUE IMPACT. ACCÈS DIRECT AU CADDIE TACTIQUE, À L'ARSENAL ET AUX SCANNEURS DE LIE. POUR LES EXÉCUTANTS DE HAUT VOL.
+              </p>
+            </div>
+
+            <div className="mt-8 flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full border border-white/20 flex items-center justify-center group-hover:bg-red-600 group-hover:border-red-600 transition-all duration-500">
+                <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 group-hover:text-white group-hover:tracking-[0.5em] transition-all">INITIALISER LE PROTOCOLE</span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* THE STUDENT Profile */}
+        <motion.div
+           onClick={() => onSelect('student')}
+           initial={{ opacity: 0, x: 50 }}
+           animate={{ opacity: 1, x: 0 }}
+           transition={{ delay: 0.2 }}
+           className="flex-1 group cursor-pointer"
+        >
+          <div className="h-full border-l-2 border-white/10 group-hover:border-[#c9964a] p-8 flex flex-col transition-all duration-500 relative bg-gradient-to-r from-white/[0.02] to-transparent hover:from-white/5">
+            <div className="flex items-center justify-between mb-8">
+              <div className="text-[10px] font-mono font-black text-white/40 group-hover:text-[#c9964a] transition-colors tracking-widest">PROP02_ACADEMIC</div>
+              <Cpu size={20} className="text-white/20 group-hover:text-[#c9964a] transition-colors" />
+            </div>
+
+            <div className="mb-auto">
+              <h3 className="text-5xl font-black italic uppercase tracking-tighter mb-4 text-white group-hover:translate-x-2 transition-transform duration-500">THE STUDENT</h3>
+              <p className="text-sm font-bold uppercase tracking-widest leading-loose text-white/30 group-hover:text-white/60 transition-colors max-w-sm">
+                DÉCORTIQUEZ LE MOUVEMENT. ACCÈS AU RÉSEAU DE MENTORS, ANALYSE BIOMÉCANIQUE ET ARCHIVES TECHNIQUES. POUR CEUX QUI VEULENT COMPRENDRE.
+              </p>
+            </div>
+
+            <div className="mt-8 flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full border border-white/20 flex items-center justify-center group-hover:bg-[#c9964a] group-hover:border-[#c9964a] transition-all duration-500">
+                <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform text-white group-hover:text-black" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20 group-hover:text-white group-hover:tracking-[0.5em] transition-all">ACCÉDER À L'ACADÉMIE</span>
+            </div>
+          </div>
+        </motion.div>
       </div>
+
+      <footer className="relative z-10 mt-20 flex justify-between items-end border-t border-white/10 pt-8 opacity-20">
+        <div className="flex flex-col">
+          <span className="text-[8px] font-black uppercase tracking-widest">AUTH_SYSTEM : VERIFIED</span>
+          <span className="text-[8px] font-black uppercase tracking-widest text-red-600">STRICT_PROTOCOL = ON</span>
+        </div>
+        <div className="text-[10px] font-black uppercase tracking-[0.5em]">
+          ONYX EST. 1992
+        </div>
+      </footer>
     </div>
   );
 }

@@ -25,27 +25,47 @@
 }
 
 .air-panel {
-  background: rgba(5, 7, 12, 0.26);
-  backdrop-filter: blur(32px);
-  border: 1px solid rgba(255, 255, 255, 0.045);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  background: rgba(10, 12, 18, 0.85);
+  backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .glow-gold {
-  text-shadow: 0 0 20px rgba(201, 150, 74, 0.4);
+  text-shadow: 0 0 15px rgba(201, 150, 74, 0.6);
 }
 
 .crystal-panel {
-  background: rgba(10, 10, 10, 0.85);
-  backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(5, 5, 5, 0.95);
+  backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.5),
-    inset 0 0 80px rgba(201, 150, 74, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    0 8px 32px rgba(0, 0, 0, 0.7),
+    inset 0 0 80px rgba(201, 150, 74, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .brg-gradient {
   background: radial-gradient(circle at bottom right, rgba(201, 150, 74, 0.1), transparent 60%),
               radial-gradient(circle at bottom center, rgba(201, 150, 74, 0.05), transparent 50%);
+}
+
+.markdown-body {
+  @apply text-current;
+}
+
+.markdown-body p {
+  @apply mb-2 last:mb-0;
+}
+
+.markdown-body strong {
+  @apply font-black text-inherit;
+}
+
+.markdown-body ul, .markdown-body ol {
+  @apply my-2 ml-4 list-disc;
+}
+
+.markdown-body li {
+  @apply mb-1;
 }

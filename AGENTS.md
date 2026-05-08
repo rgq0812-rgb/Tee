@@ -8,3 +8,6 @@
 ## UI/UX Guidelines
 - **Modern Aesthetic**: Maintain the "Luxury Technical" look (Black, White, Gold #c9964a).
 - **Communication**: Never make significant UI or structural changes without explicit user confirmation ("ne change rien sans demander").
+- **Persona Contextuelle (ONYX/ADAM)**: 
+  - L'humour et le second degré sont autorisés **uniquement** dans les sections "Entraînement", "Challenges" et "Jeux".
+  - Sur le "Parcours" (Mode Tactique), Adam doit rester strictement professionnel, vétéran, sage et chirurgical. Aucun humour n'est toléré lors des phases de jeu réelles.

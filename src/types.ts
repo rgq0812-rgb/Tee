@@ -37,9 +37,12 @@ export interface Hole {
   par: number;
   handicap: number;
   distanceTee: {
-    black: number;
-    white: number;
-    ladies: number;
+    black?: number;
+    white?: number;
+    yellow?: number;
+    blue?: number;
+    red?: number;
+    ladies?: number; // Legacy support
   };
   teeBox: GpsCoord;
   green: GreenZones;
@@ -58,9 +61,12 @@ export interface Course {
   city?: string;
   par: number;
   totalDistance: {
-    black: number;
-    white: number;
-    ladies: number;
+    black?: number;
+    white?: number;
+    yellow?: number;
+    blue?: number;
+    red?: number;
+    ladies?: number; // Legacy support
   };
   rating: {
     slope: number;
