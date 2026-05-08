@@ -35,6 +35,7 @@ export default function Dashboard({
   activeCaddie,
   setActiveCaddie,
   setMissionStarted,
+  setAppPath,
   displayMode,
   selectedTee
 }: any) {
@@ -448,7 +449,14 @@ export default function Dashboard({
       <div 
         className="relative z-10 px-6 pt-6 flex-1 flex flex-col transition-transform"
       >
-        {currentHoleData && <TacticalHoleView hole={currentHoleData as any} customImage={currentCustomImage} userLocation={userLocation} />}
+        {currentHoleData && (
+          <TacticalHoleView 
+            hole={currentHoleData as any} 
+            customImage={currentCustomImage} 
+            userLocation={userLocation} 
+            selectedTee={selectedTee}
+          />
+        )}
         
         <div className="flex-1 flex flex-col items-center justify-center py-8" onClick={() => setActiveTab('scorecard')}>
             <div className="flex gap-4 mb-4" onClick={(e) => e.stopPropagation()}>
@@ -599,7 +607,10 @@ export default function Dashboard({
 
               <div className={`pt-4 border-t ${isSolar ? 'border-zinc-200' : 'border-white/5'}`}>
                 <button 
-                  onClick={() => setMissionStarted(false)}
+                  onClick={() => {
+                    setMissionStarted(false);
+                    setAppPath('player');
+                  }}
                   className={`w-full h-16 rounded-2xl border font-black uppercase tracking-[0.3em] text-[10px] flex items-center justify-center gap-3 ${isSolar ? 'bg-red-50 text-red-600 border-red-600 shadow-md' : 'bg-red-600/10 border border-red-600 text-red-500'}`}
                 >
                   <Shield size={16} />

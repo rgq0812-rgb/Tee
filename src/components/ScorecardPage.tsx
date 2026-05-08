@@ -16,7 +16,7 @@ export default function ScorecardPage({
   handicap, setHandicap,
   arsenal, setArsenal,
   setShowMentorModal, setMentorInitialMessage,
-  setMissionStarted,
+  setMissionStarted, setAppPath,
   displayMode,
   setActiveTab,
   selectedTee
@@ -401,7 +401,17 @@ export default function ScorecardPage({
             </div>
             <div className="flex flex-col gap-2">
                <button 
-                onClick={() => setMissionStarted(false)}
+                onClick={() => {
+                  if (Object.keys(scorecard).length > 0) {
+                    if (confirm("Retourner au briefing ? Votre progression actuelle sera conservée.")) {
+                      setMissionStarted(false);
+                      setAppPath('player');
+                    }
+                  } else {
+                    setMissionStarted(false);
+                    setAppPath('player');
+                  }
+                }}
                 className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${isSolar ? 'bg-zinc-950 text-white border-zinc-950 shadow-lg' : 'bg-red-600 text-white border-red-600 shadow-lg shadow-red-600/30'}`}
                >
                  BRIEFING

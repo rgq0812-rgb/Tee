@@ -251,6 +251,7 @@ function AppContent() {
             activeCaddie={activeCaddie}
             setActiveCaddie={setActiveCaddie}
             setMissionStarted={setMissionStarted}
+            setAppPath={setAppPath}
             displayMode={displayMode}
             selectedTee={selectedTee}
           />
@@ -292,6 +293,7 @@ function AppContent() {
             setShowMentorModal={setShowMentorModal}
             setMentorInitialMessage={setMentorInitialMessage}
             setMissionStarted={setMissionStarted}
+            setAppPath={setAppPath}
             displayMode={displayMode}
             setActiveTab={setActiveTab}
             selectedTee={selectedTee}

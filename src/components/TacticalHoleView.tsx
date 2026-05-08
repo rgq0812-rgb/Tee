@@ -5,8 +5,17 @@ import { Hole } from '../types';
 import { generateSpeech, speakWithBrowser } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
 
-export default function TacticalHoleView({ hole, customImage, userLocation }: { hole: Hole, customImage?: string, userLocation?: {lat: number, lng: number} | null }) {
+export default function TacticalHoleView({ hole, customImage, userLocation, selectedTee = 'white' }: { hole: Hole, customImage?: string, userLocation?: {lat: number, lng: number} | null, selectedTee?: 'black' | 'white' | 'yellow' | 'blue' | 'red' }) {
   const [playing, setPlaying] = useState(false);
+  
+  const currentTeeDistance = (hole.distanceTee as any)[selectedTee] || hole.distanceTee.white;
+  const teeColors: Record<string, string> = {
+    black: '#000000',
+    white: '#FFFFFF',
+    yellow: '#FACC15',
+    blue: '#3b82f6',
+    red: '#EF4444'
+  };
 
   // Coordinate projection logic: Map GPS to SVG (200x320)
   const getGpsPosition = () => {
@@ -170,15 +179,16 @@ export default function TacticalHoleView({ hole, customImage, userLocation }: { 
         {/* Main Stats Footer */}
         <div className="flex justify-between items-center bg-black/40 p-2 px-4 rounded-2xl backdrop-blur-sm border border-white/5">
            <div className="flex items-center gap-3">
+             <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: teeColors[selectedTee] }} />
              <div className="flex flex-col">
                <span className="text-[8px] font-mono text-white/30 uppercase tracking-widest">Distance</span>
-               <span className="text-2xl font-black text-white italic tracking-tighter leading-none">{hole.distanceTee.black}m</span>
+               <span className="text-2xl font-black text-white italic tracking-tighter leading-none">{currentTeeDistance}m</span>
              </div>
            </div>
            <div className="h-8 w-px bg-white/10" />
            <div className="flex flex-col items-end">
-             <span className="text-[8px] font-mono text-white/30 uppercase tracking-widest">Back Green</span>
-             <span className="text-lg font-bold text-[#c9964a] leading-none">+{hole.distanceTee.black + 12}m</span>
+             <span className="text-[8px] font-mono text-white/30 uppercase tracking-widest">Fond Green</span>
+             <span className="text-lg font-bold text-[#c9964a] leading-none">{currentTeeDistance + 12}m</span>
            </div>
         </div>
       </div>
