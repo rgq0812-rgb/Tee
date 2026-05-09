@@ -5,15 +5,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
   try {
-    const { model, history, message, systemInstruction, tools } = req.body;
+    const { model, history, message, systemInstruction, tools, config } = req.body;
+    
+    const finalSystemInstruction = systemInstruction || (config && config.systemInstruction);
+
     const aiModel = genAI.getGenerativeModel({ 
       model: model || "gemini-3-flash-preview",
-      systemInstruction
+      systemInstruction: finalSystemInstruction
     });
     
     const chat = aiModel.startChat({
       history,
-      tools
+      tools,
+      generationConfig: config
     });
     
     const result = await chat.sendMessage(message);
