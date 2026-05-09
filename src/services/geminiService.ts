@@ -1,29 +1,27 @@
 import { GOLF_RULES, COURSES } from "../constants";
+import { GoogleGenAI, Modality, Type } from "@google/genai";
 
-// Helper for calling server-side AI endpoints
-async function callAI(endpoint: string, data: any) {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-  
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error || `AI Request Failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-}
+// Initialize AI client
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export async function analyzeSwing(videoThumbnailUrl: string, userNotes?: string) {
   try {
-    const response = await callAI('/api/ai/generate', {
+    // Assuming videoThumbnailUrl is a base64 data URL (e.g. data:image/jpeg;base64,...)
+    const base64Data = videoThumbnailUrl.includes(',') ? videoThumbnailUrl.split(',')[1] : videoThumbnailUrl;
+    const mimeType = videoThumbnailUrl.startsWith('data:') ? videoThumbnailUrl.split(';')[0].split(':')[1] : 'image/jpeg';
+
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [
         {
           role: "user",
           parts: [
+            {
+              inlineData: {
+                data: base64Data,
+                mimeType: mimeType
+              }
+            },
             {
               text: `Vous êtes un coach de golf professionnel de la PGA et un expert mondial en biomécanique. Analysez ce cadre de swing.
               Notes de l'utilisateur : ${userNotes || "Aucune"}
@@ -100,7 +98,7 @@ ${historyText}
 [RÉPONSE]
 Format: "${caddie.name} : [VOTRE ANALYSE CHIRURGICALE - MAX 12 MOTS]"`;
 
-    const response = await callAI('/api/ai/generate', {
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
@@ -138,14 +136,14 @@ export async function generateSpeech(text: string, caddie?: any) {
     speechText = speechText.replace(/\bDriver\b/gi, "Draïveur");
     speechText = speechText.replace(/\bdriver\b/gi, "draïveur");
 
-    const response = await callAI('/api/ai/generate', {
+    const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-tts-preview", 
       contents: [{ role: 'user', parts: [{ text: `Prononce ce message avec élégance et autorité : "${speechText}"` }] }],
       config: {
-        responseModalities: ["AUDIO"],
+        responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName } 
+            prebuiltVoiceConfig: { voiceName: voiceName as any } 
           },
         },
       },
@@ -181,7 +179,7 @@ export async function analyzeTarget(selectedTee: string, distAB: number, distBC:
       Rédige une analyse courte (max 2 phrases).
       Format : "Départ ${selectedTee.toUpperCase()}. Mire à ${distAB}m. Reste ${distBC}m. [Conseil]".`;
 
-    const response = await callAI('/api/ai/generate', {
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
@@ -270,9 +268,27 @@ export async function chatWithAdam(history: { role: 'user' | 'model', parts: any
       return p;
     });
 
-    const response = await callAI('/api/ai/chat', {
+    const chatInstance = ai.chats.create({
       model: "gemini-3-flash-preview",
-      systemInstruction: extendedInstruction,
+      config: {
+        systemInstruction: extendedInstruction,
+        tools: [{
+          functionDeclarations: [{
+            name: "update_score",
+            description: "Met à jour le score du joueur pour un trou spécifique dans la carte de score officielle.",
+            parameters: {
+              type: Type.OBJECT,
+              description: "Met à jour le score du joueur",
+              properties: {
+                hole_number: { type: Type.NUMBER, description: "Le numéro du trou (1-18)." },
+                strokes: { type: Type.NUMBER, description: "Le nombre total de coups effectués sur ce trou." },
+                putts: { type: Type.NUMBER, description: "Le nombre de putts effectués sur ce trou." }
+              },
+              required: ["hole_number", "strokes", "putts"]
+            }
+          }]
+        }]
+      },
       history: history.slice(0, -1).map(h => ({
         role: h.role,
         parts: h.parts.map(p => {
@@ -280,23 +296,11 @@ export async function chatWithAdam(history: { role: 'user' | 'model', parts: any
           if ('inlineData' in p) return { inlineData: p.inlineData };
           return p;
         })
-      })),
-      message: messageParts,
-      tools: [{
-        functionDeclarations: [{
-          name: "update_score",
-          description: "Met à jour le score du joueur pour un trou spécifique dans la carte de score officielle.",
-          parameters: {
-            type: "OBJECT",
-            properties: {
-              hole_number: { type: "NUMBER", description: "Le numéro du trou (1-18)." },
-              strokes: { type: "NUMBER", description: "Le nombre total de coups effectués sur ce trou." },
-              putts: { type: "NUMBER", description: "Le nombre de putts effectués sur ce trou." }
-            },
-            required: ["hole_number", "strokes", "putts"]
-          }
-        }]
-      }]
+      }))
+    });
+
+    const response = await chatInstance.sendMessage({
+      message: messageParts
     });
 
     return {
@@ -322,7 +326,7 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
     1. LOGIC (Commandant Stratégique) : Analyse mathématique pure. Score, probabilités de succès, gestion du risque (Strokegained). Il définit l'objectif froidement.
     2. ADAM (Commandeur Tactique) : Le vétéran des Masters. Il valide la faisabilité selon l'arsenal, le vent, le lie et la forme. Il est CHIRURGICAL, SAGE et IMPLACABLE.
     3. ONYX (Ingénieur Technique) : Analyseur de biomécanique en temps réel. Il corrige le swing et suggère des drills de précision d'élite.
-
+ 
     DIRECTIVES DE PERSONA (STYLE LUXURY TECHNICAL) :
     - Langage : Français d'élite (Soutenu, Technique, Précis).
     - Style : "Luxe Froid". Pas de fioritures, pas de chaleur humaine excessive, seulement l'excellence technique.
@@ -387,7 +391,7 @@ REPONSE :`;
 
     const finalPrompt = customPrompt || defaultPrompt;
 
-    const response = await callAI('/api/ai/generate', {
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts: [{ text: finalPrompt }] }]
     });
@@ -401,7 +405,8 @@ REPONSE :`;
 
 export async function analyzeLie(data: string, mimeType: string = "image/jpeg") {
   try {
-    const response = await callAI('/api/ai/generate', {
+    const base64Data = data.includes(',') ? data.split(',')[1] : data;
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [
         {
@@ -410,7 +415,7 @@ export async function analyzeLie(data: string, mimeType: string = "image/jpeg") 
             {
               inlineData: {
                 mimeType: mimeType,
-                data: data
+                data: base64Data
               }
             },
             {
@@ -455,7 +460,8 @@ Format JSON strict :
 
 export async function analyzeGreen(data: string, mimeType: string = "image/jpeg") {
   try {
-    const response = await callAI('/api/ai/generate', {
+    const base64Data = data.includes(',') ? data.split(',')[1] : data;
+    const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [
         {
@@ -464,7 +470,7 @@ export async function analyzeGreen(data: string, mimeType: string = "image/jpeg"
             {
               inlineData: {
                 mimeType: mimeType,
-                data: data
+                data: base64Data
               }
             },
             {

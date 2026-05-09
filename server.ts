@@ -1,18 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-
-// Import Vercel handlers
-import generateHandler from './api/ai/generate.js';
-import chatHandler from './api/ai/chat.js';
-import syncHandler from './api/auth/sync.js';
-import checkoutHandler from './api/create-checkout-session.js';
-import webhookHandler from './api/webhook.js';
-import spotifyUrlHandler from './api/auth/spotify/url.js';
-import spotifyCallbackHandler from './api/auth/spotify/callback.js';
-import youtubeUrlHandler from './api/auth/youtube/url.js';
-import youtubeCallbackHandler from './api/auth/youtube/callback.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,40 +11,45 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Basic body parsing
-  app.use(express.json());
-
-  // Helper to wrap Vercel handlers for Express
-  const wrap = (handler: any) => async (req: any, res: any) => {
+  // Helper to wrap dynamic Vercel handlers for Express
+  const wrap = (pathStr: string) => async (req: any, res: any) => {
     try {
-      // Vercel handlers expect req.query and res.status().json() etc.
-      // Express matches this closely enough for these handlers.
+      const module = await import(pathStr);
+      const handler = module.default;
+      if (!handler) throw new Error(`Handler not found at ${pathStr}`);
       await handler(req, res);
     } catch (err: any) {
-      console.error('Handler Error:', err);
-      res.status(500).json({ error: err.message });
+      console.error(`Handler Error [${pathStr}]:`, err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: err.message || 'Internal Server Error' });
+      }
     }
   };
 
-  // API Routes (must match vercel.json rewrites)
-  app.post('/api/ai/generate', wrap(generateHandler));
-  app.post('/api/ai/chat', wrap(chatHandler));
-  app.post('/api/auth/sync', wrap(syncHandler));
-  app.post('/api/create-checkout-session', wrap(checkoutHandler));
-  app.post('/api/webhook', wrap(webhookHandler));
-  app.get('/api/auth/spotify/url', wrap(spotifyUrlHandler));
-  app.get('/api/auth/spotify/callback', wrap(spotifyCallbackHandler));
-  app.get('/api/auth/youtube/url', wrap(youtubeUrlHandler));
-  app.get('/api/auth/youtube/callback', wrap(youtubeCallbackHandler));
+  // Webhook FIRST without express.json()
+  app.post('/api/webhook', wrap('./api/webhook.ts'));
+
+  app.use(express.json());
+
+  // Essential API Routes (Non-AI)
+  app.post('/api/auth/sync', wrap('./api/auth/sync.ts'));
+  app.post('/api/create-checkout-session', wrap('./api/create-checkout-session.ts'));
+  app.get('/api/auth/spotify/url', wrap('./api/auth/spotify/url.ts'));
+  app.get('/api/auth/spotify/callback', wrap('./api/auth/spotify/callback.ts'));
+  app.get('/api/auth/youtube/url', wrap('./api/auth/youtube/url.ts'));
+  app.get('/api/auth/youtube/callback', wrap('./api/auth/youtube/callback.ts'));
   
   // Custom rewrites from vercel.json
-  app.get('/auth/spotify/callback', wrap(spotifyCallbackHandler));
-  app.get('/auth/youtube/callback', wrap(youtubeCallbackHandler));
+  app.get('/auth/spotify/callback', wrap('./api/auth/spotify/callback.ts'));
+  app.get('/auth/youtube/callback', wrap('./api/auth/youtube/callback.ts'));
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: false 
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -67,8 +62,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Development server running at http://localhost:${PORT}`);
-    console.log('ONYX V2 intelligence bridge active.');
+    console.log(`Server running at http://localhost:${PORT}`);
   });
 }
 

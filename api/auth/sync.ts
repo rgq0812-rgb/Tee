@@ -11,6 +11,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    if (!db) {
+      console.warn('Sync ignored: Firebase Admin not initialized (missing credentials)');
+      return res.status(200).json({ success: true, warning: 'DB_NOT_INIT' });
+    }
     const userDocRef = db.collection('users').doc(uid);
     const userDoc = await userDocRef.get();
 
