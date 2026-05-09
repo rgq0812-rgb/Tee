@@ -35,7 +35,13 @@ export default function Profile({
 }) {
   const isSolar = displayMode === 'solar';
   const { user } = useAuth();
-  const [playerName, setPlayerName] = useState(() => localStorage.getItem('onyx_player_name') || 'ONYX_OPERATIVE');
+  const [playerName, setPlayerName] = useState(() => user?.displayName || localStorage.getItem('onyx_player_name') || 'ONYX_OPERATIVE');
+
+  useEffect(() => {
+    if (user?.displayName && !localStorage.getItem('onyx_player_name')) {
+      setPlayerName(user.displayName);
+    }
+  }, [user]);
 
   useEffect(() => {
     localStorage.setItem('onyx_player_name', playerName);

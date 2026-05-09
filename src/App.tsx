@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react';
 import { AuthProvider, useAuth } from './services/AuthProvider';
 import AuthScreen from './components/AuthScreen';
+import Paywall from './components/Paywall';
 import SplashScreen from './components/SplashScreen';
 import PathSelector from './components/PathSelector';
 import Layout from './components/Layout';
@@ -22,7 +23,7 @@ import { AppPath, HoleScore, Club } from './types';
 import { INITIAL_CLUBS, COURSES, CHALLENGES, CADDIES } from './constants';
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, hasPaid } = useAuth();
   const [isGuest, setIsGuest] = useState(() => sessionStorage.getItem('guestMode') === 'true');
   
   const handleGuestMode = () => {
@@ -175,6 +176,11 @@ function AppContent() {
 
   if (!user && !isGuest) {
     return <AuthScreen onGuest={handleGuestMode} />;
+  }
+
+  // Paywall for registered users who haven't paid (and not in guest mode)
+  if (user && !hasPaid && !isGuest) {
+    return <Paywall onGuest={handleGuestMode} />;
   }
 
   if (!splashSeen) {
