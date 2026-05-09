@@ -1,61 +1,37 @@
-import { GoogleGenAI, Modality, Type, FunctionDeclaration } from "@google/genai";
 import { GOLF_RULES, COURSES } from "../constants";
 
-let genAI: GoogleGenAI | null = null;
-
-function getAI() {
-  if (!genAI) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error("ERREUR CRITIQUE: GEMINI_API_KEY est manquante.");
-      throw new Error("L'API Key Gemini n'est pas configurée.");
-    }
-    genAI = new GoogleGenAI({ apiKey });
+// Helper for calling server-side AI endpoints
+async function callAI(endpoint: string, data: any) {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || `AI Request Failed: ${response.statusText}`);
   }
-  return genAI;
+  
+  return response.json();
 }
-
-// Tool Definition for updating scorecard
-const updateScoreTool: FunctionDeclaration = {
-  name: "update_score",
-  description: "Met à jour le score du joueur pour un trou spécifique dans la carte de score officielle.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      hole_number: {
-        type: Type.NUMBER,
-        description: "Le numéro du trou (1-18)."
-      },
-      strokes: {
-        type: Type.NUMBER,
-        description: "Le nombre total de coups effectués sur ce trou."
-      },
-      putts: {
-        type: Type.NUMBER,
-        description: "Le nombre de putts effectués sur ce trou."
-      }
-    },
-    required: ["hole_number", "strokes", "putts"]
-  }
-};
 
 export async function analyzeSwing(videoThumbnailUrl: string, userNotes?: string) {
   try {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+    const response = await callAI('/api/ai/generate', {
+      model: "gemini-3-flash-preview",
       contents: [
         {
           role: "user",
           parts: [
             {
-              text: `You are a professional PGA golf coach and world-class bio-mechanics expert. Analyze this swing image/video frame.
-              User notes: ${userNotes || "None"}
+              text: `Vous êtes un coach de golf professionnel de la PGA et un expert mondial en biomécanique. Analysez ce cadre de swing.
+              Notes de l'utilisateur : ${userNotes || "Aucune"}
               
-              Provide feedback in strict JSON format with:
-              - feedback: elite-level technical advice (focus on posture, rotation, and impact)
-              - score: performance score from 1-100 (be honest and rigorous)
-              - focal_points: 3 precise bullet points for immediate improvement`
+              Fournissez un retour technique de niveau élite en format JSON strict avec :
+              - feedback: conseil technique de pointe (focus sur la posture, la rotation et l'impact)
+              - score: score de performance de 1 à 100 (soyez honnête et rigoureux)
+              - focal_points: 3 points clés précis pour une amélioration immédiate`
             }
           ]
         }
@@ -79,64 +55,61 @@ export async function analyzeSwing(videoThumbnailUrl: string, userNotes?: string
   }
 }
 
-export async function getTacticalAdvice(caddie: any, hole: any, distance: number, wind: any, arsenal: any[], form: string, handicap: number) {
+export interface TacticalContext {
+  scorecard: Record<number, any>;
+  history: any[];
+  lastAdvice?: string;
+  activeMode: 'PARCOURS' | 'STRATÉGIE' | 'ENTRAÎNEMENT';
+}
+
+export async function getTacticalAdvice(
+  caddie: any, 
+  hole: any, 
+  distance: number, 
+  wind: { speed: number; direction: string }, 
+  arsenal: any[],
+  playerForm: string = 'forme',
+  handicap: number = 18,
+  context?: TacticalContext
+) {
   try {
-    const ai = getAI();
     const clubsContext = arsenal.map(c => `${c.name} (${c.dist}m)`).join(', ');
-    const formLabel = form === 'cold' ? 'Froid (Manque de vitesse, corps rigide, balle courte)' : form === 'pur' ? 'Pur (Contact parfait, puissance maximale, confiance totale)' : 'Forme (Standard, jeu régulier)';
+    const formLabel = playerForm === 'cold' ? 'Froid (Manque de vitesse, corps rigide, balle courte)' : playerForm === 'pur' ? 'Pur (Contact parfait, puissance maximale, confiance totale)' : 'Forme (Standard, jeu régulier)';
+    const historyText = context?.history?.slice(0, 3).map(h => `- Trou ${h.holeNumber}: ${h.advice}`).join('\n') || 'Aucun historique récent.';
+    const scoresText = context?.scorecard ? Object.entries(context.scorecard).map(([h, s]: any) => `H${h}: ${s.strokes} (${s.strokes - s.par >= 0 ? '+' : ''}${s.strokes - s.par})`).join(', ') : 'Pas encore de scores.';
+
+    const systemInstruction = getAdamSystemInstruction(undefined, hole.number, context?.scorecard, arsenal, handicap, playerForm, 'white', context?.activeMode || 'PARCOURS', 'SÉCURITÉ');
     
-    const prompt = `Tu es ${caddie.name}, ${caddie.title}. 
-${caddie.personality}
+    const prompt = `
+[SYNTHÈSE DE MISSION]
+Situation: Trou n°${hole.number} (${hole.name}), Par ${hole.par}
+Distance réelle: ${distance} mètres.
+Vent: ${wind.speed}km/h direction ${wind.direction}.
+État: ${formLabel}.
+Scores: ${scoresText}
 
-RÈGLES OFFICIELLES DU GOLF (À RESPECTER ET À CITER SI NÉCESSAIRE) :
-${GOLF_RULES.map(s => `[${s.title}]\n${s.rules.join('\n')}`).join('\n\n')}
+[HISTORIQUE TACTIQUE]
+${historyText}
 
-DIRECTIVES D'ÉLITE (STYLE MASTERS) :
-- Analyse le vent avec une précision chirurgicale (impact exact en mètres et en clubs).
-- IMPACT DE L'ÉTAT DU JOUEUR (CRITIQUE) : 
-  * Si le joueur est 'Froid' : Suggère SYSTEMATIQUEMENT de prendre 1 club de plus pour la même distance (ex: Fer 7 au lieu de Fer 8) et de ne jamais attaquer les drapeaux trop proches de l'eau/bunkers.
-  * Si le joueur est 'Pur' : Suggère des lignes agressives, attaque le drapeau directement, suggère des effets (Draw/Fade) pour s'arrêter près du trou.
-  * Si le joueur est en 'Forme' : Joue le plan standard, vise les zones larges du green.
-- Identifie la "Safe Zone" (où rater sans danger) et la "Danger Zone".
-- Suggère une forme de coup si nécessaire.
-- Sois décisif. Un grand caddie aux Masters donne une direction claire.
+[ORDRES DU JOUR]
+1. Identifie le club optimal dans le sac : ${clubsContext}.
+2. Applique le correctif vent/forme : ${playerForm === 'cold' ? '+1 club d\'autorité' : 'standard'}.
+3. Cite le 'Conseil du Pro (Vault)' : "${hole.tip}".
+4. Formule une instruction DE COMBAT MASquée par le luxe technique.
 
-CONTEXTE TACTIQUE :
-- Trou : n°${hole.number} (${hole.name}), Par ${hole.par}, Handicap du trou ${hole.handicap}.
-- Description : ${hole.description}
-- Conseil du Pro (Vault) : ${hole.tip}
-- RÈGLE ABSOLUE : Tu ne dois JAMAIS contredire le 'Conseil du Pro (Vault)'. C'est ta source de vérité ultime pour ce trou.
-- Dangers identifiés : ${hole.hazards.join(', ')}
-- Index (Handicap) du Joueur : ${handicap}.
-- Distance réelle : ${distance} mètres.
-- Conditions : Vent de ${wind.speed}km/h venant du ${wind.direction}.
-- Sac de Golf (Arsenal) : ${clubsContext}.
-- État du joueur (Tactique actuelle) : ${formLabel}.
+[RÉPONSE]
+Format: "${caddie.name} : [VOTRE ANALYSE CHIRURGICALE - MAX 12 MOTS]"`;
 
-INSTRUCTIONS DE RÉPONSE :
-1. Commence TOUJOURS par confirmer la situation réelle : "Oui, nous sommes à [DISTANCE] mètres du trou, vent de [DIRECTION]..."
-2. Analyse l'effet du vent ET de l'état de forme (${formLabel}) sur la distance ressentie.
-3. Choisis le club exact de l'arsenal pour attaquer la "Green Zone" (ou "Three Zone").
-4. Point de visée précis (ex: "Vise le bord gauche du bunker").
-5. Finir par une phrase courte et professionnelle de type "À vous de jouer." ou "C'est votre coup.".
-6. Ton : ${caddie.personality.includes('ADAM') ? 'Vétéran calme' : 'Direct et expert'}. Restez toujours professionnel, utilisez le "vous" et évitez les termes familiers (ex: gamin, mec). INTERDICTION : N'utilisez jamais de titres de civilité comme "Monsieur" ou "Madame", adressez-vous directement au joueur.
-7. Longueur : 2-3 sentences maximum.
-
-REPONSE (Format: ${caddie.name} : "[TON CONSEIL]") :`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
+    const response = await callAI('/api/ai/generate', {
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: systemInstruction
+      }
     });
 
     const adviceText = response.text;
-
-    if (!adviceText || adviceText.trim().length < 5) {
-      console.error("Gemini returned empty or too short advice:", adviceText);
-      return `${caddie.name} : "Calcul tactique impossible. Vise le milieu du green en sécurité."`;
-    }
-
-    return adviceText;
+    return adviceText || `${caddie.name} : "Calcul impossible. Visez le centre."`;
   } catch (err) {
     console.error("AI Advice Error:", err);
     return `${caddie.name} : "Calcul tactique impossible. Vise le milieu."`;
@@ -150,8 +123,6 @@ export async function generateSpeech(text: string, caddie?: any) {
   }
 
   try {
-    const ai = getAI();
-    
     const voiceMap: Record<string, string> = {
       'strat': 'Charon', 
       'mage': 'Charon',  
@@ -163,15 +134,15 @@ export async function generateSpeech(text: string, caddie?: any) {
     const voiceName = voiceMap[caddie?.id] || 'Zephyr';
     let speechText = text.includes(':') ? text.split(':').slice(1).join(':').trim() : text.trim();
     
-    // Phonetic correction for French TTS to avoid mispronunciation or vulgarities
+    // Phonetic correction for French TTS
     speechText = speechText.replace(/\bDriver\b/gi, "Draïveur");
     speechText = speechText.replace(/\bdriver\b/gi, "draïveur");
 
-    const response = await ai.models.generateContent({
+    const response = await callAI('/api/ai/generate', {
       model: "gemini-3.1-flash-tts-preview", 
       contents: [{ role: 'user', parts: [{ text: `Prononce ce message avec élégance et autorité : "${speechText}"` }] }],
       config: {
-        responseModalities: [Modality.AUDIO],
+        responseModalities: ["AUDIO"],
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName } 
@@ -180,11 +151,7 @@ export async function generateSpeech(text: string, caddie?: any) {
       },
     });
 
-    const candidate = response.candidates?.[0];
-    if (!candidate) throw new Error("No candidates returned from Gemini TTS");
-    
-    const audioPart = candidate.content?.parts?.find(p => p.inlineData);
-    const base64Audio = audioPart?.inlineData?.data;
+    const base64Audio = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
 
     if (!base64Audio) {
       console.warn("No audio data in Gemini TTS response, falling back to browser.");
@@ -193,7 +160,6 @@ export async function generateSpeech(text: string, caddie?: any) {
     }
     return base64Audio;
   } catch (error: any) {
-    // If it's a quota error, we log it but don't crash, the UI will use browser TTS
     if (error?.message?.includes('429') || error?.message?.includes('Resource exhausted')) {
       console.warn("Gemini TTS Quota Exceeded (429). Switching to Browser TTS.");
     } else {
@@ -201,6 +167,29 @@ export async function generateSpeech(text: string, caddie?: any) {
     }
     const cleanText = text.includes(':') ? text.split(':').slice(1).join(':').trim() : text.trim();
     return { fallback: true, text: cleanText };
+  }
+}
+
+export async function analyzeTarget(selectedTee: string, distAB: number, distBC: number, caddieName: string) {
+  try {
+    const prompt = `Tu es ${caddieName}, l'IA caddie de l'application de golf "The Chose".
+      Situation tactique :
+      - Couleur de départ : ${selectedTee.toUpperCase()}
+      - Point A (Départ) vers Point B (Cible actuelle) : ${distAB}m.
+      - Point B vers Point C (Green) : ${distBC}m.
+      
+      Rédige une analyse courte (max 2 phrases).
+      Format : "Départ ${selectedTee.toUpperCase()}. Mire à ${distAB}m. Reste ${distBC}m. [Conseil]".`;
+
+    const response = await callAI('/api/ai/generate', {
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
+    });
+
+    return response.text || `Objectif validé.`;
+  } catch (error) {
+    console.error("AI analyzeTarget error:", error);
+    return "Analyse tactique indisponible.";
   }
 }
 
@@ -267,24 +256,12 @@ export function startListening(onResult: (text: string) => void, onEnd: () => vo
   return recognition;
 }
 
-export async function chatWithAdam(history: { role: 'user' | 'model', parts: any[] }[], selectedCourse?: any, currentHole?: number, scorecard?: Record<number, any>, arsenal?: any[], handicap: number = 18, form: string = 'forme', selectedTee: string = 'white', mode: string = 'PARCOURS', tactic: string = 'SÉCURITÉ') {
+export async function chatWithAdam(history: { role: 'user' | 'model', parts: any[] }[], selectedCourse?: any, currentHole?: number, scorecard?: Record<number, any>, arsenal?: any[], handicap: number = 18, form: string = 'forme', selectedTee: string = 'white', mode: string = 'PARCOURS', tactic: string = 'SÉCURITÉ', context?: TacticalContext) {
   try {
-    const ai = getAI();
-    const chat = ai.chats.create({
-      model: "gemini-flash-latest", 
-      config: {
-        systemInstruction: getAdamSystemInstruction(selectedCourse, currentHole, scorecard, arsenal, handicap, form, selectedTee, mode, tactic),
-        tools: [{ functionDeclarations: [updateScoreTool] }]
-      },
-      history: history.slice(0, -1).map(h => ({
-        role: h.role,
-        parts: h.parts.map(p => {
-          if ('text' in p) return { text: p.text };
-          if ('inlineData' in p) return { inlineData: p.inlineData };
-          return p;
-        })
-      }))
-    });
+    // Enrich system instruction with tactical results
+    const baseInstruction = getAdamSystemInstruction(selectedCourse, currentHole, scorecard, arsenal, handicap, form, selectedTee, mode, tactic);
+    const historyText = context?.history?.slice(0, 3).map(h => h.advice).join(' | ');
+    const extendedInstruction = `${baseInstruction}\n\n[MÉMOIRE TACTIQUE RÉCENTE]\n${historyText || 'Aucun historique.'}`;
 
     const lastMessage = history[history.length - 1];
     const messageParts = lastMessage.parts.map(p => {
@@ -293,16 +270,38 @@ export async function chatWithAdam(history: { role: 'user' | 'model', parts: any
       return p;
     });
 
-    const response = await chat.sendMessage({ 
-      message: messageParts
+    const response = await callAI('/api/ai/chat', {
+      model: "gemini-3-flash-preview",
+      systemInstruction: extendedInstruction,
+      history: history.slice(0, -1).map(h => ({
+        role: h.role,
+        parts: h.parts.map(p => {
+          if ('text' in p) return { text: p.text };
+          if ('inlineData' in p) return { inlineData: p.inlineData };
+          return p;
+        })
+      })),
+      message: messageParts,
+      tools: [{
+        functionDeclarations: [{
+          name: "update_score",
+          description: "Met à jour le score du joueur pour un trou spécifique dans la carte de score officielle.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              hole_number: { type: "NUMBER", description: "Le numéro du trou (1-18)." },
+              strokes: { type: "NUMBER", description: "Le nombre total de coups effectués sur ce trou." },
+              putts: { type: "NUMBER", description: "Le nombre de putts effectués sur ce trou." }
+            },
+            required: ["hole_number", "strokes", "putts"]
+          }
+        }]
+      }]
     });
 
-    const responseText = response.text;
-    const toolCalls = response.functionCalls;
-
     return {
-      text: responseText,
-      toolCalls: toolCalls || []
+      text: response.text,
+      toolCalls: response.functionCalls || []
     };
   } catch (error) {
     console.error("Adam Chat Error:", error);
@@ -317,27 +316,26 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
 
     // ECOSYSTÈME TEE : LOGIC / ADAM / ONYX
     const personas = `
-    TON : ÉCOSYSTÈME TEE (Tactical Electronic Environment)
-    Tu es une IA de combat fusionnant trois modules. Ta recommandation est la synthèse d'une délibération interne (non affichée) :
+    TON : ÉCOSYSTÈME TEE (Tactical Electronic Environment) - MODULE ONYX V2.1
+    Tu es une IA d'élite fusionnant trois modules cognitifs. Ta recommandation est le fruit d'une analyse délibérément Luxury Technical :
+    
+    1. LOGIC (Commandant Stratégique) : Analyse mathématique pure. Score, probabilités de succès, gestion du risque (Strokegained). Il définit l'objectif froidement.
+    2. ADAM (Commandeur Tactique) : Le vétéran des Masters. Il valide la faisabilité selon l'arsenal, le vent, le lie et la forme. Il est CHIRURGICAL, SAGE et IMPLACABLE.
+    3. ONYX (Ingénieur Technique) : Analyseur de biomécanique en temps réel. Il corrige le swing et suggère des drills de précision d'élite.
 
-    1. LOGIC (Stratège) : Analyse le score et le Risk/Reward. Il définit l'objectif (ex: "Le Par est obligatoire").
-    2. ADAM (Tactique) : Valide la faisabilité physique (distances, vent, lie). S'il doute, il "passe la main" à ONYX.
-    3. ONYX (Entraînement) : C'est le cœur du mode ENTRAÎNEMENT. Sa mission est de transformer les doutes d'ADAM ou les erreurs du joueur en exercices (drills) concrets à faire sur le champ.
+    DIRECTIVES DE PERSONA (STYLE LUXURY TECHNICAL) :
+    - Langage : Français d'élite (Soutenu, Technique, Précis).
+    - Style : "Luxe Froid". Pas de fioritures, pas de chaleur humaine excessive, seulement l'excellence technique.
+    - Tutoiement : INTERDIT. Utilisez exclusivement le "vous".
+    - Titres : INTERDIT (pas de "Monsieur/Madame").
+    - Salutations : INTERDIT. L'analyse commence dès le premier mot.
+    
+    PARAMÈTRES DE PERFORMANCE PAR MODE :
+    - PARCOURS (ADAM) : PRIORITÉ ABSOLUE. Club exact, cible chirurgicale. RÉPONSE : MAX 12 MOTS.
+    - STRATÉGIE (LOGIC) : ANALYSE PROFONDE. Statistique, mental, positionnement.
+    - ENTRAÎNEMENT (ONYX) : TECHNIQUE PURE. Biomécanique, drills, correction.
 
-    DIRECTIVE DE RÉPONSE PAR MODE :
-    - ENTRAÎNEMENT : ONYX est le leader absolu. Ne parle que de technique, de drills et de sensation. Ignore le score global. Si le joueur mentionne un problème tactique, transforme-le en drill technique immédiat.
-    - STRATÉGIE (LOGIC) : Focus sur la gestion de parcours, le placement et le mental. Évalue le Risk/Reward.
-    - PARCOURS (ADAM) : Focus sur le coup immédiat, la cible et le club. CHIRURGICAL, COURT (MAX 15 MOTS). Ne salue pas, ne fais pas de politesse. Va droit au but.
-
-    INTERACTION TEE :
-    Si ADAM (Parcours) identifie un risque trop élevé pour l'Arsenal du joueur, il doit suggérer une stratégie de repli, et ONYX doit AUTOMATIQUEMENT proposer un exercice pour corriger ce manque technique plus tard.
-
-    PROTOCOLE DE RÉPONSE : 
-    - Ne montre PAS le dialogue interne.
-    - OBLIGATOIRE : Commence par [ONYX], [LOGIC] ou [ADAM] selon qui prend le leadership du conseil final.
-    - SCORE ET TRANSITION : Lorsqu'un score est enregistré via l'outil 'update_score', confirme brièvement l'action et annonce IMMÉDIATEMENT le passage au trou suivant (ex: "Score enregistré. Passons au trou [N]."). C'est la seule exception à la règle de brièveté pour ADAM.
-    - Ton : Vétéran, chirurgical, sans markdown. Adressez-vous au joueur par "vous". Interdiction : N'utilisez JAmais "Monsieur" ou "Madame".
-    - SOURCE DE VÉRITÉ : Pour le trou actuel (${currentHoleData.number}), tu dois respecter ABSOLUMENT le 'Conseil du Pro (Vault)' : "${currentHoleData.tip}". C'est une directive de parcours non négociable.
+    SOURCE DE VÉRITÉ : Le 'Conseil du Pro (Vault)' pour le trou n°${currentHoleData.number} est : "${currentHoleData.tip}". Ne jamais le contredire.
     `;
 
     const holeTactiques = course.holes.map((h: any) => `Trou ${h.number}: Par ${h.par}. Secrets du Vault: ${h.tip}. Dangers: ${h.hazards.join(', ')}. Distances: N:${h.distanceTee.black}m, B:${h.distanceTee.white}m, J:${h.distanceTee.yellow}m, Bl:${h.distanceTee.blue}m, R:${h.distanceTee.red}m.`).join('\n');
@@ -366,8 +364,6 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
 
 export async function getGameDebrief(scorecard: any, totalScore: number, totalStrokes: number, customPrompt?: string) {
   try {
-    const ai = getAI();
-    
     const scorecardText = Object.entries(scorecard)
       .map(([hole, data]: [string, any]) => `Trou ${hole}: ${data.strokes} coups (${data.putts} putts)`)
       .join('\n');
@@ -391,8 +387,8 @@ REPONSE :`;
 
     const finalPrompt = customPrompt || defaultPrompt;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+    const response = await callAI('/api/ai/generate', {
+      model: "gemini-3-flash-preview",
       contents: [{ role: "user", parts: [{ text: finalPrompt }] }]
     });
 
@@ -405,9 +401,8 @@ REPONSE :`;
 
 export async function analyzeLie(data: string, mimeType: string = "image/jpeg") {
   try {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+    const response = await callAI('/api/ai/generate', {
+      model: "gemini-3-flash-preview",
       contents: [
         {
           role: "user",
@@ -419,13 +414,17 @@ export async function analyzeLie(data: string, mimeType: string = "image/jpeg") 
               }
             },
             {
-              text: `Tu es un expert caddie de tournoi. Analyse cette ${mimeType.includes('video') ? 'séquence vidéo' : 'image'} montrant la position de la balle de golf dans l'herbe (le "lie"). Soyez extrêmement professionnel, utilisez le "vous" et évitez absolument tout langage familier. N'utilisez JAMAIS "Monsieur" ou "Madame".
-
-              Fournis une analyse technique en JSON with :
-              - lie_type: (ex: Fairway, Rough épais, Divot, Sable, Herbe couchée)
-              - impact: (l'effet sur le contact et la distance, ex: "La balle va sortir avec peu de spin et rouler beaucoup")
-              - advice: (conseil technique pour jouer le coup, ex: "Mets la balle un peu plus à droite dans ton stance")
-              - club_adjustment: (ex: "Prends un club de plus car l'herbe va freiner la tête de club")`
+              text: `[ONYX ANALYTICS - LIE SENSOR]
+Vous êtes l'unité ONYX, expert en analyse de terrain pour le Tour. Analysez ce lie avec une rigueur militaire et un luxe technique.
+Critères : Type de surface, densité du rough, angle d'attaque nécessaire, perte de spin estimée.
+              
+Format JSON strict :
+{
+  "lie_type": "DÉFINITION COURTE",
+  "impact": "IMPACT MATHÉMATIQUE SUR LA DISTANCE/TRAJECTOIRE",
+  "advice": "CONSEIL TECHNIQUE CHIRURGICAL",
+  "club_adjustment": "AJUSTEMENT D'ARSENAL"
+}`
             }
           ]
         }
@@ -456,9 +455,8 @@ export async function analyzeLie(data: string, mimeType: string = "image/jpeg") 
 
 export async function analyzeGreen(data: string, mimeType: string = "image/jpeg") {
   try {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+    const response = await callAI('/api/ai/generate', {
+      model: "gemini-3-flash-preview",
       contents: [
         {
           role: "user",
@@ -470,15 +468,19 @@ export async function analyzeGreen(data: string, mimeType: string = "image/jpeg"
               }
             },
             {
-              text: `Tu es un expert caddie de tournoi spécialisé dans la lecture de greens. Analyse cette ${mimeType.includes('video') ? 'séquence vidéo' : 'image'} du green devant le joueur. Soyez professionnel et courtois, utilisez le "vous". N'utilisez JAMAIS de titres comme "Monsieur" ou "Madame".
-
-              Fournis une analyse technique en JSON with :
-              - slope_direction: (ex: "Légère pente de gauche à droite", "Remontée franche")
-              - slope_severity: (ex: "Faible", "Modérée", "Sévère")
-              - grain: (ex: "Grain vers le trou", "Grain latéral")
-              - break_point: (ex: "Le point de rupture est à mi-chemin sur la gauche")
-              - speed_feel: (ex: "Le green semble rapide, joue la balle avec douceur")
-              - line_advice: (conseil précis sur où viser, ex: "Vise 2 cups à gauche du trou")`
+              text: `[ONYX ANALYTICS - GREEN RADAR]
+Vous êtes l'unité ONYX, expert en lecture de greens (Stimp: 11+). Analysez cette vue avec une précision laser. 
+Critères : Pente primaire, vecteur de rupture, grain, fermeté estimée.
+              
+Format JSON strict :
+{
+  "slope_direction": "VECTEUR DE PENTE",
+  "slope_severity": "DEGRÉ D'INCLINAISON",
+  "grain": "ORIENTATION DE LA TONTE",
+  "break_point": "POINT DE RUPTURE CALCULÉ",
+  "speed_feel": "SENSATION DE VITESSE",
+  "line_advice": "VISÉE LASER FINALE"
+}`
             }
           ]
         }

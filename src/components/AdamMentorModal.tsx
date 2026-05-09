@@ -389,7 +389,26 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
         { inlineData: attachedImage }
       ] : [{ text: isHandsFree ? `[AUDIO HUD MODE: RÉPONSE CHIRURGICALE MAX 10 MOTS] ${contextualLastMessage}` : contextualLastMessage }] }].map(m => ({ role: m.role, parts: m.parts }));
       
-      const { text, toolCalls } = await chatWithAdam(historyForApi, selectedCourse, currentHole, scorecard, arsenal, handicap, currentForm.toLowerCase(), selectedTee, activeTacticalMode, selectedTactic);
+      const { text, toolCalls } = await chatWithAdam(
+        historyForApi, 
+        selectedCourse, 
+        currentHole, 
+        scorecard, 
+        arsenal, 
+        handicap, 
+        currentForm.toLowerCase(), 
+        selectedTee, 
+        activeTacticalMode, 
+        selectedTactic,
+        {
+          scorecard: scorecard || {},
+          history: messages.slice(-5).map(m => {
+            const firstPart = m.parts[0];
+            return { advice: 'text' in firstPart ? firstPart.text : 'Image analysis' };
+          }), // Simplified history mapping
+          activeMode: activeTacticalMode
+        }
+      );
       
       // Handle Tool Calls
       if (toolCalls && toolCalls.length > 0) {

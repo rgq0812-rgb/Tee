@@ -2,13 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { Crosshair, Navigation, Target, Shield, Brain, Zap, Info, ChevronRight, Map as MapIcon, X } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { analyzeTarget } from '../services/geminiService';
 
-const API_KEY = process.env.GOOGLE_MAPS_PLATFORM_KEY || 
-                process.env.VITE_GOOGLE_MAPS_API_KEY || 
-                process.env.GOOGLE_MAPS_API_KEY ||
-                (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || 
-                '';
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY' && API_KEY.length > 5;
 
 interface TacticalMapProps {
@@ -57,13 +53,6 @@ const AIScreen = ({ isSolar }: { isSolar?: boolean }) => (
         <div className="flex flex-col">
           <p className={`text-[10px] uppercase tracking-widest leading-tight mb-1 font-bold ${isSolar ? 'text-black' : 'text-white/80'}`}>Activer <span className={`${isSolar ? 'text-black font-black underline decoration-2' : 'text-[#c9964a] underline'}`}>Maps JavaScript API</span></p>
           <p className={`text-[9px] leading-normal italic text-xs ${isSolar ? 'text-zinc-500' : 'text-white/40'}`}>C'est différent du 'SDK Android'. Activez 'Maps JavaScript API' dans la console Google Cloud.</p>
-        </div>
-      </div>
-      <div className="flex gap-4 text-red-600">
-        <div className="w-6 h-6 rounded-full bg-red-600/10 flex items-center justify-center text-[10px] font-bold shrink-0">!</div>
-        <div className="flex flex-col">
-          <p className="text-[10px] uppercase tracking-widest leading-tight mb-1 font-black">ApiTargetBlockedMapError</p>
-          <p className={`text-[9px] leading-normal italic text-xs ${isSolar ? 'text-red-800 font-medium' : ''}`}>Cette erreur (présente dans vos logs) signifie que l'API n'est pas activée sur cette clé.</p>
         </div>
       </div>
       <div className="flex gap-4">
@@ -141,36 +130,20 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
   const distAB = calculateDistance(hole.teeBox.lat, hole.teeBox.lng, mire.lat, mire.lng);
   const distBC = calculateDistance(mire.lat, mire.lng, hole.green.middle.lat, hole.green.middle.lng);
 
-  const analyzeTarget = async () => {
-    if (!process.env.GEMINI_API_KEY) return;
+  const performAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      const genAI = new GoogleGenAI({ apiKey });
-      
-      const prompt = `Tu es ${activeCaddie.name}, l'IA caddie de l'application de golf "The Chose".
-      Situation tactique :
-      - Couleur de départ : ${selectedTee.toUpperCase()}
-      - Point A (Départ) vers Point B (Cible actuelle) : ${distAB}m.
-      - Point B vers Point C (Green) : ${distBC}m.
-      
-      Rédige une analyse courte (max 2 phrases).
-      Format : "Départ ${selectedTee.toUpperCase()}. Mire à ${distAB}m. Reste ${distBC}m. [Conseil]".`;
-
-      const response = await genAI.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: prompt
-      });
-      setCommentary(response.text || `Objectif validé.`);
+      const result = await analyzeTarget(selectedTee, distAB, distBC, activeCaddie.name);
+      setCommentary(result);
     } catch (error) {
-      console.error("AI error:", error);
+      console.error("AI error in map analysis:", error);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   useEffect(() => {
-     const timeout = setTimeout(analyzeTarget, 1500);
+     const timeout = setTimeout(performAnalysis, 1500);
      return () => clearTimeout(timeout);
   }, [mire.lat, mire.lng]);
 
@@ -293,7 +266,7 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
             </div>
          </motion.div>
          <button 
-           onClick={analyzeTarget}
+           onClick={performAnalysis}
            className={`w-16 h-16 rounded-[1.8rem] flex items-center justify-center shadow-xl active:scale-95 transition-all ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black shadow-[0_15px_40px_rgba(201,150,74,0.3)]'}`}
           >
             <Navigation size={24} />

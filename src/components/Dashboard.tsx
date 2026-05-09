@@ -144,13 +144,43 @@ export default function Dashboard({
 
   const currentHoleData = useMemo(() => selectedCourse.holes[currentHole - 1], [currentHole, selectedCourse]);
 
+  const [tacticalHistory, setTacticalHistory] = useState<any[]>([]);
+
+  // Fetch tactical history for context
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'tactical_advice'),
+      where('userId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(5)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setTacticalHistory(snapshot.docs.map(doc => doc.data()));
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   const generateAdvice = useCallback(async () => {
     if (isSpeaking) return;
     setIsSpeaking(true);
     playWind();
     
     try {
-      const message = await getTacticalAdvice(activeCaddie, currentHoleData, distance, wind, arsenal, playerForm, handicap);
+      const message = await getTacticalAdvice(
+        activeCaddie, 
+        currentHoleData, 
+        distance, 
+        wind, 
+        arsenal, 
+        playerForm, 
+        handicap,
+        { 
+          scorecard, 
+          history: tacticalHistory,
+          activeMode: selectedMode === GameMode.STROKE ? 'PARCOURS' : 'STRATÉGIE' // Simplified mapping
+        }
+      );
       setAdvice(message);
       
       // Save to Firestore history

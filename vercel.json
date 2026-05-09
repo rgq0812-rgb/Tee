@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/auth/youtube/callback", "destination": "/api/auth/youtube/callback" },
+    { "source": "/auth/spotify/callback", "destination": "/api/auth/spotify/callback" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
