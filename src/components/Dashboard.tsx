@@ -325,17 +325,35 @@ export default function Dashboard({
       <div className={`relative z-20 p-6 pt-12 flex flex-col gap-4 border-b ${isSolar ? 'border-red-600 bg-white' : 'border-red-600 bg-black/90 backdrop-blur-xl'} transition-all`}>
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowCaddieSelector(true)}
-              className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
-                isSpeaking 
-                  ? (isSolar ? 'bg-red-600 border-red-600 shadow-xl' : 'bg-red-600 border-red-600 animate-pulse') 
-                  : (isSolar ? 'bg-zinc-50 border-zinc-950/10' : 'bg-white/5 border-white/10')
-              }`}
-            >
-              <Brain size={24} className={isSpeaking ? 'text-white' : (isSolar ? 'text-zinc-950 font-black' : '#c9964a')} />
-            </motion.button>
+            {!user ? (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={async () => {
+                   try {
+                     const { signInWithGoogle } = await import('../services/firebase');
+                     await signInWithGoogle();
+                   } catch (e: any) {
+                     alert(e.message || "Échec Google Login");
+                   }
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl border border-white/20 bg-white/5 text-white text-[10px] font-black uppercase tracking-widest`}
+              >
+                <img src="https://www.google.com/favicon.ico" className="w-3 h-3 grayscale opacity-80" alt="G" />
+                Login
+              </motion.button>
+            ) : (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowCaddieSelector(true)}
+                className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
+                  isSpeaking 
+                    ? (isSolar ? 'bg-red-600 border-red-600 shadow-xl' : 'bg-red-600 border-red-600 animate-pulse') 
+                    : (isSolar ? 'bg-zinc-50 border-zinc-950/10' : 'bg-white/5 border-white/10')
+                }`}
+              >
+                <Brain size={24} className={isSpeaking ? 'text-white' : (isSolar ? 'text-zinc-950 font-black' : '#c9964a')} />
+              </motion.button>
+            )}
             <div>
               <h1 className={`text-sm font-black uppercase tracking-tighter leading-tight flex items-center gap-1.5 ${isSolar ? 'text-zinc-950' : 'text-white'}`}>
                 {activeCaddie.name} <span className="text-red-600 italic">ONYX</span>
@@ -479,7 +497,7 @@ export default function Dashboard({
         {advice && (
           <div className="fixed bottom-32 left-6 right-6 z-[60]">
             <motion.div 
-              key={`advice-box-${advice.substring(0, 50)}`}
+              key={`advice-box-v3-${advice.length}-${advice.substring(0, 20)}`}
               initial={{ opacity: 0, y: 20, scale: 0.95 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: 10 }}

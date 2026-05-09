@@ -85,14 +85,15 @@ service cloud.firestore {
     }
 
     match /hole_assets/{assetId} {
-      allow read: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create, update: if isVerified() && isValidHoleAsset(incoming());
       allow delete: if isOwner(resource.data.userId) || isAdmin();
     }
 
     match /tactical_advice/{adviceId} {
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid);
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isVerified() && isValidTacticalAdvice(incoming());
       allow delete: if isOwner(resource.data.userId) || isAdmin();
     }

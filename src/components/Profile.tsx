@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { logout, db, handleFirestoreError, OperationType } from '../services/firebase';
+import { logout, db, handleFirestoreError, OperationType, signInWithGoogle } from '../services/firebase';
 import { useAuth } from '../services/AuthProvider';
 import { collection, query, where, getDocs, onSnapshot, addDoc, serverTimestamp, setDoc, doc, orderBy, limit } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -195,9 +195,12 @@ export default function Profile({
         body: JSON.stringify({ userId: user.uid })
       });
       const data = await resp.json();
-      if (data.id) {
+      if (data.url) {
+        window.location.href = data.url;
+      } else if (data.id) {
         const stripe = await stripePromise;
         if (stripe) {
+          // Fallback if URL not provided, though modern sessions should have it
           await (stripe as any).redirectToCheckout({ sessionId: data.id });
         }
       } else {
@@ -313,7 +316,7 @@ export default function Profile({
 
                 {assetsLoading ? (
                    <div className="grid grid-cols-3 gap-2">
-                      {[1,2,3].map(i => <div key={`profile-vault-skeleton-${i}`} className={`aspect-square rounded-xl animate-pulse ${isSolar ? 'bg-zinc-200' : 'bg-white/5'}`} />)}
+                      {[1, 2, 3].map(i => <div key={`profile-vault-skeleton-row-${i}`} className={`aspect-square rounded-xl animate-pulse ${isSolar ? 'bg-zinc-200' : 'bg-white/5'}`} />)}
                    </div>
                 ) : assets.length > 0 ? (
                   <div className="grid grid-cols-3 gap-2">
@@ -483,8 +486,8 @@ export default function Profile({
                  className="overflow-hidden space-y-3"
                >
                   {savedRounds.length > 0 ? (
-                    savedRounds.map((round, idx) => (
-                      <div key={`saved-round-${round.id}-${idx}`} className={`border rounded-2xl p-5 space-y-4 relative overflow-hidden group shadow-sm ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
+                    savedRounds.map((round, sidx) => (
+                      <div key={`profile-saved-round-v3-${round.id}-${sidx}`} className={`border rounded-2xl p-5 space-y-4 relative overflow-hidden group shadow-sm ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
                           <ShieldCheck size={40} className={isSolar ? 'text-zinc-200' : 'text-[#c9964a]'} />
                         </div>
@@ -599,10 +602,16 @@ export default function Profile({
             </button>
           ) : (
             <button
-              onClick={() => window.location.reload()} // Simple way to go back to auth if they really want
-              className={`w-full p-5 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 border active:scale-[0.98] transition-all mt-8 ${isSolar ? 'bg-black text-white border-black' : 'bg-[#c9964a]/10 text-[#c9964a] border-[#c9964a]/20 hover:bg-[#c9964a]/20'}`}
+              onClick={async () => {
+                try {
+                  await signInWithGoogle();
+                } catch (e: any) {
+                  alert(e.message || "Échec de la connexion Google");
+                }
+              }}
+              className={`w-full bg-white text-black p-5 rounded-2xl font-black uppercase text-sm tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-[0.98] group shadow-[0_15px_40px_rgba(255,255,255,0.1)] mt-8`}
             >
-              <User size={16} />
+              <img src="https://www.google.com/favicon.ico" className="w-5 h-5 grayscale opacity-80" alt="Google" referrerPolicy="no-referrer" />
               CONNEXION (GOOGLE)
             </button>
           )}

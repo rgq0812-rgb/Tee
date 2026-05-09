@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Sparkles, Check, Shield, Zap, ArrowRight, Gauge } from 'lucide-react';
 import { useAuth } from '../services/AuthProvider';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { auth, signInWithGoogle } from '../services/firebase';
 
 export default function Paywall({ onGuest }: { onGuest?: () => void }) {
   const { user } = useAuth();
@@ -17,7 +16,7 @@ export default function Paywall({ onGuest }: { onGuest?: () => void }) {
       
       // 1. Force Login if not already logged in
       if (!currentUser) {
-        const result = await signInWithPopup(auth, new GoogleAuthProvider());
+        const result = await signInWithGoogle();
         currentUser = result.user;
       }
 
@@ -115,7 +114,7 @@ export default function Paywall({ onGuest }: { onGuest?: () => void }) {
               </h3>
               <div className="grid gap-4">
                 {features.map((feature, i) => (
-                  <div key={i} className="flex items-center gap-4 group">
+                  <div key={`paywall-feature-${i}-${feature.substring(0, 10)}`} className="flex items-center gap-4 group">
                     <div className="w-6 h-6 rounded-full bg-[#c9964a]/10 border border-[#c9964a]/30 flex items-center justify-center flex-shrink-0 group-hover:bg-[#c9964a] transition-all">
                       <Check size={12} className="text-[#c9964a] group-hover:text-black transition-all" />
                     </div>

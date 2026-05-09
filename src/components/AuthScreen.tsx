@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { loginWithEmail, registerWithEmail } from '../services/firebase';
+import { signInWithGoogle, loginWithEmail, registerWithEmail } from '../services/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trophy, ChevronRight, Mail, Lock, User as UserIcon, ArrowLeft } from 'lucide-react';
 
@@ -14,6 +14,23 @@ export default function AuthScreen({ onGuest }: { onGuest: () => void }) {
     password: '',
     displayName: ''
   });
+
+  const handleGoogleLogin = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      await signInWithGoogle();
+    } catch (err: any) {
+      console.error("Login error:", err);
+      if (err.message?.includes('unauthorized domain')) {
+        setError("Domaine non autorisé pour Google Auth. Utilisez l'email ou le mode invité.");
+      } else {
+        setError(err.message || "Échec de la connexion. Veuillez réessayer.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +137,17 @@ export default function AuthScreen({ onGuest }: { onGuest: () => void }) {
               exit={{ opacity: 0, x: 20 }}
               className="w-full space-y-4"
             >
-              {/* PRIMARY ACTION: GUEST MODE */}
+              <button
+                disabled={isLoading}
+                onClick={handleGoogleLogin}
+                className="w-full bg-white text-black py-5 px-6 rounded-2xl font-black uppercase text-sm tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-[0.98] group shadow-[0_15px_40px_rgba(255,255,255,0.1)] hover:-translate-y-1"
+              >
+                <img src="https://www.google.com/favicon.ico" className="w-5 h-5 grayscale opacity-80" alt="Google" referrerPolicy="no-referrer" />
+                Google Login
+                <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              {/* GUEST MODE ACTION */}
               <button
                 onClick={onGuest}
                 className="w-full bg-[#c9964a] text-black py-6 px-6 rounded-2xl font-black uppercase text-base tracking-[0.3em] flex items-center justify-center gap-4 transition-all active:scale-[0.95] group shadow-[0_20px_50px_rgba(201,150,74,0.3)] relative overflow-hidden"
@@ -206,6 +233,22 @@ export default function AuthScreen({ onGuest }: { onGuest: () => void }) {
               >
                 {isLoading ? "CHARGEMENT..." : mode === 'email-login' ? "VALIDER L'ACCÈS" : "CRÉER MATRICULE"}
                 {!isLoading && <ChevronRight size={20} />}
+              </button>
+
+              <div className="py-4 flex items-center gap-4">
+                <div className="h-[1px] flex-1 bg-white/10" />
+                <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Ou</span>
+                <div className="h-[1px] flex-1 bg-white/10" />
+              </div>
+
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={handleGoogleLogin}
+                className="w-full bg-white text-black py-4 px-6 rounded-2xl font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-[0.98] group"
+              >
+                <img src="https://www.google.com/favicon.ico" className="w-4 h-4 grayscale opacity-80" alt="Google" referrerPolicy="no-referrer" />
+                Login rapide avec Google
               </button>
 
               <button
