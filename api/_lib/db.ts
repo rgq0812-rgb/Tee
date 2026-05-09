@@ -20,7 +20,7 @@ export const db = firebaseConfig.firestoreDatabaseId
   ? getFirestore(adminApp, firebaseConfig.firestoreDatabaseId)
   : getFirestore(adminApp);
 
-export const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY || '');
+export const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 let stripeClient: Stripe | null = null;
 export function getStripe(): Stripe {

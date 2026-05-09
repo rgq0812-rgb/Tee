@@ -9,7 +9,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     const finalSystemInstruction = systemInstruction || (config && config.systemInstruction);
 
-    const aiModel = genAI.getGenerativeModel({ 
+    const aiModel = (genAI.getGenerativeModel as any)({ 
       model: model || "gemini-3-flash-preview",
       systemInstruction: finalSystemInstruction
     });
