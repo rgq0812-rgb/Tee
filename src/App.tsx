@@ -358,6 +358,7 @@ function AppContent() {
         handicap={handicap}
         playerForm={playerForm}
         onUpdateScore={updateScore}
+        onSetCurrentHole={setCurrentHole}
         displayMode={displayMode}
         selectedTee={selectedTee}
       />

@@ -7,14 +7,7 @@ import { ADAM_AVATAR_URL } from '../constants';
 import AudioVisualizer from './AudioVisualizer';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
 import { playRawPcm } from '../lib/audioUtils';
-import { useVoiceInput } from '../hooks/useVoiceInput';
-
-interface SafeMessage {
-  id: string;
-  role: 'user' | 'model';
-  parts: [{ text: string } | { inlineData: { mimeType: string; data: string } }];
-  speaker?: 'ONYX' | 'LOGIC' | 'ADAM';
-}
+import { useLiveChat, type SafeMessage } from '../hooks/useLiveChat';
 
 interface AdamMentorModalProps {
   isOpen: boolean;
@@ -28,27 +21,60 @@ interface AdamMentorModalProps {
   playerForm?: string;
   displayMode: 'tactical' | 'solar';
   onUpdateScore?: (hole: number, strokes: number, putts: number) => void;
+  onSetCurrentHole?: (hole: number) => void;
   selectedTee: 'black' | 'white' | 'yellow' | 'blue' | 'red';
 }
 
-export default function AdamMentorModal({ isOpen, onClose, selectedCourse, currentHole, scorecard, arsenal, initialMessage, handicap = 18, playerForm = 'forme', displayMode, onUpdateScore, selectedTee }: AdamMentorModalProps) {
+export default function AdamMentorModal({ isOpen, onClose, selectedCourse, currentHole, scorecard, arsenal, initialMessage, handicap = 18, playerForm = 'forme', displayMode, onUpdateScore, onSetCurrentHole, selectedTee }: AdamMentorModalProps) {
   const { playPing } = useAmbientSound();
-  const [messages, setMessages] = useState<SafeMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [attachedImage, setAttachedImage] = useState<{ mimeType: string, data: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isMuted, setIsMuted] = useState(() => localStorage.getItem('onyx_voice') === 'false');
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [userLocation, setUserLocation] = useState<GeolocationPosition | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem('onyx_voice', isMuted ? 'false' : 'true');
-  }, [isMuted]);
-  const [lastScoreUpdate, setLastScoreUpdate] = useState<{ hole: number, strokes: number, putts: number } | null>(null);
   const [activeTacticalMode, setActiveTacticalMode] = useState<'PARCOURS' | 'STRATÉGIE' | 'ENTRAÎNEMENT'>('PARCOURS');
   const [selectedTactic, setSelectedTactic] = useState<'AGRESSIF' | 'SÉCURITÉ' | 'CRÉATIF'>('SÉCURITÉ');
   const [currentForm, setCurrentForm] = useState<'FROID' | 'FORME' | 'PUR'>('FORME');
-  const [currentSpeaker, setCurrentSpeaker] = useState<'ADAM' | 'LOGIC' | 'ONYX' | null>(null);
+  const [userLocation, setUserLocation] = useState<GeolocationPosition | null>(null);
+  const [isHandsFree, setIsHandsFree] = useState(false);
+  const wakeWordDetectedRef = useRef(false);
+  const handsFreeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastScoreUpdateRef = useRef<{ hole: number, strokes: number, putts: number } | null>(null);
+  const [lastScoreUpdate, setLastScoreUpdate] = useState<{ hole: number, strokes: number, putts: number } | null>(null);
+
+  const {
+    messages, setMessages, input, setInput, attachedImage, setAttachedImage,
+    isLoading, isListening, isSpeaking, isMuted, setIsMuted, lastTranscript,
+    handleSend: baseHandleSend, toggleListening, startListening, stopListening, speakText, currentSpeaker, setCurrentSpeaker, voiceError,
+    repeatLastAdvice, lastAdvice
+  } = useLiveChat({
+    initialMessage: initialMessage,
+    initialSpeaker: activeTacticalMode === 'ENTRAÎNEMENT' ? 'ONYX' : activeTacticalMode === 'STRATÉGIE' ? 'LOGIC' : 'ADAM',
+    silenceDelay: isHandsFree ? 4000 : 2500,
+    wakeWords: [],
+    autoRestartMic: true,
+    courseContext: {
+      selectedCourse,
+      currentHole,
+      scorecard,
+      arsenal,
+      handicap,
+      playerForm: currentForm,
+      selectedTee,
+      activeTacticalMode,
+      selectedTactic
+    },
+    onToolCall: (toolCalls) => {
+      toolCalls.forEach((call: any) => {
+        if (call.name === 'update_score' && onUpdateScore) {
+          const { hole_number, strokes, putts } = call.args;
+          onUpdateScore(hole_number, strokes, putts);
+          setLastScoreUpdate({ hole: hole_number, strokes, putts });
+          setTimeout(() => setLastScoreUpdate(null), 4000);
+          if (playPing) playPing(1000, 'sine', 0.1);
+        } else if (call.name === 'set_current_hole' && onSetCurrentHole) {
+          const { hole_number } = call.args;
+          onSetCurrentHole(hole_number);
+          if (playPing) playPing(880, 'sine', 0.05);
+        }
+      });
+    }
+  });
 
   const isSolar = displayMode === 'solar';
 
@@ -126,114 +152,36 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
     }
   }, [isOpen, initialMessage, activeTacticalMode]);
 
+  useEffect(() => {
+    if (isOpen && currentHole && initializedRef.current) {
+      // If hole changes, we could potentially inject a context reminder 
+      // but the chatWithAdam call already uses the fresh currentHole.
+      // However, it's good to clear any "Old Hole" mental state from the AI.
+      console.log(`[ONYX] Context sync: hole ${currentHole}`);
+    }
+  }, [currentHole, isOpen]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const currentAudioSource = useRef<AudioBufferSourceNode | null>(null);
-  const micTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [isHandsFree, setIsHandsFree] = useState(false);
-  const wakeWordDetectedRef = useRef(false);
-
-  const handsFreeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Use the updated voice input hook
-  const { isListening, startListening, stopListening, error } = useVoiceInput((text, isFinal) => {
-    const transcript = text.toLowerCase();
-    
-    // Wake word detection: ONYX (multiple variations)
-    const wakeWords = ['onyx', 'onix', 'onice', 'aux nix', 'onyks'];
-    const hasWakeWord = wakeWords.some(word => transcript.includes(word));
-
-    if (!wakeWordDetectedRef.current && hasWakeWord) {
-      wakeWordDetectedRef.current = true;
-      if (playPing) playPing(1200, 'sine', 0.1); // Detection sound
-      
-      // Extract query after wake word
-      let query = '';
-      for (const word of wakeWords) {
-        if (transcript.includes(word)) {
-          const parts = transcript.split(word);
-          query = parts[parts.length - 1].trim();
-          break;
-        }
-      }
-      
-      if (isFinal && query) {
-        handleSend(query);
-        wakeWordDetectedRef.current = false;
-        resetHandsFreeTimer(); // Activity detected
-      }
-    } else if (wakeWordDetectedRef.current && isFinal) {
-      handleSend(text);
-      wakeWordDetectedRef.current = false;
-      resetHandsFreeTimer();
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) {
+      alert("Image trop lourde (max 4MB)");
+      return;
     }
-  });
-
-  const resetHandsFreeTimer = useCallback(() => {
-    if (isHandsFree) {
-      if (handsFreeTimeoutRef.current) clearTimeout(handsFreeTimeoutRef.current);
-      handsFreeTimeoutRef.current = setTimeout(() => {
-        setIsHandsFree(false);
-        stopListening();
-        if (playPing) playPing(400, 'sine', 0.05); // Deactivation sound
-      }, 45000);
-    }
-  }, [isHandsFree, stopListening, playPing]);
-
-  const startAutoMic = useCallback(() => {
-    if (isHandsFree || wasListeningRef.current) {
-      startListening(true, isHandsFree ? 45000 : 20000);
-      if (isHandsFree) resetHandsFreeTimer();
-      wasListeningRef.current = false;
-    }
-  }, [isHandsFree, startListening, resetHandsFreeTimer]);
-
-  const toggleHandsFree = () => {
-    if (isHandsFree) {
-      setIsHandsFree(false);
-      if (handsFreeTimeoutRef.current) {
-        clearTimeout(handsFreeTimeoutRef.current);
-        handsFreeTimeoutRef.current = null;
-      }
-      stopListening();
-    } else {
-      setIsHandsFree(true);
-      wakeWordDetectedRef.current = false;
-      // Start a 45s session
-      startListening(true, 45000);
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const base64 = (readerEvent.target?.result as string).split(',')[1];
+      setAttachedImage({ mimeType: file.type, data: base64 });
       if (playPing) playPing(1500, 'sine', 0.1);
-      
-      // Reset timer on start
-      if (handsFreeTimeoutRef.current) clearTimeout(handsFreeTimeoutRef.current);
-      handsFreeTimeoutRef.current = setTimeout(() => {
-        setIsHandsFree(false);
-        stopListening();
-        if (playPing) playPing(400, 'sine', 0.05);
-      }, 45000);
-    }
+    };
+    reader.readAsDataURL(file);
   };
 
-  useEffect(() => {
-    if ('mediaSession' in navigator && isOpen) {
-      const setupMediaSession = () => {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: 'ONYX Mentoring',
-          artist: 'The Chose Elite',
-          album: 'Course Session',
-          artwork: [{ src: 'https://images.unsplash.com/photo-1540324155974-7523202daa3f?w=512', sizes: '512x512', type: 'image/jpeg' }]
-        });
-        navigator.mediaSession.setActionHandler('play', () => triggerMic());
-      };
-      setupMediaSession();
-    }
-  }, [isOpen]);
-
   const triggerMic = () => {
-    if (micTimeoutRef.current) {
-      clearTimeout(micTimeoutRef.current);
-      micTimeoutRef.current = null;
-    }
-
     if (isListening) {
       stopListening();
       return;
@@ -245,228 +193,71 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
     if (isSpeaking && currentAudioSource.current) {
       try {
         currentAudioSource.current.stop();
-      } catch (e) {
-        // Source might have already stopped
-      }
-      setIsSpeaking(false);
+      } catch (e) {}
     }
     
-    if (!isSpeechRecognitionSupported()) {
-      alert("La reconnaissance vocale n'est pas supportée sur ce navigateur. Essaie sur Chrome ou Safari.");
-      return;
-    }
-
     if (isHandsFree) {
         toggleHandsFree();
         return;
     }
 
-    // Clearer tactical "listening" beep
     if (playPing) playPing(1200, 'sine', 0.05);
-
-    // Démarrage en mode Continu pour le chat fluide
-    startListening(true, 20000);
+    toggleListening();
   };
+
+  const toggleHandsFree = () => {
+    if (isHandsFree) {
+      setIsHandsFree(false);
+      if (handsFreeTimeoutRef.current) {
+        clearTimeout(handsFreeTimeoutRef.current);
+        handsFreeTimeoutRef.current = null;
+      }
+      stopListening();
+    } else {
+      setIsHandsFree(true);
+      startListening(true, 45000);
+      if (playPing) playPing(1500, 'sine', 0.1);
+      
+      if (handsFreeTimeoutRef.current) clearTimeout(handsFreeTimeoutRef.current);
+      handsFreeTimeoutRef.current = setTimeout(() => {
+        setIsHandsFree(false);
+        stopListening();
+        if (playPing) playPing(400, 'sine', 0.05);
+      }, 45000);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition((position) => {
+          setUserLocation(position);
+        }, (err) => console.log("Geolocation error:", err));
+      }
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, isLoading, isSpeaking, isListening]);
 
-  const wasListeningRef = useRef(false);
-
-  const speakText = async (text: string, speaker?: 'ADAM' | 'LOGIC' | 'ONYX') => {
-    if (isMuted) return;
-    
-    // Pause listening while Adam speaks
-    if (isListening) {
-      wasListeningRef.current = true;
-      stopListening();
-    }
-
-    setIsSpeaking(true);
-    console.log(`[ONYX] Speaking response: "${text.substring(0, 30)}..."`);
-    
-    try {
-      // Find the caddie config based on speaker if possible
-      const speakerId = speaker === 'ONYX' ? 'pred' : speaker === 'LOGIC' ? 'strat' : 'mage';
-      const result = await generateSpeech(text, { id: speakerId });
-      
-      if (typeof result === 'object' && result.fallback) {
-        speakWithBrowser(result.text, () => {
-          setIsSpeaking(false);
-          startAutoMic();
-        });
-        return;
-      }
-      
-      if (typeof result === 'string') {
-        const source = await playRawPcm(result);
-        if (source) {
-          currentAudioSource.current = source;
-          source.onended = () => {
-            setIsSpeaking(false);
-            currentAudioSource.current = null;
-            startAutoMic();
-          };
-        } else {
-          setIsSpeaking(false);
-          startAutoMic();
-        }
-      } else {
-        setIsSpeaking(false);
-        startAutoMic();
-      }
-    } catch (error) {
-      console.error(error);
-      setIsSpeaking(false);
-      startAutoMic();
-    }
-  };
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 4 * 1024 * 1024) {
-      alert("Image trop lourde (max 4MB)");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (readerEvent) => {
-      const base64 = (readerEvent.target?.result as string).split(',')[1];
-      setAttachedImage({
-        mimeType: file.type,
-        data: base64
-      });
-      if (playPing) playPing(1500, 'sine', 0.1);
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleSend = async (textOverride?: string) => {
-    if (micTimeoutRef.current) {
-      clearTimeout(micTimeoutRef.current);
-      micTimeoutRef.current = null;
-    }
-    const textToSend = textOverride || input;
-    if (!textToSend.trim() && !attachedImage || isLoading) return;
+    let textToSend = textOverride || input;
+    if (!textToSend.trim() && !attachedImage) return;
 
-    if (playPing) playPing(600, 'sine', 0.03); // "Sent" feedback
-    
-    // Construct parts
-    const parts: any[] = [{ text: textToSend }];
-    if (attachedImage) {
-      parts.push({ inlineData: attachedImage });
+    if (isHandsFree) {
+      textToSend = `[AUDIO HUD MODE: RÉPONSE CHIRURGICALE MAX 10 MOTS] ${textToSend}`;
     }
 
-    const userMessage: SafeMessage = { 
-      id: generateUniqueId('user'),
-      role: 'user', 
-      parts: parts as any
-    };
-    
-    setMessages(prev => {
-      if (prev.some(m => m.id === userMessage.id)) return prev;
-      return [...prev, userMessage];
-    });
-    setInput('');
-    setAttachedImage(null);
-    setIsLoading(true);
-
-    try {
-      // Add tactical context to history for this specific turn
-      let contextualLastMessage = textToSend;
-      if (userLocation) {
-        contextualLastMessage = `[DATA TACTIQUE Lidar/GPS: Lat ${userLocation.coords.latitude.toFixed(6)}, Lng ${userLocation.coords.longitude.toFixed(6)}] ${textToSend}`;
-      }
-
-      // Cast the history for the API which expects Message[]
-      const historyForApi = [...messages, { ...userMessage, parts: attachedImage ? [
-        { text: isHandsFree ? `[AUDIO HUD MODE: RÉPONSE CHIRURGICALE MAX 10 MOTS] ${contextualLastMessage}` : contextualLastMessage },
-        { inlineData: attachedImage }
-      ] : [{ text: isHandsFree ? `[AUDIO HUD MODE: RÉPONSE CHIRURGICALE MAX 10 MOTS] ${contextualLastMessage}` : contextualLastMessage }] }].map(m => ({ role: m.role, parts: m.parts }));
-      
-      const { text, toolCalls } = await chatWithAdam(
-        historyForApi, 
-        selectedCourse, 
-        currentHole, 
-        scorecard, 
-        arsenal, 
-        handicap, 
-        currentForm.toLowerCase(), 
-        selectedTee, 
-        activeTacticalMode, 
-        selectedTactic,
-        {
-          scorecard: scorecard || {},
-          history: messages.slice(-5).map(m => {
-            const firstPart = m.parts[0];
-            return { advice: 'text' in firstPart ? firstPart.text : 'Image analysis' };
-          }), // Simplified history mapping
-          activeMode: activeTacticalMode
-        }
-      );
-      
-      // Handle Tool Calls
-      if (toolCalls && toolCalls.length > 0) {
-        toolCalls.forEach((call: any) => {
-          if (call.name === 'update_score' && onUpdateScore) {
-            const { hole_number, strokes, putts } = call.args;
-            onUpdateScore(hole_number, strokes, putts);
-            setLastScoreUpdate({ hole: hole_number, strokes, putts });
-            setTimeout(() => setLastScoreUpdate(null), 4000);
-            if (playPing) playPing(1000, 'sine', 0.1); // Score recorded ping
-          }
-        });
-      }
-
-      const responseTextWithTag = text || "...";
-      let responseText = responseTextWithTag;
-      let speaker: 'ONYX' | 'LOGIC' | 'ADAM' | null = null;
-
-      // Extract speaker tag [ONYX], [LOGIC], [ADAM]
-      const speakerMatch = responseTextWithTag.match(/^\[(ONYX|LOGIC|ADAM)\]/i);
-      if (speakerMatch) {
-        speaker = speakerMatch[1].toUpperCase() as any;
-        responseText = responseTextWithTag.replace(/^\[(ONYX|LOGIC|ADAM)\]\s*/i, '');
-      } else {
-        // Fallback to active mode label if no tag
-        speaker = activeTacticalMode === 'ENTRAÎNEMENT' ? 'ONYX' : activeTacticalMode === 'STRATÉGIE' ? 'LOGIC' : 'ADAM';
-      }
-      setCurrentSpeaker(speaker);
-
-      // Remove redundant speaker labels at the start of the line that might still be there
-      responseText = responseText
-        .replace(/^(ONYX|LOGIC|ADAM)\s*:\s*/i, '')
-        .trim();
-
-      const adamMessage: SafeMessage = { 
-        id: generateUniqueId('adam'),
-        role: 'model', 
-        parts: [{ text: responseText }],
-        speaker: speaker || undefined
-      };
-      setMessages(prev => {
-        if (prev.some(m => m.id === adamMessage.id)) return prev;
-        return [...prev, adamMessage];
-      });
-      if (responseText) speakText(responseText, speaker || undefined);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsLoading(false);
+    if (userLocation) {
+        textToSend = `[DATA GPS: ${userLocation.coords.latitude.toFixed(5)},${userLocation.coords.longitude.toFixed(5)}] ${textToSend}`;
     }
+
+    baseHandleSend(textToSend);
   };
 
   const handleClose = () => {
     stopListening();
-    if (micTimeoutRef.current) {
-      clearTimeout(micTimeoutRef.current);
-      micTimeoutRef.current = null;
-    }
     onClose();
   };
 
@@ -483,10 +274,10 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
             className={`w-full h-full sm:max-w-xl sm:h-[90vh] ${isSolar ? 'bg-white' : 'bg-black'} border-t sm:border ${isSolar ? 'border-zinc-200 shadow-2xl' : 'border-white/10'} sm:rounded-[2.5rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] flex flex-col relative`}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* LIVE NEURAL BACKGROUND - The Primary Immersive Layer */}
             <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ${isSolar ? 'opacity-100' : 'opacity-100'}`}>
                <AudioVisualizer 
-                 isActive={isLoading || isSpeaking || isListening || isHandsFree} 
+                 isActive={isLoading || isSpeaking || isListening} 
+                 mode={isLoading ? 'thinking' : isSpeaking ? 'speaking' : isListening ? 'listening' : 'idle'}
                  isSolar={isSolar}
                />
             </div>
@@ -517,7 +308,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
             </AnimatePresence>
 
             {/* FIXED HUD HEADER - LUXURY BANNER STYLE */}
-            <div className={`relative z-30 flex flex-col ${isSolar ? 'bg-white border-b-2 border-black shadow-lg' : 'bg-black/95 border-b-2 border-red-600 shadow-2xl'} group`}>
+            <div className={`relative z-30 flex flex-col ${isSolar ? 'bg-white border-b-2 border-black shadow-lg' : 'bg-black/95 border-b-2 border-zinc-800 shadow-2xl'} group`}>
               {/* Luxury Banner Image */}
               <div className="absolute inset-0 z-0">
                 <img 
@@ -584,9 +375,9 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                  ) : (
                     <>
                       {[
-                        { id: 'COURSE', label: 'ADAM', sub: 'PARCOURS', icon: <MapIcon size={16} />, color: isSolar ? 'from-emerald-100' : 'from-emerald-500/40', mode: 'PARCOURS' as const },
-                        { id: 'LOGIC', label: 'LOGIC', sub: 'STRATÉGIE', icon: <Brain size={16} />, color: isSolar ? 'from-blue-100' : 'from-blue-500/40', mode: 'STRATÉGIE' as const },
-                        { id: 'TRAINING', label: 'ONYX', sub: 'ENTRAÎNEMENT', icon: <Target size={16} />, color: isSolar ? 'from-black/10' : 'from-[#c9964a]/40', mode: 'ENTRAÎNEMENT' as const },
+                        { id: 'COURSE', label: 'ADAM', sub: 'PARCOURS', icon: <MapIcon size={16} />, color: isSolar ? 'from-zinc-100' : 'from-white/10', mode: 'PARCOURS' as const },
+                        { id: 'LOGIC', label: 'LOGIC', sub: 'STRATÉGIE', icon: <Brain size={16} />, color: isSolar ? 'from-zinc-200' : 'from-zinc-500/20', mode: 'STRATÉGIE' as const },
+                        { id: 'TRAINING', label: 'ONYX', sub: 'ENTRAÎNEMENT', icon: <Target size={16} />, color: isSolar ? 'from-[#c9964a]/10' : 'from-[#c9964a]/20', mode: 'ENTRAÎNEMENT' as const },
                       ].map(mode => (
                         <button 
                           key={mode.id}
@@ -648,7 +439,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                           setCurrentForm(f as any);
                           if (playPing) playPing(1200, 'sine', 0.05);
                         }}
-                        className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${currentForm === f ? (isSolar ? 'bg-red-600 text-white' : 'bg-red-600 text-white') : (isSolar ? 'text-zinc-500' : 'text-white/40')}`}
+                        className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${currentForm === f ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-500' : 'text-white/40')}`}
                       >
                         {f}
                       </button>
@@ -662,26 +453,24 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
             {/* SCROLLING CONVERSATION */}
             <div ref={scrollRef} className={`relative z-20 flex-1 overflow-y-auto px-6 py-6 scrollbar-hide ${isSolar ? 'bg-zinc-50/50' : 'bg-transparent'}`}>
               
-              {messages.map((msg) => (
+              {messages.slice(-10).map((msg) => (
                 <motion.div key={msg.id} initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }} animate={{ opacity: 1, x: 0 }} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}>
                   <div className={`max-w-[85%] ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                      <div className={`inline-block p-3 rounded-xl text-[14px] font-bold leading-relaxed shadow-2xl ${
+                      <div className={`inline-block p-4 rounded-2xl text-[14px] font-medium leading-relaxed shadow-2xl ${
                         msg.role === 'user' 
-                          ? (isSolar ? 'bg-white border-2 border-zinc-950 text-black shadow-zinc-200' : 'bg-zinc-800 text-white rounded-tr-none border-2 border-white/20 shadow-black/50') 
+                          ? (isSolar ? 'bg-black text-white' : 'bg-white/10 text-white rounded-tr-none border border-white/20 backdrop-blur-md') 
                           : (isSolar 
-                              ? `bg-white text-black italic border-2 shadow-xl ${
+                              ? `bg-white text-black italic border shadow-xl ${
                                    msg.speaker === 'ONYX' 
-                                    ? 'border-zinc-950 border-double' 
-                                    : msg.speaker === 'LOGIC' 
-                                      ? 'border-blue-600' 
-                                      : 'border-emerald-600'
+                                    ? 'border-[#c9964a]' 
+                                    : 'border-zinc-950'
                                  }`
-                              : `bg-black text-white italic border-2 rounded-tl-none ring-2 shadow-2xl ${
+                              : `bg-black text-white italic border rounded-tl-none shadow-[0_10px_40px_rgba(0,0,0,0.8)] ${
                                 msg.speaker === 'ONYX' 
-                                  ? 'border-[#c9964a] ring-[#c9964a]/20 shadow-[#c9964a]/20' 
+                                  ? 'border-[#c9964a]/60 ring-1 ring-[#c9964a]/10 shadow-[#c9964a]/5' 
                                   : msg.speaker === 'LOGIC' 
-                                    ? 'border-blue-500 ring-blue-500/20 shadow-blue-500/20' 
-                                    : 'border-emerald-500 ring-emerald-500/20 shadow-emerald-500/20'
+                                    ? 'border-zinc-700/50 ring-1 ring-zinc-700/10 shadow-zinc-700/5' 
+                                    : 'border-white/30 ring-1 ring-white/5 shadow-white/5'
                                 }`)
                       }`}>
                         {msg.parts.map((part: any, pIdx) => {
@@ -708,8 +497,8 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                           : msg.speaker === 'ONYX' 
                             ? (isSolar ? 'bg-black' : 'bg-[#c9964a]') 
                             : msg.speaker === 'LOGIC' 
-                              ? 'bg-blue-500' 
-                              : 'bg-emerald-500'
+                              ? 'bg-zinc-500' 
+                              : 'bg-white'
                       }`} />
                     </div>
                   </div>
@@ -726,7 +515,32 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
             </div>
 
             {/* TACTICAL INPUT CONSOLE - Robust for Sunlight */}
-            <div className={`relative z-30 p-4 pb-6 border-t-2 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] ${isSolar ? 'bg-white border-zinc-950' : 'bg-black border-red-600'}`}>
+            <div className={`relative z-30 p-4 pb-6 border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] ${isSolar ? 'bg-white border-zinc-950' : 'bg-[#0a0a0a]'}`}>
+               
+               {/* Live Transcription HUD */}
+               <AnimatePresence>
+                 {(isListening || (lastTranscript && !isLoading)) && (
+                   <motion.div 
+                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                     animate={{ opacity: 1, y: 0, scale: 1 }}
+                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                     className={`mb-4 p-4 rounded-2xl border-2 flex flex-col gap-1 items-center justify-center text-center shadow-2xl relative overflow-hidden ${isSolar ? 'bg-zinc-100 border-zinc-950' : 'bg-zinc-900 border-[#c9964a]/30'}`}
+                   >
+                     {isListening && (
+                       <div className="absolute inset-0 opacity-10 pointer-events-none">
+                         <AudioVisualizer isActive={true} isSolar={isSolar} />
+                       </div>
+                     )}
+                     <span className={`text-[8px] font-black uppercase tracking-[0.4em] ${isSolar ? 'text-black/40' : 'text-[#c9964a]/50'}`}>
+                       {isListening ? "ADAM À L'ÉCOUTE" : "VOIX DÉTECTÉE"}
+                     </span>
+                     <div className={`text-sm font-medium italic ${isSolar ? 'text-black' : 'text-white'} line-clamp-2`}>
+                       {lastTranscript || "Parlez maintenant..."}
+                     </div>
+                   </motion.div>
+                 )}
+               </AnimatePresence>
+
                {attachedImage && (
                  <motion.div 
                    initial={{ y: 20, opacity: 0 }}
@@ -792,6 +606,21 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                )}
                
                <div className="flex items-center gap-2">
+                 <AnimatePresence>
+                   {lastAdvice && (
+                     <motion.button
+                       initial={{ opacity: 0, x: -10 }}
+                       animate={{ opacity: 1, x: 0 }}
+                       exit={{ opacity: 0, x: -10 }}
+                       whileTap={{ scale: 0.9 }}
+                       onClick={repeatLastAdvice}
+                       className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all border-2 ${isSolar ? 'bg-white border-black text-black' : 'bg-black/40 border-[#c9964a]/30 text-[#c9964a]'}`}
+                     >
+                       <Volume2 size={22} className={isSpeaking ? 'animate-pulse' : ''} />
+                     </motion.button>
+                   )}
+                 </AnimatePresence>
+
                  <div className="relative">
                    <motion.button 
                      whileTap={{ scale: 0.9 }}
@@ -803,16 +632,16 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                    </motion.button>
                    
                    <AnimatePresence>
-                     {error && (
+                     {voiceError && (
                        <motion.div 
                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
                          animate={{ opacity: 1, scale: 1, y: 0 }}
                          exit={{ opacity: 0, scale: 0.8, y: 10 }}
-                         className="absolute bottom-full left-0 mb-4 w-60 bg-red-600 text-white text-[10px] font-black p-3 rounded-xl shadow-2xl z-50 border-2 border-white/20"
+                         className="absolute bottom-full left-0 mb-4 w-60 bg-zinc-900 text-[#c9964a] text-[10px] font-black p-3 rounded-xl shadow-2xl z-50 border border-[#c9964a]/30"
                        >
                          <div className="flex items-center gap-2">
-                           <VolumeX size={12} />
-                           <span>{error}</span>
+                            <VolumeX size={12} />
+                            <span>{voiceError}</span>
                          </div>
                          <div className="absolute top-full left-6 w-3 h-3 bg-red-600 rotate-45 -translate-y-1.5 border-r border-b border-white/10" />
                        </motion.div>
@@ -820,7 +649,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                    </AnimatePresence>
                  </div>
                  
-                 <div className={`flex-1 flex items-center gap-2 border-2 rounded-xl px-3 group transition-all shadow-inner h-12 ${isSolar ? 'bg-white border-zinc-950 focus-within:ring-2 ring-black' : 'bg-zinc-900 border-white/10 focus-within:border-red-600/80 shadow-inner'}`}>
+                 <div className={`flex-1 flex items-center gap-2 border-2 rounded-xl px-3 group transition-all shadow-inner h-12 ${isSolar ? 'bg-white border-zinc-950 focus-within:ring-2 ring-black' : 'bg-zinc-900 border-white/10 focus-within:border-[#c9964a]/50 shadow-inner'}`}>
                    <motion.button 
                      whileHover={{ scale: 1.1 }}
                      whileTap={{ scale: 0.9 }}
@@ -853,7 +682,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                      className={`p-2 rounded-lg transition-all flex items-center justify-center ${
                        (!input.trim() && !attachedImage) 
                          ? 'opacity-20 grayscale' 
-                         : (isSolar ? 'bg-black text-white shadow-lg' : 'bg-red-600 text-white shadow-lg shadow-red-600/20')
+                         : (isSolar ? 'bg-black text-white shadow-lg' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/20')
                      }`}
                    >
                      <Send size={18} strokeWidth={3} className={(!input.trim() && !attachedImage) ? '' : 'animate-pulse'} />
@@ -870,7 +699,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                  >
                    <button 
                      onClick={() => (input.trim() || attachedImage) ? handleSend() : handleSend(`[COMMANDE TACTIQUE] ${selectedTactic} / ${currentForm}.`)}
-                     className={`w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-95 border-2 bg-red-600 text-white border-red-500 shadow-xl shadow-red-600/40 hover:bg-red-700 hover:scale-[1.01]`}
+                     className={`w-full py-4 rounded-xl font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-95 border border-[#c9964a]/50 ${isSolar ? 'bg-black text-white' : 'bg-gradient-to-r from-[#c9964a] via-[#f5e6d3] to-[#c9964a] text-zinc-950 shadow-[0_0_30px_rgba(201,150,74,0.3)]'} hover:scale-[1.01] overflow-hidden relative group`}
                    >
                      <Check size={20} strokeWidth={4} />
                      <span>{(input.trim() || attachedImage) ? "VALIDER LA COMMANDE" : "VALIDER LA TACTIQUE"}</span>

@@ -207,15 +207,15 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
       {/* Sub-Tabs */}
       <div className={`sticky top-0 z-50 px-4 py-4 backdrop-blur-xl flex gap-2 ${isSolar ? 'bg-white/90 border-b border-zinc-100' : 'bg-black/90 border-b border-white/5'}`}>
         {[
-          { id: 'feed', label: 'FLUX', icon: LayoutIcon },
-          { id: 'challenges', label: 'DÉFIS', icon: Flame },
-          { id: 'friends', label: 'EQUIPE', icon: Users },
+          { id: 'comm-feed', label: 'FLUX', icon: LayoutIcon },
+          { id: 'comm-challenges', label: 'DÉFIS', icon: Flame },
+          { id: 'comm-friends', label: 'EQUIPE', icon: Users },
         ].map(t => (
           <button
-            key={t.id}
-            onClick={() => setActiveSubTab(t.id as any)}
+            key={`comm-subtab-${t.id}`}
+            onClick={() => setActiveSubTab(t.id.replace('comm-', '') as any)}
             className={`flex-1 h-12 rounded-xl flex items-center justify-center gap-2 transition-all p-2 ${
-              activeSubTab === t.id 
+              activeSubTab === t.id.replace('comm-', '') 
                 ? (isSolar ? 'bg-black text-white shadow-xl' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/20') 
                 : (isSolar ? 'bg-zinc-100 text-zinc-400' : 'bg-white/5 text-white/30 hover:bg-white/10')
             }`}
@@ -370,7 +370,7 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
               className="space-y-4"
             >
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={`friend-${i}`} className={`border rounded-[2rem] p-4 flex items-center justify-between shadow-sm ${isSolar ? 'bg-white border-zinc-100' : 'bg-white/5 border-white/5'}`}>
+                <div key={`community-friend-item-${i}`} className={`border rounded-[2rem] p-4 flex items-center justify-between shadow-sm ${isSolar ? 'bg-white border-zinc-100' : 'bg-white/5 border-white/5'}`}>
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center relative overflow-hidden ${isSolar ? 'bg-zinc-100 border-zinc-200' : 'bg-zinc-800 border-white/5'}`}>
                       <Users size={20} className={isSolar ? 'text-zinc-300' : 'text-white/20'} />

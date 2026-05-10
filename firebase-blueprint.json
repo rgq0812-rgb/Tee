@@ -95,6 +95,23 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "caddieName", "advice", "createdAt"]
+    },
+    "CourseTacticalProfile": {
+      "title": "Course Tactical Profile",
+      "description": "Aggregated tactical takeaways for a specific golf course based on past performance.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "courseName": { "type": "string" },
+        "lastTotalScore": { "type": "number" },
+        "tacticalSummary": { "type": "string" },
+        "holeAdvice": { 
+          "type": "object",
+          "description": "Map of hole number to specific tactical advice derived from the last round."
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "courseName", "tacticalSummary", "updatedAt"]
     }
   },
   "firestore": {
@@ -113,6 +130,10 @@
     "/tactical_advice/{adviceId}": {
       "schema": "TacticalAdvice",
       "description": "History of AI advice."
+    },
+    "/course_tactical_profiles/{profileId}": {
+      "schema": "CourseTacticalProfile",
+      "description": "Course-specific tactical history for a user."
     },
     "/rounds/{roundId}": {
       "schema": "Round",

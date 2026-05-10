@@ -19,6 +19,11 @@ service cloud.firestore {
       return isSignedIn() && (request.auth.token.email == "rgq0812@gmail.com" && request.auth.token.email_verified == true);
     }
 
+    // Connection Test
+    match /test/connection {
+      allow read: if true;
+    }
+
     // --- Entities Validators ---
     
     function isValidUser(data) {
@@ -63,6 +68,14 @@ service cloud.firestore {
               data.advice is string && data.advice.size() <= 3000;
     }
 
+    function isValidCourseTacticalProfile(data) {
+       return data.keys().hasAll(['userId', 'courseName', 'tacticalSummary', 'updatedAt']) &&
+              data.userId == request.auth.uid &&
+              data.updatedAt == request.time &&
+              data.courseName is string &&
+              data.tacticalSummary is string && data.tacticalSummary.size() <= 4000;
+    }
+
     // --- Path Rules ---
 
     match /users/{userId} {
@@ -93,8 +106,15 @@ service cloud.firestore {
 
     match /tactical_advice/{adviceId} {
       allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
       allow create: if isVerified() && isValidTacticalAdvice(incoming());
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    match /course_tactical_profiles/{profileId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create, update: if isVerified() && isValidCourseTacticalProfile(incoming());
       allow delete: if isOwner(resource.data.userId) || isAdmin();
     }
 

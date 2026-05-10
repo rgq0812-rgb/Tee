@@ -127,9 +127,9 @@ export default function MissionControl({
                   <span className={`text-[9px] font-black uppercase tracking-[0.4em] ${isSolar ? 'text-black font-black' : 'text-white/40'}`}>FORME</span>
                 </div>
                 <div className={`h-20 rounded-[2rem] border grid grid-cols-3 p-1.5 shadow-sm ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
-                  {(['cold', 'forme', 'pur'] as const).map(f => (
+                  {(['cold', 'forme', 'pur'] as const).map((f, fidx) => (
                     <button 
-                      key={f}
+                      key={`mission-form-btn-${f}-${fidx}`}
                       onClick={() => setPlayerForm(f)}
                       className={`rounded-2xl transition-all flex items-center justify-center text-[7px] font-black uppercase tracking-widest ${
                         playerForm === f 
@@ -158,9 +158,9 @@ export default function MissionControl({
                     { id: 'yellow', color: 'bg-yellow-400', border: 'border-yellow-200', label: 'JAUNE' },
                     { id: 'blue', color: 'bg-blue-600', border: 'border-blue-400', label: 'BLEU' },
                     { id: 'red', color: 'bg-red-600', border: 'border-red-400', label: 'ROUGE' },
-                  ].map(tee => (
+                  ].map((tee, tidx) => (
                     <button 
-                      key={tee.id}
+                      key={`mission-tee-btn-${tee.id}-${tidx}`}
                       onClick={() => setSelectedTee(tee.id as any)}
                       className={`h-24 rounded-3xl flex flex-col items-center justify-center gap-2 transition-all border-2 relative overflow-hidden ${
                         selectedTee === tee.id 

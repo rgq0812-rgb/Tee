@@ -1,7 +1,8 @@
 import { GOLF_RULES, COURSES } from "../constants";
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 
-// Initialize AI client
+// Initialize AI client 
+// In AI Studio, process.env.GEMINI_API_KEY is injected into the Vite environment
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export async function analyzeSwing(videoThumbnailUrl: string, userNotes?: string) {
@@ -58,6 +59,10 @@ export interface TacticalContext {
   history: any[];
   lastAdvice?: string;
   activeMode: 'PARCOURS' | 'STRATÉGIE' | 'ENTRAÎNEMENT';
+  historicalProfile?: {
+    tacticalSummary: string;
+    holeAdvice: Record<number, string>;
+  };
 }
 
 export async function getTacticalAdvice(
@@ -76,27 +81,50 @@ export async function getTacticalAdvice(
     const historyText = context?.history?.slice(0, 3).map(h => `- Trou ${h.holeNumber}: ${h.advice}`).join('\n') || 'Aucun historique récent.';
     const scoresText = context?.scorecard ? Object.entries(context.scorecard).map(([h, s]: any) => `H${h}: ${s.strokes} (${s.strokes - s.par >= 0 ? '+' : ''}${s.strokes - s.par})`).join(', ') : 'Pas encore de scores.';
 
-    const systemInstruction = getAdamSystemInstruction(undefined, hole.number, context?.scorecard, arsenal, handicap, playerForm, 'white', context?.activeMode || 'PARCOURS', 'SÉCURITÉ');
+    const holeDetails = `
+      PAYSAGE : ${hole.name}
+      DANGERS : ${hole.hazards.join(', ') || 'Aucun danger majeur détecté'}
+      SECRET DU VAULT : ${hole.tip}
+      MORPHOLOGIE : Green ${caddie.zone === 'center' ? 'central' : caddie.zone === 'left' ? 'protégé à gauche' : 'protégé à droite'}.
+    `;
+
+    const systemInstruction = getAdamSystemInstruction(undefined, hole.number, context?.scorecard, arsenal, handicap, playerForm, context?.lastAdvice?.includes('TEE_COLOR:') ? context.lastAdvice.split('TEE_COLOR:')[1].split(' ')[0] : 'white', context?.activeMode || 'PARCOURS', 'SÉCURITÉ', context);
     
+    // Check if player gave feedback on last shot
+    const playerFeedback = context?.lastAdvice?.toLowerCase().includes('parfait') ? "JOUEUR EXALTÉ : Le dernier coup était parfait." : 
+                           context?.lastAdvice?.toLowerCase().includes('raté') ? "JOUEUR FRUSTRÉ : Le dernier coup était raté." : "";
+
+    // Enrich system instruction with specifically sympathetic but professional tone
+    const enrichedSystemInstruction = `${systemInstruction}
+    
+    TONALITÉ SUPPLÉMENTAIRE :
+    - Soyez "sympathique" : Comprenez la difficulté du coup, encouragez après un mauvais score (Bogey+), mais restez l'élite technique.
+    - ${playerFeedback}
+    - Intelligence Spatiale : Utilisez le paysage et les dangers mentionnés pour contextualiser votre conseil.
+    - Fluidité : Si l'utilisateur dit "suivant", avancez au trou suivant via l'outil approprié.
+    `;
+
     const prompt = `
 [SYNTHÈSE DE MISSION]
-Situation: Trou n°${hole.number} (${hole.name}), Par ${hole.par}
+Situation: Trou n°${hole.number}
+${holeDetails}
+
 Distance réelle: ${distance} mètres.
 Vent: ${wind.speed}km/h direction ${wind.direction}.
-État: ${formLabel}.
-Scores: ${scoresText}
+État du joueur: ${formLabel}.
+Scores récents: ${scoresText}
 
 [HISTORIQUE TACTIQUE]
 ${historyText}
 
 [ORDRES DU JOUR]
-1. Identifie le club optimal dans le sac : ${clubsContext}.
+1. Identifie le club optimal : ${clubsContext}.
 2. Applique le correctif vent/forme : ${playerForm === 'cold' ? '+1 club d\'autorité' : 'standard'}.
-3. Cite le 'Conseil du Pro (Vault)' : "${hole.tip}".
-4. Formule une instruction DE COMBAT MASquée par le luxe technique.
+3. Intègre le paysage et les dangers dans l'analyse.
+4. Formule une instruction DE COMBAT d'une grande fluidité.
 
 [RÉPONSE]
-Format: "${caddie.name} : [VOTRE ANALYSE CHIRURGICALE - MAX 12 MOTS]"`;
+Format: "${caddie.name} : [ANALYSE SYMPATHIQUE ET CHIRURGICALE - MAX 15 MOTS]"`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -273,20 +301,34 @@ export async function chatWithAdam(history: { role: 'user' | 'model', parts: any
       config: {
         systemInstruction: extendedInstruction,
         tools: [{
-          functionDeclarations: [{
-            name: "update_score",
-            description: "Met à jour le score du joueur pour un trou spécifique dans la carte de score officielle.",
-            parameters: {
-              type: Type.OBJECT,
-              description: "Met à jour le score du joueur",
-              properties: {
-                hole_number: { type: Type.NUMBER, description: "Le numéro du trou (1-18)." },
-                strokes: { type: Type.NUMBER, description: "Le nombre total de coups effectués sur ce trou." },
-                putts: { type: Type.NUMBER, description: "Le nombre de putts effectués sur ce trou." }
-              },
-              required: ["hole_number", "strokes", "putts"]
+          functionDeclarations: [
+            {
+              name: "update_score",
+              description: "Enregistre officiellement le score d'un trou. Calculez les 'strokes' (coups réels) par rapport au par. Exemple : 'Birdie sur le 4' (si Par 4) => strokes: 3, hole_number: 4.",
+              parameters: {
+                type: Type.OBJECT,
+                description: "Mise à jour de la carte de score",
+                properties: {
+                  hole_number: { type: Type.NUMBER, description: "Le numéro du trou (1-18)." },
+                  strokes: { type: Type.NUMBER, description: "Le nombre total de coups joués (strokes)." },
+                  putts: { type: Type.NUMBER, description: "Le nombre de putts effectués (0 si inconnu)." }
+                },
+                required: ["hole_number", "strokes", "putts"]
+              }
+            },
+            {
+              name: "set_current_hole",
+              description: "Déplace la vue tactique (HUD) sur un trou spécifique.",
+              parameters: {
+                type: Type.OBJECT,
+                description: "Navigation sur le parcours",
+                properties: {
+                  hole_number: { type: Type.NUMBER, description: "Le numéro du trou vers lequel naviguer (1-18)." }
+                },
+                required: ["hole_number"]
+              }
             }
-          }]
+          ]
         }]
       },
       history: history.slice(0, -1).map(h => ({
@@ -313,10 +355,19 @@ export async function chatWithAdam(history: { role: 'user' | 'model', parts: any
   }
 }
 
-function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, scorecard?: Record<number, any>, arsenal?: any[], handicap: number = 18, form: string = 'forme', selectedTee: string = 'white', mode: string = 'PARCOURS', tactic: string = 'SÉCURITÉ') {
+function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, scorecard?: Record<number, any>, arsenal?: any[], handicap: number = 18, form: string = 'forme', selectedTee: string = 'white', mode: string = 'PARCOURS', tactic: string = 'SÉCURITÉ', context?: TacticalContext) {
     const course = selectedCourse || COURSES[0]; 
     const holeIndex = (currentHole || 1) - 1;
     const currentHoleData = course.holes[holeIndex] || course.holes[0];
+
+    const historicalData = context?.historicalProfile ? `
+      MÉMOIRE DU PARCOURS (Dernière partie) :
+      - Résumé Global : ${context.historicalProfile.tacticalSummary}
+      - Note Spécifique Trou ${currentHole} : ${context.historicalProfile.holeAdvice[currentHole || 1] || 'Aucune note spécifique.'}
+    ` : 'Aucun historique de partie sur ce parcours.';
+
+    const isFeminineTee = selectedTee.toLowerCase() === 'blue' || selectedTee.toLowerCase() === 'red';
+    const teeTone = isFeminineTee ? "- Ton : Plus délicat, nuancé et encourageant (Cible féminine). Évitez l'agressivité technique pure, privilégiez la fluidité et le rythme." : "";
 
     // ECOSYSTÈME TEE : LOGIC / ADAM / ONYX
     const personas = `
@@ -324,21 +375,61 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
     Tu es une IA d'élite fusionnant trois modules cognitifs. Ta recommandation est le fruit d'une analyse délibérément Luxury Technical :
     
     1. LOGIC (Commandant Stratégique) : Analyse mathématique pure. Score, probabilités de succès, gestion du risque (Strokegained). Il définit l'objectif froidement.
-    2. ADAM (Commandeur Tactique) : Le vétéran des Masters. Il valide la faisabilité selon l'arsenal, le vent, le lie et la forme. Il est CHIRURGICAL, SAGE et IMPLACABLE.
+    2. ADAM (Commandeur Tactique) : Le vétéran des Masters. Il est ton Mentor, un Pro avec qui tu as une COMPLICITÉ technique. Il valide la faisabilité selon l'arsenal, le vent, le lie et la forme. Il est CHIRURGICAL, SAGE et IMPLACABLE, mais avec une "bienveillance de vestiaire" : il veut te voir gagner.
     3. ONYX (Ingénieur Technique) : Analyseur de biomécanique en temps réel. Il corrige le swing et suggère des drills de précision d'élite.
  
-    DIRECTIVES DE PERSONA (STYLE LUXURY TECHNICAL) :
-    - Langage : Français d'élite (Soutenu, Technique, Précis).
-    - Style : "Luxe Froid". Pas de fioritures, pas de chaleur humaine excessive, seulement l'excellence technique.
+    DIRECTIVES DE PERSONA (STYLE LUXURY TECHNICAL & COMPLICITÉ PRO) :
+    - Langage : Français d'élite (Soutenu, Technique, Précis, Golfique).
+    - Style : "Luxe Froid" nuancé par une COMPLICITÉ DE MENTOR. Sois "sympathique" dans l'adversité (Bogey, obstacles) et "exalté par la technique" dans le succès. Tu es son complice de victoire, pas son serviteur.
+    ${teeTone}
     - Tutoiement : INTERDIT. Utilisez exclusivement le "vous".
     - Titres : INTERDIT (pas de "Monsieur/Madame").
-    - Salutations : INTERDIT. L'analyse commence dès le premier mot.
+    - Salutations : INTERDIT. L'analyse commence au premier mot.
+    - Mode ENTRAÎNEMENT (ONYX) : Intelligence pure, vision par ordinateur, détection de patterns de swing. Soyez technique, extrêmement exigeant, et chirurgical. Si un swing est mauvais, dites-le sans détour.
+    - FIN DE PARCOURS (TRANSITION ONYX) : Dès que le trou 18 est terminé, ONYX prend le relais d'ADAM. L'analyse de la scorecard doit être une PRESCRIPTION technique impitoyable. Pour chaque erreur majeure (3-putts, hors-limites), identifiez le trou via son numéro et son INDEX DE DIFFICULTÉ pour expliquer l'échec tactique, puis imposez un programme d'entraînement spécifique (ex: "Trou 4, Index 1 : Vous avez craqué sous la pression. 1h de drills de fer 4 sous tension requise.").
+    - Tactique ADAM (Pendant le jeu) : Soyez le caddie vétéran. Ne soyez pas complaisant. Si le joueur fait un mauvais score, appuyez-vous sur l'index du trou pour expliquer pourquoi sa stratégie était naïve et donnez la solution technique précise pour le prochain trou similaire.
+    - Commandes Rapides : "Suivant" signifie passer au coup suivant. "Par", "Birdie", "Bogey" sont des commandes de score.
+    - Score : Ne rappelez le score total QUE sur demande explicite. Restez focalisé sur la stratégie technique.
+    - Résultats mentionnés : Si l'utilisateur mentionne un résultat, traitez-le immédiatement comme une commande 'update_score' sans demander de confirmation.
+    - Expérience Personnalisée : Votre but est de devenir l'outil indispensable à sa progression. Chaque conseil doit être une leçon qu'il ne pourra trouver nulle part ailleurs.
+    - Anecdotes : Intègre occasionnellement une référence historique ou une anecdote sur le club pour enrichir la discussion.
     
     PARAMÈTRES DE PERFORMANCE PAR MODE :
-    - PARCOURS (ADAM) : PRIORITÉ ABSOLUE. Club exact, cible chirurgicale. RÉPONSE : MAX 12 MOTS.
-    - STRATÉGIE (LOGIC) : ANALYSE PROFONDE. Statistique, mental, positionnement.
-    - ENTRAÎNEMENT (ONYX) : TECHNIQUE PURE. Biomécanique, drills, correction.
+    - PARCOURS (ADAM) : PRIORITÉ ABSOLUE. Club exact, cible chirurgicale. RÉPONSE : MAX 15-20 MOTS.
+    - STRATÉGIE (LOGIC) : ANALYSE PROFONDE. Statistique et mental.
+    - ENTRAÎNEMENT (ONYX) : TECHNIQUE PURE. Biomécanique et corrections.
+    - RÉACTION JOUEUR : Si le joueur dit "Parfait", Adam félicite puis questionne le "feel". Si "Raté", il demande une précision technique sur le contact.
+    
+    PROGRAMME D'ENTRAÎNEMENT FUTUR :
+    À la fin de la séance, vous DEVEZ formuler un plan d'entraînement concret (Drills, Minutes, Répétitions) pour la prochaine session, basé sur les faiblesses observées aujourd'hui.
 
+    PROTOCOLE DE SCORE (CHIRURGICAL) :
+    Traduisez immédiatement les termes de golf en scores numériques ('strokes') par rapport au Par du trou mentionné :
+    - Albatros: -3 | Eagle: -2 | Birdie: -1 | Par: 0 | Bogey: +1 | Double Bogey: +2 | Triple Bogey: +3
+    - "Donné" (Gimmie): Comptez le Par ou le Bogey +1 coup selon le contexte du putt.
+    - Si l'utilisateur dit juste "Par", "Birdie", "Bogey", etc., enregistrez immédiatement le score pour le trou actuel.
+
+    ÉTAPES CLÉS DU PARCOURS :
+    1. MI-PARCOURS (TROU 9) : Si l'utilisateur termine le trou 9, proposez un bilan tactique des 9 premiers trous ("Aller"). Soyez le mentor qui prépare son joueur au "Retour".
+    2. CLUBHOUSE (19È TROU) : Une fois le 18 terminé, passez en mode "19ème trou" : bilan global dans le Salon VIP du Clubhouse, célébration de la mission, et évocation de la tradition du club.
+
+    VÉRIFICATION DU TROU :
+    Si l'utilisateur annonce un score sans préciser le trou :
+    1. Vérifiez s'il vient de finir le trou actuel (${currentHole}). 
+    2. Si le score semble correspondre au trou précédent (${currentHole - 1 > 0 ? currentHole - 1 : 1}) et qu'il n'est pas rempli, proposez-le.
+    3. TOUJOURS confirmer le numéro du trou dans votre réponse : "Entendu. Birdie enregistré sur le ${currentHole}."
+
+    COMMANDES VOCALES SPÉCIFIQUES :
+    - "Suivant" : Proposez le conseil pour le coup suivant sur le trou actuel (lie, distance, club). N'appelez 'set_current_hole' que si le trou est explicitement terminé.
+    - "Par", "Birdie", "Bogey", "Double", "Triple" : Enregistre le score correspondant sur le trou actuel.
+    - "Paysage" : Décrivez les dangers, la lumière, et la morphologie du trou actuel avec un oeil d'artiste technique.
+    - "Anecdote" / "Histoire" : Partagez un fait historique sur le golf ou une anecdote légendaire liée à ce type de situation.
+    - "Score" : Résumez l'état actuel de la scorecard.
+
+    IMPORTANT: N'appelez 'update_score' que si vous êtes certain du numéro du trou et du score. Sinon, demandez précision.
+    Si vous enregistrez le score du trou actuel, informez l'utilisateur que vous passez au suivant opérationnellement.
+    Vous pouvez aussi utiliser 'set_current_hole' pour déplacer le HUD sur le parcours si l'utilisateur le demande explicitly (ex: "Passons au suivant", "Je suis au 12").
+    
     SOURCE DE VÉRITÉ : Le 'Conseil du Pro (Vault)' pour le trou n°${currentHoleData.number} est : "${currentHoleData.tip}". Ne jamais le contredire.
     `;
 
@@ -350,6 +441,8 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
     playerContext += `\nCOULEUR DES DÉPARTS : ${selectedTee.toUpperCase()}`;
     playerContext += `\nFORME : ${form.toUpperCase()} | TACTIQUE : ${tactic.toUpperCase()}`;
     playerContext += `\nINDEX (HANDICAP) DU JOUEUR : ${handicap}`;
+
+    playerContext += `\n\n${historicalData}`;
 
     if (arsenal && arsenal.length > 0) {
       const clubs = arsenal.filter(c => c.dist > 0).map(c => `${c.name}:${c.dist}m`).join(', ');
@@ -372,7 +465,7 @@ export async function getGameDebrief(scorecard: any, totalScore: number, totalSt
       .map(([hole, data]: [string, any]) => `Trou ${hole}: ${data.strokes} coups (${data.putts} putts)`)
       .join('\n');
 
-    const defaultPrompt = `Tu es Adam, le Mentor Suprême du golf. Analyse cette partie terminée :
+    const defaultPrompt = `Tu es Adam, le Mentor Suprême du golf. Nous sommes installés au Salon VIP du Clubhouse pour le débriefing. Analyse cette partie terminée :
     
 SCORE DETAIL :
 ${scorecardText}
@@ -400,6 +493,65 @@ REPONSE :`;
   } catch (error) {
     console.error("Game Debrief Error:", error);
     return "Je n'ai pas pu analyser la partie, mais l'important est d'être revenu au club-house avec la même passion. Repose-toi, le prochain départ t'attend.";
+  }
+}
+
+export async function generateCourseTacticalProfile(courseName: string, scorecard: any, totalScore: number) {
+  try {
+    const scorecardText = Object.entries(scorecard)
+      .map(([hole, data]: [string, any]) => `Trou ${hole}: ${data.strokes} strokes, ${data.putts} putts`)
+      .join('\n');
+
+    const prompt = `Tu es Adam, le Pro du club. Analyse cette carte de score sur le parcours "${courseName}" pour en extraire un PROFIL TACTIQUE PERMANENT pour ce joueur.
+    
+CARTE DE SCORE :
+${scorecardText}
+SCORE TOTAL : ${totalScore}
+
+MISSION :
+1. Crée un résumé tactique global (2 phrases) soulignant la force et la faiblesse sur ce parcours spécifique.
+2. Pour chaque trou (1 à 18), donne UN conseil ultra-court (max 5 mots) basé sur le résultat pour la prochaine fois (ex: "Relance à droite", "Prudence bunker", "Attaquez le green").
+3. Garde ton ton de Mentor Complice.
+
+Format JSON strict :
+{
+  "tacticalSummary": "le résumé ici",
+  "holeAdvice": {
+    "1": "conseil hole 1",
+    "2": "conseil hole 2",
+    "3": "conseil hole 3",
+    "4": "conseil hole 4",
+    "5": "conseil hole 5",
+    "6": "conseil hole 6",
+    "7": "conseil hole 7",
+    "8": "conseil hole 8",
+    "9": "conseil hole 9",
+    "10": "conseil hole 10",
+    "11": "conseil hole 11",
+    "12": "conseil hole 12",
+    "13": "conseil hole 13",
+    "14": "conseil hole 14",
+    "15": "conseil hole 15",
+    "16": "conseil hole 16",
+    "17": "conseil hole 17",
+    "18": "conseil hole 18"
+  }
+}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    const text = response.text || "{}";
+    const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanJson);
+  } catch (error) {
+    console.error("Course Tactical Profile Error:", error);
+    return null;
   }
 }
 

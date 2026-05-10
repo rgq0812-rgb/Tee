@@ -50,9 +50,32 @@ export default function Profile({
   const { assets, loading: assetsLoading, quotaExceeded } = useHoleAssets();
   const [advices, setAdvices] = useState<any[]>([]);
   const [advicesLoading, setAdvicesLoading] = useState(true);
+  const [courseProfiles, setCourseProfiles] = useState<any[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   
-  // Tactical history fetch
+  // Course profiles fetch
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'course_tactical_profiles'),
+      where('userId', '==', user.uid),
+      orderBy('updatedAt', 'desc'),
+      limit(20)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setCourseProfiles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setProfilesLoading(false);
+    }, (error) => {
+      console.error("Error fetching course profiles:", error);
+      setProfilesLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Individual tactical history fetch
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -66,7 +89,7 @@ export default function Profile({
       setAdvices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setAdvicesLoading(false);
     }, (error) => {
-      console.error("Advice history error:", error);
+      handleFirestoreError(error, OperationType.LIST, 'tactical_advice');
       setAdvicesLoading(false);
     });
 
@@ -121,7 +144,7 @@ export default function Profile({
         if (playPing) playPing(1200, 'sine', 0.1);
         setShowUploadModal(false);
       } catch (error: any) {
-        console.error("Upload error:", error);
+        handleFirestoreError(error, OperationType.WRITE, `hole_assets/${assetId}`);
         if (error.message?.includes('quota')) {
           setUploadError("Quota de lecture/écriture dépassé. Réessayez demain.");
         } else {
@@ -168,9 +191,10 @@ export default function Profile({
   };
   const [showArsenalMenu, setShowArsenalMenu] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    profiles: true,
     vault: false,
     history: false,
-    rounds: true,
+    rounds: false,
     academy: false
   });
 
@@ -179,7 +203,14 @@ export default function Profile({
     if (playPing) playPing(1000, 'sine', 0.05);
   };
 
+  const [expandedProfiles, setExpandedProfiles] = useState<Record<string, boolean>>({});
+  const toggleProfile = (id: string) => {
+    setExpandedProfiles(prev => ({ ...prev, [id]: !prev[id] }));
+    if (playPing) playPing(800, 'sine', 0.05);
+  };
+
   const [showLegal, setShowLegal] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
   const [isPaying, setIsPaying] = useState(false);
 
   const handlePayment = async () => {
@@ -277,6 +308,94 @@ export default function Profile({
               <p className="text-xl font-black font-mono text-red-600">4,250</p>
             </div>
           </div>
+        </div>
+
+        {/* Course Tactical Profiles (Memory) */}
+        <div className="space-y-4">
+           <button 
+             onClick={() => toggleSection('profiles')}
+             className="w-full flex items-center justify-between gap-2 px-2"
+           >
+              <div className="flex items-center gap-2">
+                <Brain size={16} className={isSolar ? "text-black" : "text-[#c9964a]"} />
+                <h3 className={`text-xs font-black tracking-[0.3em] uppercase ${isSolar ? 'text-black' : 'text-white'}`}>MÉMOIRE TACTIQUE ADAM</h3>
+              </div>
+              <div className="flex items-center gap-4">
+                <span className={`text-[10px] font-mono font-bold ${isSolar ? 'text-zinc-400' : 'text-white/20'}`}>{courseProfiles.length}/20 RÉSEAUX</span>
+                {expandedSections.profiles ? <ChevronDown size={16} className="opacity-20" /> : <ChevronRight size={16} className="opacity-20" />}
+              </div>
+           </button>
+           
+           <AnimatePresence>
+             {expandedSections.profiles && (
+               <motion.div 
+                 key="profiles-section"
+                 initial={{ height: 0, opacity: 0 }}
+                 animate={{ height: 'auto', opacity: 1 }}
+                 exit={{ height: 0, opacity: 0 }}
+                 className="space-y-4"
+               >
+                  {profilesLoading ? (
+                     <div className="p-6 flex justify-center"><Loader2 className="animate-spin text-white/20" /></div>
+                  ) : courseProfiles.length > 0 ? (
+                    courseProfiles.map((p, pidx) => (
+                      <div key={`profile-card-${p.id}-${pidx}`} className={`border rounded-[2rem] overflow-hidden transition-all ${isSolar ? 'bg-white border-zinc-200 shadow-sm' : 'bg-white/5 border-white/10'}`}>
+                        <div className="p-5 space-y-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className={`text-lg font-black italic uppercase tracking-tighter ${isSolar ? 'text-black' : 'text-white'}`}>{p.courseName}</h4>
+                              <p className={`text-[8px] font-black uppercase tracking-widest ${isSolar ? 'text-zinc-400 font-bold' : 'text-[#c9964a]'}`}>
+                                DERNIER SCORE : {p.lastTotalScore} COUPS
+                              </p>
+                            </div>
+                            <button 
+                              onClick={() => toggleProfile(p.id)}
+                              className={`p-2 rounded-xl border ${isSolar ? 'bg-zinc-50 border-zinc-200' : 'bg-white/5 border-white/10'}`}
+                            >
+                              {expandedProfiles[p.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                            </button>
+                          </div>
+                          
+                          <div className={`p-4 rounded-xl border italic text-xs leading-relaxed ${isSolar ? 'bg-zinc-50 border-zinc-100 text-zinc-600' : 'bg-black/50 border-white/5 text-white/70'}`}>
+                            "{p.tacticalSummary}"
+                          </div>
+
+                          <AnimatePresence>
+                            {expandedProfiles[p.id] && (
+                              <motion.div 
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="pt-4 border-t border-white/5 space-y-4"
+                              >
+                                <p className={`text-[10px] font-black uppercase tracking-widest ${isSolar ? 'text-zinc-400' : 'text-white/20'}`}>Conseils par Trou (Mémoire)</p>
+                                <div className="grid grid-cols-1 gap-2">
+                                  {Object.entries(p.holeAdvice || {}).map(([hole, advice]) => (
+                                    <div key={`hole-advice-${p.id}-${hole}`} className={`flex gap-3 p-3 rounded-xl border ${isSolar ? 'bg-white border-zinc-100' : 'bg-white/5 border-white/5'}`}>
+                                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 font-black italic border ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black border-black shadow-sm'}`}>
+                                        T{hole}
+                                      </div>
+                                      <p className={`text-[10px] leading-relaxed italic ${isSolar ? 'text-zinc-600 font-medium' : 'text-white/60'}`}>
+                                        {advice as string}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className={`p-12 border border-dashed rounded-[2rem] text-center flex flex-col items-center gap-3 ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
+                      <Brain size={32} className={isSolar ? 'text-zinc-200' : 'text-white/10'} />
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${isSolar ? 'text-zinc-400' : 'text-white/20'}`}>Aucune mémoire tactique. Terminez une partie.</p>
+                    </div>
+                  )}
+               </motion.div>
+             )}
+           </AnimatePresence>
         </div>
 
         {/* Tactical Photo Gallery (Hole Assets from Firebase) */}

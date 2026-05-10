@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from './firebase';
+import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface AuthContextType {
@@ -50,6 +50,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   subscriptionStatus: 'none'
                 });
               } catch (clientErr) {
+                // If it's a permission denied we might want to know why
+                if (clientErr instanceof Error && clientErr.message.includes('permission-denied')) {
+                   handleFirestoreError(clientErr, OperationType.CREATE, `users/${firebaseUser.uid}`);
+                }
+                
                 console.error("Client-side init failed, falling back to server:", clientErr);
                 // Fallback to server sync
                 fetch('/api/auth/sync', {

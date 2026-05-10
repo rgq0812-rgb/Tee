@@ -38,12 +38,21 @@ export async function playRawPcm(base64Data: string, sampleRate = 24000) {
     const byteLen = bytes.byteLength;
     // Ensure we have an even number of bytes for Int16 conversion
     const alignedLen = byteLen - (byteLen % 2);
-    const float32Array = new Float32Array(alignedLen / 2);
+    
+    // Add 0.8s of silence at the start to prevent clipping/missing start of speech
+    const silenceSamples = Math.floor(sampleRate * 0.8);
+    const float32Array = new Float32Array(alignedLen / 2 + silenceSamples);
+    
     const dataView = new DataView(bytes.buffer, bytes.byteOffset, alignedLen);
     
-    for (let i = 0; i < float32Array.length; i++) {
+    // Fill with zero (silence) to avoid start clipping on some browsers
+    for (let i = 0; i < silenceSamples; i++) {
+      float32Array[i] = 0;
+    }
+    
+    for (let i = 0; i < (alignedLen / 2); i++) {
       // Linear 16-bit PCM is usually little-endian
-      float32Array[i] = dataView.getInt16(i * 2, true) / 32768.0;
+      float32Array[i + silenceSamples] = dataView.getInt16(i * 2, true) / 32768.0;
     }
 
     const audioBuffer = audioContext.createBuffer(1, float32Array.length, sampleRate);

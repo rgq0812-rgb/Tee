@@ -1,10 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, ChevronDown, Check, Info, Target, MapPin, X, Plus, Minus, ArrowRight, Brain, Sparkles, Loader2, ShieldCheck, Zap, Activity, Share2 } from 'lucide-react';
+import { Trophy, ChevronDown, Check, Info, Target, MapPin, X, Plus, Minus, ArrowRight, Brain, Sparkles, Loader2, ShieldCheck, Zap, Activity, Share2, GlassWater, Download, Camera } from 'lucide-react';
 import { useScore, GameMode } from './use-score';
-import { getGameDebrief, generateSpeech, speakWithBrowser } from '../services/geminiService';
+import { getGameDebrief, generateSpeech, speakWithBrowser, generateCourseTacticalProfile } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
 import { CADDIES } from '../constants';
+import { db } from '../services/firebase';
+import { collection, query, where, getDocs, setDoc, doc, deleteDoc, orderBy, limit, serverTimestamp } from 'firebase/firestore';
+import { toPng } from 'html-to-image';
 
 export default function ScorecardPage({ 
   user,
@@ -22,6 +25,8 @@ export default function ScorecardPage({
   selectedTee
 }: any) {
   const isSolar = displayMode === 'solar';
+  const scorecardRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const { calculateStableford } = useScore();
   const [playerName] = useState(() => localStorage.getItem('onyx_player_name') || 'ONYX_OPERATIVE');
   const [showModeSelector, setShowModeSelector] = useState(false);
@@ -30,7 +35,9 @@ export default function ScorecardPage({
   const [editingHole, setEditingHole] = useState<number | null>(null);
   const [activeScoreField, setActiveScoreField] = useState<'strokes' | 'putts'>('strokes');
   const [isLoadingDebrief, setIsLoadingDebrief] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [debriefText, setDebriefText] = useState<string | null>(null);
+  const [lastAudioData, setLastAudioData] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -60,20 +67,37 @@ export default function ScorecardPage({
   }, [scorecardData]);
 
   const handleAdamDebrief = async () => {
-    if (isLoadingDebrief) return;
+    if (isLoadingDebrief || isSpeaking) return;
     setIsLoadingDebrief(true);
     setDebriefText(null);
     try {
-      const text = await getGameDebrief(scorecard, totalScore, totalStrokes);
+      // Determine if it's a mid-round or final round debrief
+      const filledHoles = Object.keys(scorecard).filter(k => scorecard[Number(k)]?.strokes > 0);
+      const isMidRound = filledHoles.includes('9') && !filledHoles.includes('10');
+      
+      const customPrompt = isMidRound 
+        ? `Tu es Adam, le Mentor. C'est le bilan de mi-parcours (fin du 9). Analyse les 9 premiers trous ("L'aller"). Donne un bilan tactique chirurgical mais complice, encourage le joueur pour "Le retour" (trous 10-18) et donne un axe d'amélioration majeur basé sur ces stats. (Max 4 phrases).`
+        : undefined;
+
+      const text = await getGameDebrief(scorecard, totalScore, totalStrokes, customPrompt);
       setDebriefText(text);
       
       const isMuted = localStorage.getItem('onyx_voice') === 'false';
       if (!isMuted) {
+        setIsSpeaking(true);
         const resultData = await generateSpeech(text);
         if (typeof resultData === 'object' && resultData.fallback) {
-          speakWithBrowser(resultData.text);
+          speakWithBrowser(resultData.text, () => setIsSpeaking(false));
         } else if (typeof resultData === 'string') {
-          await playRawPcm(resultData);
+          setLastAudioData(resultData);
+          const source = await playRawPcm(resultData);
+          if (source) {
+            source.onended = () => setIsSpeaking(false);
+          } else {
+            setIsSpeaking(false);
+          }
+        } else {
+          setIsSpeaking(false);
         }
       }
     } catch (error) {
@@ -83,11 +107,57 @@ export default function ScorecardPage({
     }
   };
 
-  const handleSaveScorecard = () => {
+  const handleExportImage = async () => {
+    if (!scorecardRef.current || isExporting) return;
+    setIsExporting(true);
+    try {
+      // Create a temporary clone or ensure styles are perfect for capture
+      // Scroll to the element to ensure it's in view (some libraries need this)
+      scorecardRef.current.scrollIntoView({ behavior: 'smooth' });
+      
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const dataUrl = await toPng(scorecardRef.current, {
+        quality: 0.95,
+        pixelRatio: 2,
+        backgroundColor: isSolar ? '#ffffff' : '#000000',
+        cacheBust: true,
+      });
+      
+      const link = document.createElement('a');
+      link.download = `ONYX_SCORECARD_${playerName}_${new Date().toLocaleDateString()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert("Échec de la génération 8K. Vérifiez votre connexion.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleRepeatScorecardAdvice = async () => {
+    if (!lastAudioData || isSpeaking) return;
+    setIsSpeaking(true);
+    try {
+      const source = await playRawPcm(lastAudioData);
+      if (source) {
+        source.onended = () => setIsSpeaking(false);
+      } else {
+        setIsSpeaking(false);
+      }
+    } catch (e) {
+      console.error(e);
+      setIsSpeaking(false);
+    }
+  };
+
+  const handleSaveScorecard = async () => {
     if (Object.keys(scorecard).length === 0) return;
     setSaveStatus('saving');
     
     try {
+      // 1. Save to LocalStorage
       const savedRounds = JSON.parse(localStorage.getItem('the-chose-saved-rounds') || '[]');
       const newRound = {
         id: Date.now(),
@@ -103,11 +173,44 @@ export default function ScorecardPage({
       
       savedRounds.unshift(newRound);
       localStorage.setItem('the-chose-saved-rounds', JSON.stringify(savedRounds.slice(0, 50)));
+
+      // 2. Save Tactical Profile to Firebase if game is finished
+      if (isGameFinished && user) {
+        try {
+          const profile = await generateCourseTacticalProfile(selectedCourse.name, scorecard, totalStrokes);
+          if (profile) {
+            const profileId = `${user.uid}_${selectedCourse.name.replace(/\s+/g, '_')}`;
+            
+            await setDoc(doc(db, 'course_tactical_profiles', profileId), {
+              userId: user.uid,
+              courseName: selectedCourse.name,
+              lastTotalScore: totalStrokes,
+              tacticalSummary: profile.tacticalSummary,
+              holeAdvice: profile.holeAdvice,
+              updatedAt: serverTimestamp()
+            });
+
+            // Enforce 20 courses limit
+            const q = query(
+              collection(db, 'course_tactical_profiles'),
+              where('userId', '==', user.uid),
+              orderBy('updatedAt', 'desc')
+            );
+            const snapshot = await getDocs(q);
+            if (snapshot.docs.length > 20) {
+              const extraDocs = snapshot.docs.slice(20);
+              for (const d of extraDocs) {
+                await deleteDoc(d.ref);
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Failed to save tactical profile:", err);
+        }
+      }
       
-      setTimeout(() => {
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus('idle'), 3000);
-      }, 1000);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (e) {
       console.error(e);
       setSaveStatus('idle');
@@ -116,14 +219,23 @@ export default function ScorecardPage({
 
   const updateScore = (holeNum: number, strokes: number, putts?: number) => {
     const holeData = scorecard[holeNum] || { strokes: 0, putts: 0 };
+    // Default putts to 2 if strokes is set for the first time and putts is not specified/is 0
+    const finalPutts = (putts !== undefined) ? putts : (holeData.putts || (strokes > 0 ? 2 : 0));
+    
     setScorecard({
       ...scorecard,
       [holeNum]: {
         ...holeData,
         strokes: strokes > 0 ? strokes : null,
-        putts: putts !== undefined ? putts : holeData.putts
+        putts: finalPutts
       }
     });
+
+    // Check for Mid-Round Review (Hole 9)
+    if (holeNum === 9 && strokes > 0 && !scorecard[10]) {
+      // Trigger a special mention or state if needed, here we'll let the AI handle it via context
+      console.log("[ONYX] Mid-round point reached.");
+    }
   };
 
   return (
@@ -272,9 +384,9 @@ export default function ScorecardPage({
                 </div>
                 
                 <div className="space-y-2">
-                  {Object.values(CADDIES).map((c: any) => (
+                  {Object.values(CADDIES).map((c: any, idx: number) => (
                     <button 
-                      key={c.id}
+                      key={`scorecard-caddie-sel-${c.id}-${idx}`}
                       onClick={() => setActiveCaddie(c)}
                       className={`w-full p-6 p-4 rounded-[2rem] border-2 text-left transition-all flex items-center gap-6 shadow-sm ${activeCaddie.id === c.id ? (isSolar ? 'bg-white border-zinc-950 shadow-xl' : 'bg-[#c9964a]/10 border-[#c9964a] shadow-lg shadow-[#c9964a]/10') : (isSolar ? 'bg-white border-zinc-100 opacity-40' : 'bg-white/5 border-white/10 opacity-40')}`}
                     >
@@ -377,9 +489,10 @@ export default function ScorecardPage({
       </AnimatePresence>
 
       <div className="relative z-10 space-y-8 pb-32">
-        {/* Tactical Header */}
-        <section className={`border-b pb-8 pt-4 space-y-6 ${isSolar ? 'border-zinc-950/10' : 'border-white/10'}`}>
-          <div className="flex justify-between items-start">
+        <div ref={scorecardRef} className={isSolar ? 'bg-white rounded-[2rem]' : 'bg-black rounded-[2rem]'}>
+          {/* Tactical Header */}
+          <section className={`border-b pb-8 pt-4 space-y-6 px-4 ${isSolar ? 'border-zinc-950/10' : 'border-white/10'}`}>
+            <div className="flex justify-between items-start">
             <div className="flex flex-col">
               <div className="flex items-center gap-4 mb-4">
                  <div className={`h-12 border-l-4 ${isSolar ? 'border-zinc-950' : 'border-red-600'} pl-4 flex flex-col justify-center`}>
@@ -470,25 +583,6 @@ export default function ScorecardPage({
               <button onClick={handleSaveScorecard} className="text-[10px] font-black text-emerald-600">{saveStatus === 'saving' ? 'SYNC...' : 'SAUVER'}</button>
             </div>
           </div>
-          {(isGameFinished || currentHole === 18) && (
-            <div className={`p-6 border-b flex flex-col gap-6 ${isSolar ? 'border-zinc-950/10 bg-zinc-50' : 'border-white/10 bg-[#c9964a]/5'}`}>
-              <button 
-                onClick={handleAdamDebrief}
-                className={`relative w-full h-40 rounded-3xl overflow-hidden transition-all ${isSolar ? 'bg-zinc-950 text-white shadow-xl' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/20'}`}
-              >
-                <div className="flex flex-col items-center justify-center h-full gap-2 px-6">
-                  <Sparkles size={24} />
-                  <span className="text-xl font-black italic uppercase italic tracking-tighter">19ÈME TROU & BILAN D'ADAM</span>
-                </div>
-                {isLoadingDebrief && <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center"><Loader2 className="animate-spin text-white" /></div>}
-              </button>
-              {debriefText && (
-                <div className={`p-6 rounded-2xl text-[13px] leading-relaxed italic ${isSolar ? 'bg-zinc-100 text-black border-2 border-zinc-950' : 'bg-white/5 text-white/80'}`}>
-                  "{debriefText}"
-                </div>
-              )}
-            </div>
-          )}
 
           <div className={`px-6 py-5 flex text-[10px] font-black tracking-[0.4em] uppercase border-b ${isSolar ? 'bg-zinc-950 text-white' : 'bg-white/10 text-[#c9964a]'}`}>
             <span className="w-10 text-left">N°</span>
@@ -523,7 +617,132 @@ export default function ScorecardPage({
                 </div>
               </button>
             ))}
+
+            {/* 19th Hole Tradition Row */}
+            {isGameFinished && (
+              <div 
+                className={`w-full px-6 py-6 flex items-center border-t-2 border-dashed ${isSolar ? 'border-zinc-950/20 bg-zinc-50' : 'border-[#c9964a]/20 bg-[#c9964a]/5'}`}
+              >
+                <span className={`w-10 font-mono text-lg font-black ${isSolar ? 'text-zinc-950' : 'text-[#c9964a]'}`}>19</span>
+                <span className={`flex-1 text-center font-black uppercase italic tracking-widest text-xs`}>Salon VIP • Clubhouse</span>
+                <div className="w-12 text-right">
+                  <GlassWater size={18} className={isSolar ? 'text-black' : 'text-[#c9964a]'} />
+                </div>
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* 9th Hole Summary */}
+        {scorecard[9]?.strokes && !scorecard[10]?.strokes && (
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mt-6 p-6 rounded-[2rem] border-2 shadow-xl relative overflow-hidden ${isSolar ? 'bg-zinc-50 border-zinc-950' : 'bg-zinc-900 border-white/20'}`}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black'}`}>
+                <Info size={16} />
+              </div>
+              <h4 className="text-sm font-black uppercase italic tracking-tighter">BILAN MI-PARCOURS (OUT)</h4>
+            </div>
+            <p className={`text-xs font-black italic opacity-60 leading-relaxed mb-4`}>
+              Section "OUT" terminée. Vous avez franchi le virage du 9. ADAM prépare une analyse corrective pour le retour "IN".
+            </p>
+            <button 
+              onClick={handleAdamDebrief}
+              className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${isSolar ? 'bg-zinc-950 text-white border-zinc-950 shadow-md' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+            >
+              ÉCOUTER LE BILAN MI-PARCOURS
+            </button>
+          </motion.div>
+        )}
+
+        {/* 19th Hole / Social Share Experience */}
+        {(currentHole >= 18 || Object.keys(scorecard).length >= 18) && (
+          <motion.section 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`mt-8 mb-12 rounded-[2.5rem] border-4 overflow-hidden relative group transition-all duration-700 ${isSolar ? 'bg-white border-zinc-950 shadow-2xl' : 'bg-black border-[#c9964a] shadow-[0_0_60px_rgba(201,150,74,0.15)]'}`}
+          >
+            {/* Background Image Optimized for Export */}
+            <div className={`absolute inset-0 z-0 transition-opacity duration-1000 ${isSolar ? 'opacity-30' : 'opacity-60'}`}>
+              <img 
+                src="https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?q=80&w=2000&auto=format&fit=crop" 
+                alt="Luxury Bar Lounge" 
+                crossOrigin="anonymous"
+                className="w-full h-full object-cover grayscale brightness-50 contrast-125"
+              />
+              <div className={`absolute inset-0 ${isSolar ? 'bg-gradient-to-b from-white/80 via-white/40 to-white' : 'bg-gradient-to-b from-black/80 via-black/40 to-black'}`} />
+            </div>
+
+            <div className="relative z-10 p-8 flex flex-col items-center">
+              <p className={`text-[10px] font-black uppercase tracking-[0.5em] mb-12 flex items-center gap-2 ${isSolar ? 'text-zinc-400' : 'text-[#c9964a]'}`}>
+                <GlassWater size={12} /> MISSION TERMINÉE • 19ÈÈME TROU
+              </p>
+
+              {/* Player Hero Info */}
+              <div className="text-center mb-10 w-full">
+                <div className={`text-[11px] font-black uppercase tracking-widest mb-1 opacity-50 ${isSolar ? 'text-zinc-600' : 'text-white'}`}>OFFICIER TACTIQUE</div>
+                <h2 className={`text-6xl font-black italic uppercase tracking-tighter mb-4 ${isSolar ? 'text-zinc-950' : 'text-white'}`}>
+                  {playerName}
+                </h2>
+                <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border ${isSolar ? 'border-zinc-950/20 bg-zinc-950 text-white' : 'border-[#c9964a]/30 bg-[#c9964a]/10 text-[#c9964a]'}`}>
+                  <MapPin size={12} />
+                  <span className="text-[9px] font-black uppercase tracking-[0.2em]">{selectedCourse.name}</span>
+                </div>
+              </div>
+
+              {/* High Contrast Score Stats */}
+              <div className="flex justify-center gap-6 w-full mb-12">
+                <div className="flex-1 max-w-[140px] text-center p-6 rounded-3xl bg-black/40 backdrop-blur-md border border-white/10">
+                   <div className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1">SCORE</div>
+                   <div className={`text-4xl font-mono font-black italic ${totalScore < 0 ? 'text-green-500' : totalScore === 0 ? 'text-white' : 'text-red-500'}`}>
+                     {totalScore > 0 ? `+${totalScore}` : totalScore === 0 ? 'E' : totalScore}
+                   </div>
+                </div>
+                <div className="flex-1 max-w-[140px] text-center p-6 rounded-3xl bg-black/40 backdrop-blur-md border border-white/10">
+                   <div className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1">STROKES</div>
+                   <div className="text-4xl font-mono font-black italic text-white">{totalStrokes}</div>
+                </div>
+              </div>
+
+              {/* Strategic Advice */}
+              {debriefText && (
+                <div className={`w-full max-w-sm mb-12 p-6 rounded-3xl backdrop-blur-xl border ${isSolar ? 'bg-zinc-100/90 border-zinc-950/20 text-zinc-950' : 'bg-zinc-900/40 border-white/10 text-white/90'}`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Brain size={10} className="text-red-600" />
+                    <span className="text-[8px] font-black uppercase tracking-[0.3em] opacity-40">BILAN D'ADAM</span>
+                  </div>
+                  <p className="text-xs italic leading-relaxed text-center">"{debriefText}"</p>
+                </div>
+              )}
+
+              {/* Functional Controls */}
+              <div className="grid gap-4 w-full max-w-sm">
+                <button 
+                  onClick={debriefText ? handleRepeatScorecardAdvice : handleAdamDebrief}
+                  disabled={isLoadingDebrief || isSpeaking}
+                  className={`flex items-center justify-center gap-4 p-6 rounded-2xl font-black transition-all shadow-xl active:scale-95 ${isSolar ? 'bg-zinc-950 text-white' : 'bg-[#c9964a] text-black hover:bg-white hover:text-black'}`}
+                >
+                  {isSpeaking ? <Activity size={24} className="animate-pulse" /> : <Brain size={24} className={isLoadingDebrief ? 'animate-spin' : ''} />}
+                  <span className="text-lg uppercase italic font-black">
+                    {debriefText ? (isSpeaking ? 'Adam parle...' : 'Ré-écouter Adam') : 'Lancer le Bilan'}
+                  </span>
+                </button>
+
+                <button 
+                  onClick={handleExportImage}
+                  disabled={isExporting}
+                  className={`flex items-center justify-center gap-4 p-6 rounded-2xl border-2 font-black transition-all shadow-md active:scale-95 ${isSolar ? 'bg-white border-zinc-950 text-zinc-950' : 'bg-white/5 border-white/20 text-white hover:bg-[#c9964a] hover:text-black hover:border-transparent'}`}
+                >
+                  {isExporting ? <Loader2 size={24} className="animate-spin" /> : <Camera size={24} className="text-red-600" />}
+                  <span className="text-lg uppercase italic font-black">Exporter 8K Share Card</span>
+                </button>
+              </div>
+            </div>
+          </motion.section>
+        )}
         </div>
       </div>
 

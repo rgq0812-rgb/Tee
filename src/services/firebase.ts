@@ -1,10 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialiser Firestore avec Long Polling pour une meilleure stabilité dans les environnements restreints
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -43,12 +46,24 @@ export const registerWithEmail = async (email: string, pass: string, name: strin
 
 export const logout = () => signOut(auth);
 
-async function testConnection() {
+  async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    console.log("[Firebase] Testing connection to Firestore...");
+    // Use the specially allowed test path with a timeout to prevent hanging
+    const connectionTest = getDocFromServer(doc(db, 'test', 'connection'));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 5000));
+    
+    await Promise.race([connectionTest, timeout]);
+    console.log("[Firebase] Firestore connection healthy.");
   } catch (error) {
-    if(error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
+    if (error instanceof Error) {
+      if (error.message.includes('the client is offline') || error.message.includes('Connection timeout')) {
+        console.error("Firebase connection failed: Client is offline or timeout. Database may still be provisioning.");
+      } else if (error.message.includes('permission-denied')) {
+        console.log("[Firebase] Firestore reachable (Permission Denied as expected).");
+      } else {
+        console.warn("[Firebase] Connection test warning:", error.message);
+      }
     }
   }
 }

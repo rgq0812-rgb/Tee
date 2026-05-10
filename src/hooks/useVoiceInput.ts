@@ -13,22 +13,28 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
   onResultRef.current = onResult;
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      isAutoRestarting.current = false;
-      if (durationTimeoutRef.current) {
-        clearTimeout(durationTimeoutRef.current);
-        durationTimeoutRef.current = null;
-      }
-      try {
-          recognitionRef.current.stop();
-      } catch (e) {
-          // Already stopped
-      }
-      setIsListening(false);
+    isAutoRestarting.current = false;
+    if (durationTimeoutRef.current) {
+      clearTimeout(durationTimeoutRef.current);
+      durationTimeoutRef.current = null;
     }
+    
+    if (recognitionRef.current) {
+      try {
+        // Supprimer le onend pour éviter les boucles de redémarrage lors de l'arrêt volontaire
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Already stopped
+      }
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
   }, []);
 
-  useEffect(() => {
+  const startListening = useCallback((continuousMode = false, timeoutMs?: number) => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
@@ -36,105 +42,113 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'fr-FR';
-    recognition.continuous = false; 
-    recognition.interimResults = true; // Permet de détecter le mot-clé plus vite
+    // Reset potential previous instance
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch (e) {}
+    }
 
-    recognition.onresult = (event: any) => {
-      const last = event.results.length - 1;
-      const transcript = event.results[last][0].transcript;
-      const isFinal = event.results[last].isFinal;
-      
-      if (transcript && onResultRef.current) {
-        // Transmission au parent si c'est final ou si on veut gérer l'intermédiaire
-        onResultRef.current(transcript, isFinal);
-      }
-    };
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'fr-FR';
+      // Toujours utiliser le mode continu pour éviter que le mobile ne coupe le flux trop vite
+      recognition.continuous = true; 
+      recognition.interimResults = true; 
+      recognition.maxAlternatives = 3; 
 
-    recognition.onerror = (event: any) => {
-      const errorType = event.error;
-      
-      // We don't want to flood the console with expected "errors"
-      if (errorType !== 'no-speech' && errorType !== 'aborted') {
-        console.error("Erreur vocale:", errorType);
-      }
-      
-      let msg = "";
-      if (errorType === 'not-allowed') {
-        msg = "Micro bloqué : Autorisez l'accès dans votre navigateur.";
-      } else if (errorType === 'no-speech') {
-        // Souvent normal en mode continu
-      } else if (errorType === 'aborted') {
-        // Souvent normal lors d'une interruption manuelle
-      } else {
-        msg = `Erreur micro: ${errorType}`;
-      }
-      
-      if (msg) setError(msg);
+      recognition.onresult = (event: any) => {
+        let fullTranscript = '';
+        let interimTranscript = '';
+        
+        for (let i = 0; i < event.results.length; ++i) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            fullTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        const currentText = (fullTranscript + interimTranscript).trim();
+        const isSomeFinal = event.results[event.results.length - 1].isFinal;
+        
+        if (currentText && onResultRef.current) {
+          // Pass the combined text and whether the very last part is final
+          onResultRef.current(currentText, isSomeFinal);
+        }
+      };
 
-      // 'no-speech' et 'aborted' ne sont pas vraiment des erreurs fatales en mode auto
-      if (errorType !== 'no-speech' && errorType !== 'aborted') {
-        if (!isAutoRestarting.current) {
+      recognition.onerror = (event: any) => {
+        const errorType = event.error;
+        console.error("[ONYX] Speech Recognition Error:", errorType);
+        
+        if (errorType === 'not-allowed') {
+          setError("Accès Micro Refusé - Vérifiez les réglages");
+          setIsListening(false);
+          isAutoRestarting.current = false;
+        } else if (errorType === 'network') {
+          setError("Erreur Réseau - Connexion instable");
+          setIsListening(false);
+          isAutoRestarting.current = false;
+        } else if (errorType === 'no-speech') {
+          // Keep it quiet for no-speech, just log it
+          console.log("[ONYX] Aucun son détecté, maintien de la session...");
+        } else {
+          setError(`Erreur: ${errorType}`);
+          setIsListening(false);
+          isAutoRestarting.current = false;
+        }
+      };
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setError(null);
+        if (window.navigator?.vibrate) window.navigator.vibrate(20);
+      };
+
+      recognition.onend = () => {
+        // Redémarrage automatique si mobile timeout ou no-speech
+        if (isAutoRestarting.current || (isListening && !error)) {
+          setTimeout(() => {
+            if (recognitionRef.current && isListening) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) {
+                // Already started or failed
+              }
+            }
+          }, 200);
+        } else {
           setIsListening(false);
         }
-      }
-    };
+      };
 
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
-    recognition.onend = () => {
-      // C'est ici que la magie opère : si on est en mode "Chat", on relance direct
-      if (isAutoRestarting.current) {
-        setTimeout(() => {
-          if (isAutoRestarting.current) {
-            try {
-              recognition.start();
-            } catch (e) {
-              // Déjà démarré
-            }
-          } else {
-            setIsListening(false);
-          }
-        }, 300);
-      } else {
-        setIsListening(false);
-      }
-    };
-
-    recognitionRef.current = recognition;
-
-    return () => {
-      if (recognitionRef.current) {
-        isAutoRestarting.current = false;
-        recognitionRef.current.stop();
-      }
-    };
-  }, []); // Re-run only on mount
-
-  const startListening = useCallback((continuousMode = false, timeoutMs?: number) => {
-    if (recognitionRef.current) {
       isAutoRestarting.current = continuousMode;
-      recognitionRef.current.continuous = continuousMode;
-      setError(null);
+      recognitionRef.current = recognition;
       
+      // On mobile, start() MUST be called directly in the touch start handler
+      // which Dashboard does (onClick calling startListening)
+      recognition.start();
+
       if (timeoutMs) {
         if (durationTimeoutRef.current) clearTimeout(durationTimeoutRef.current);
         durationTimeoutRef.current = setTimeout(() => {
           stopListening();
         }, timeoutMs);
       }
-
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (e) {
-        // Déjà en cours, on s'assure juste que l'état est synchro
-        setIsListening(true);
-      }
+    } catch (err) {
+      console.error("Speech Recognition Start Failed:", err);
+      setError("Échec démarrage micro");
+      setIsListening(false);
     }
+  }, [stopListening]);
+
+  useEffect(() => {
+    return () => {
+      stopListening();
+    };
   }, [stopListening]);
 
   return { isListening, startListening, stopListening, error };

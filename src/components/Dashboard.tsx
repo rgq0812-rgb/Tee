@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { collection, query, where, orderBy, getDocs, limit, setDoc, doc, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../services/firebase';
 import { useAuth } from '../services/AuthProvider';
@@ -20,6 +20,8 @@ import LieScanner from './LieScanner';
 import { GameMode } from './use-score';
 
 import { useHoleAssets } from '../hooks/useHoleAssets';
+import { useVoiceInput } from '../hooks/useVoiceInput';
+import AudioVisualizer from './AudioVisualizer';
 
 export default function Dashboard({ 
   scorecard, setScorecard, 
@@ -48,7 +50,11 @@ export default function Dashboard({
   const [showCaddieSelector, setShowCaddieSelector] = useState(false);
   const [showArsenalMenu, setShowArsenalMenu] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
-  
+
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [lastSpeechData, setLastSpeechData] = useState<any>(null);
+  const welcomePlayedRef = React.useRef(false);
+
   const customHoleImages = useMemo(() => {
     const images: Record<string, string> = {};
     assets.filter(a => a.id.startsWith(selectedCourse.id) || (a as any).userId === user?.uid).forEach(a => {
@@ -60,12 +66,10 @@ export default function Dashboard({
   const [wind, setWind] = useState({ speed: Math.floor(Math.random() * 25) + 5, direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.floor(Math.random() * 8)] });
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [gpsStatus, setGpsStatus] = useState<'searching' | 'active' | 'denied' | 'unavailable'>('searching');
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [isEarPosition, setIsEarPosition] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [units, setUnits] = useState(() => localStorage.getItem('onyx_units') || 'meters');
   const [isMuted, setIsMuted] = useState(() => localStorage.getItem('onyx_voice') === 'false');
-  const welcomePlayedRef = React.useRef(false);
 
   // Sync units and muted state
   useEffect(() => {
@@ -118,13 +122,18 @@ export default function Dashboard({
        try {
          const importedData = JSON.parse(event.target?.result as string);
          for (const [assetId, imageData] of Object.entries(importedData)) {
-            await setDoc(doc(db, 'hole_assets', assetId), {
-                imageData,
-                updatedAt: new Date().toISOString(),
-                userId: user.uid,
-                courseId: assetId.split('_')[0],
-                holeNumber: parseInt(assetId.split('_')[1])
-            });
+            const path = `hole_assets/${assetId}`;
+            try {
+              await setDoc(doc(db, 'hole_assets', assetId), {
+                  imageData,
+                  updatedAt: new Date().toISOString(),
+                  userId: user.uid,
+                  courseId: assetId.split('_')[0],
+                  holeNumber: parseInt(assetId.split('_')[1])
+              });
+            } catch (err) {
+              handleFirestoreError(err, OperationType.WRITE, path);
+            }
          }
          setShowSyncMenu(false);
        } catch (err) { console.error(err); }
@@ -145,6 +154,23 @@ export default function Dashboard({
   const currentHoleData = useMemo(() => selectedCourse.holes[currentHole - 1], [currentHole, selectedCourse]);
 
   const [tacticalHistory, setTacticalHistory] = useState<any[]>([]);
+  const [currentProfile, setCurrentProfile] = useState<any>(null);
+
+  // Fetch current course tactical profile
+  useEffect(() => {
+    if (!user || !selectedCourse) return;
+    const profileId = `${user.uid}_${selectedCourse.name.replace(/\s+/g, '_')}`;
+    const unsubscribe = onSnapshot(doc(db, 'course_tactical_profiles', profileId), (snap) => {
+      if (snap.exists()) {
+        setCurrentProfile(snap.data());
+      } else {
+        setCurrentProfile(null);
+      }
+    }, (error) => {
+       console.error("Error fetching course profile:", error);
+    });
+    return () => unsubscribe();
+  }, [user, selectedCourse]);
 
   // Fetch tactical history for context
   useEffect(() => {
@@ -153,23 +179,72 @@ export default function Dashboard({
       collection(db, 'tactical_advice'),
       where('userId', '==', user.uid),
       orderBy('createdAt', 'desc'),
-      limit(5)
+      limit(10)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setTacticalHistory(snapshot.docs.map(doc => doc.data()));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'tactical_advice');
     });
     return () => unsubscribe();
   }, [user]);
 
-  const generateAdvice = useCallback(async () => {
+  const navigateHole = useCallback((direction: 'next' | 'prev') => {
+    if (playPing) playPing(direction === 'next' ? 880 : 440, 'sine', 0.05);
+    if (direction === 'next' && currentHole < 18) {
+      setCurrentHole(currentHole + 1);
+    }
+    if (direction === 'prev' && currentHole > 1) {
+      setCurrentHole(currentHole - 1);
+    }
+    setWind({
+      speed: Math.floor(Math.random() * 22) + 4,
+      direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.floor(Math.random() * 8)]
+    });
+  }, [currentHole, setCurrentHole, playPing]);
+
+  const repeatLastAdvice = useCallback(async () => {
+    if (isSpeaking || !lastSpeechData) return;
+    setIsSpeaking(true);
+    
+    try {
+      const isMutedLocal = localStorage.getItem('onyx_voice') === 'false';
+      if (!isMutedLocal) {
+        if (typeof lastSpeechData === 'object' && lastSpeechData.fallback) {
+          speakWithBrowser(lastSpeechData.text, () => setIsSpeaking(false));
+        } else if (typeof lastSpeechData === 'string') {
+          const source = await playRawPcm(lastSpeechData);
+          if (source) {
+            source.onended = () => setIsSpeaking(false);
+          } else {
+            setIsSpeaking(false);
+          }
+        } else {
+          setIsSpeaking(false);
+        }
+      } else {
+        setIsSpeaking(false);
+      }
+    } catch (err) {
+      console.error("Repeat failed", err);
+      setIsSpeaking(false);
+    }
+  }, [isSpeaking, lastSpeechData]);
+
+  const generateAdvice = useCallback(async (textOverride?: string) => {
     if (isSpeaking) return;
     setIsSpeaking(true);
     playWind();
     
     try {
+      // Pass tee color and specific feedback in the override
+      const feedbackTag = textOverride?.toLowerCase().includes('parfait') ? ' [FEEDBACK:PARFAIT]' : 
+                         textOverride?.toLowerCase().includes('raté') ? ' [FEEDBACK:RATÉ]' : '';
+      const systemContext = `TEE_COLOR:${selectedTee} ${textOverride || ''}${feedbackTag}`;
+      
       const message = await getTacticalAdvice(
         activeCaddie, 
-        currentHoleData, 
+        selectedCourse.holes[currentHole - 1], 
         distance, 
         wind, 
         arsenal, 
@@ -178,7 +253,9 @@ export default function Dashboard({
         { 
           scorecard, 
           history: tacticalHistory,
-          activeMode: selectedMode === GameMode.STROKE ? 'PARCOURS' : 'STRATÉGIE' // Simplified mapping
+          activeMode: selectedMode === GameMode.STROKE ? 'PARCOURS' : 'STRATÉGIE',
+          lastAdvice: systemContext,
+          historicalProfile: currentProfile
         }
       );
       setAdvice(message);
@@ -195,12 +272,14 @@ export default function Dashboard({
             createdAt: serverTimestamp()
           });
         } catch (e) {
-          console.error("Failed to save tactical advice to history", e);
+          handleFirestoreError(e, OperationType.CREATE, 'tactical_advice');
         }
       }
       
-      if (!isMuted) {
+      const isMutedLocal = localStorage.getItem('onyx_voice') === 'false';
+      if (!isMutedLocal) {
         const result = await generateSpeech(message, activeCaddie);
+        setLastSpeechData(result);
         if (typeof result === 'object' && result.fallback) {
           speakWithBrowser(result.text, () => setIsSpeaking(false));
         } else if (typeof result === 'string') {
@@ -220,7 +299,73 @@ export default function Dashboard({
       console.error(err);
       setIsSpeaking(false);
     }
-  }, [isSpeaking, playWind, currentHoleData, distance, wind, arsenal, playerForm, handicap, activeCaddie, setAdvice, isMuted]);
+  }, [isSpeaking, playWind, currentHole, selectedCourse, distance, wind, arsenal, playerForm, handicap, activeCaddie, setAdvice, tacticalHistory, selectedMode, scorecard, user]);
+
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Voice Command Handler
+  const { isListening, startListening, stopListening, error: voiceError } = useVoiceInput((text, isFinal) => {
+    setLastTranscript(text);
+
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+    const processCommand = (finalText: string) => {
+      const transcript = finalText.toLowerCase();
+      console.log("[ONYX] Commande vocale traitée:", transcript);
+      
+      if (transcript.includes('suivant') || transcript.includes('prochain')) {
+        if (currentHole < 18) {
+          navigateHole('next');
+          generateAdvice("Passage au trou suivant. Analyse la ligne de jeu immédiatement.");
+        }
+      } else if (transcript.includes('paysage') || transcript.includes('alentour') || transcript.includes('regarde')) {
+        generateAdvice("Décris-moi le paysage, la lumière et les dangers avec ton œil de pro complicit.");
+      } else if (transcript.includes('anecdote') || transcript.includes('histoire') || transcript.includes('raconte')) {
+        generateAdvice("Raconte-moi une anecdote historique sur le golf ou ce parcours pour détendre l'atmosphère.");
+      } else if (transcript.includes('répète') || transcript.includes('encore') || transcript.includes('quoi')) {
+        repeatLastAdvice();
+      } else if (transcript.includes('parfait') || transcript.includes('génial') || transcript.includes('top')) {
+        generateAdvice("Le dernier coup était parfait ! Rebondis sur ma réussite.");
+      } else if (transcript.includes('raté') || transcript.includes('nul') || transcript.includes('merde')) {
+        generateAdvice("J'ai raté mon coup. Sois mon mentor et analyse l'erreur possible.");
+      } else if (transcript.includes('score') || transcript.includes('combien')) {
+        generateAdvice("Fais un point sur mon score actuel et donne-moi ton ressenti de mentor.");
+      } else if (transcript.trim().length > 3) {
+        generateAdvice(transcript);
+      }
+      
+      stopListening();
+    };
+
+    if (text.trim().length > 3) {
+      silenceTimerRef.current = setTimeout(() => {
+        processCommand(text);
+      }, 2500); 
+    }
+  });
+
+  const [lastTranscript, setLastTranscript] = useState("");
+  useEffect(() => {
+    if (isListening) {
+      setLastTranscript("");
+    }
+  }, [isListening]);
+
+  const handleMicTrigger = () => {
+    if (isSpeaking) {
+      // If Adam is talking, we can't listen or we stop him?
+      // For now, ignore if speaking to avoid feedback loops
+      return;
+    }
+    
+    if (isListening) {
+      stopListening();
+    } else {
+      if (playPing) playPing(1200, 'sine', 0.05);
+      // Increased sensitivity/timeout for golf context
+      startListening(false, 45000); 
+    }
+  };
 
   // Ear Gesture & Media Key Tap
   useEffect(() => {
@@ -228,16 +373,15 @@ export default function Dashboard({
       // Beta > 75 is roughly phone vertical (near ear)
       const inPosition = Math.abs(e.beta || 0) > 75 && Math.abs(e.gamma || 0) < 35;
       
-      if (inPosition && !isEarPosition && !isSpeaking) {
+      if (inPosition && !isEarPosition && !isSpeaking && !isListening) {
         if (window.navigator.vibrate) window.navigator.vibrate([40, 20, 40]);
-        generateAdvice();
+        handleMicTrigger();
       }
       setIsEarPosition(inPosition);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Many Bluetooth earpieces send media keys when "tapped"
-      // MediaPlayPause: 179, MediaTrackNext: 176, MediaTrackPrevious: 177
       const mediaKeys = ['MediaPlayPause', 'MediaTrackNext', 'MediaTrackPrevious', 'AudioVolumeUp', 'AudioVolumeDown'];
       if (mediaKeys.includes(e.key) || [176, 177, 179].includes(e.keyCode)) {
         e.preventDefault();
@@ -320,16 +464,6 @@ export default function Dashboard({
     }
   }, [advice, setAdvice]);
 
-  const navigateHole = (direction: 'next' | 'prev') => {
-    if (playPing) playPing(direction === 'next' ? 880 : 440, 'sine', 0.05);
-    if (direction === 'next' && currentHole < 18) setCurrentHole(currentHole + 1);
-    if (direction === 'prev' && currentHole > 1) setCurrentHole(currentHole - 1);
-    setWind({
-      speed: Math.floor(Math.random() * 22) + 4,
-      direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.floor(Math.random() * 8)]
-    });
-  };
-
   const currentCustomImage = useMemo(() => customHoleImages[`${selectedCourse.id}_${currentHole}`], [customHoleImages, selectedCourse.id, currentHole]);
 
   return (
@@ -396,13 +530,57 @@ export default function Dashboard({
           </div>
           <motion.button 
             whileTap={{ scale: 0.9 }}
-            onClick={generateAdvice}
+            onClick={handleMicTrigger}
             disabled={isSpeaking}
-            className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${isSpeaking ? (isSolar ? 'bg-zinc-950' : 'bg-zinc-800') : (isSolar ? 'bg-zinc-950' : 'bg-[#c9964a]')}`}
+            className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${isListening ? 'bg-red-600 scale-110 shadow-red-600/50' : (isSolar ? 'bg-zinc-950' : 'bg-[#c9964a]')}`}
           >
-            <Mic size={20} className={isSpeaking ? 'text-white animate-pulse' : (isSolar ? 'text-white' : 'text-black')} />
+            <Mic size={20} className={(isListening || isSpeaking) ? 'text-white animate-pulse' : (isSolar ? 'text-white' : 'text-black')} />
           </motion.button>
         </div>
+        
+        {/* Real-time Voice Feedback Overlay */}
+        <AnimatePresence>
+          {(isListening || voiceError || (lastTranscript && !lastSpeechData)) && (
+            <motion.div 
+              initial={{ opacity: 0, scaleY: 0 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{ opacity: 0, scaleY: 0 }}
+              className="absolute bottom-4 left-4 right-4 z-50 origin-bottom"
+            >
+              <div className={`relative w-full rounded-[2rem] overflow-hidden border shadow-2xl ${isSolar ? 'bg-white border-zinc-950' : 'bg-zinc-900/95 border-[#c9964a]/30'}`}>
+                <div className="h-16 w-full opacity-30 absolute inset-0 pointer-events-none">
+                  <AudioVisualizer isActive={isListening} isSolar={isSolar} />
+                </div>
+                
+                <div className="relative p-5 flex flex-col items-center justify-center text-center gap-1">
+                  {voiceError ? (
+                    <>
+                      <div className="text-red-500 text-[10px] uppercase font-black tracking-widest">{voiceError}</div>
+                      <button onClick={() => stopListening()} className="text-[8px] font-bold opacity-30 underline mt-1">FERMER</button>
+                    </>
+                  ) : isListening ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-1">
+                         <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+                         <span className={`text-[9px] font-black uppercase tracking-[0.3em] ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>
+                           {lastTranscript ? "Saisie en cours..." : "Adam est à l'écoute..."}
+                         </span>
+                      </div>
+                      <div className={`text-sm font-bold max-w-[90%] break-words ${isSolar ? 'text-zinc-800' : 'text-white'}`}>
+                        {lastTranscript ? `"${lastTranscript}"` : "Dites quelque chose..."}
+                      </div>
+                    </>
+                  ) : lastTranscript && (
+                    <div className="flex flex-col items-center gap-1">
+                       <span className="text-[8px] font-black opacity-20 uppercase tracking-[0.5em]">Commande traitée</span>
+                       <div className="text-[10px] font-medium italic opacity-60">"{lastTranscript}"</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
           <div className="flex flex-col gap-3">
             <button onClick={() => setShowCourseSelector(true)} className={`flex items-center gap-3 p-3 rounded-xl hover:opacity-80 shadow-md transition-all border-2 ${isSolar ? 'bg-white border-zinc-950' : 'bg-white/10 border-white/20'}`}>
@@ -539,10 +717,19 @@ export default function Dashboard({
                   <Brain size={16} />
                 </div>
                 <div className="flex-1">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className={`text-[8px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>CONSEIL DU CADDIE</span>
-                    <button onClick={() => setAdvice(null)} className={isSolar ? 'text-zinc-400' : 'text-white/20 hover:text-white'}><X size={12} /></button>
-                  </div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className={`text-[8px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>CONSEIL DU CADDIE</span>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); repeatLastAdvice(); }} 
+                          className={`p-1 rounded-full ${isSolar ? 'hover:bg-zinc-100 text-zinc-950' : 'hover:bg-white/10 text-white/40'}`}
+                          title="Répéter le conseil"
+                        >
+                          <Zap size={10} className={isSpeaking ? 'animate-pulse' : ''} />
+                        </button>
+                        <button onClick={() => setAdvice(null)} className={isSolar ? 'text-zinc-400' : 'text-white/20 hover:text-white'}><X size={12} /></button>
+                      </div>
+                    </div>
                   {(() => {
                     const cleanAdvice = advice.includes(':') ? advice.split(':').slice(1).join(':').trim() : advice.trim();
                     return cleanAdvice.length > 0 ? (
@@ -585,7 +772,7 @@ export default function Dashboard({
           <motion.div key="course-selector" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className={`fixed inset-0 z-[500] ${isSolar ? 'bg-white' : 'bg-black'} p-6 pt-16`}>
             <button onClick={() => setShowCourseSelector(false)} className={`${isSolar ? 'text-black border-black shadow-md' : 'text-white/40 border-white/10'} uppercase text-[10px] border px-4 py-2 rounded-full mb-8 font-black`}>Fermer</button>
             <div className="grid gap-4">
-              {COURSES.map(c => <button key={`course-sel-${c.id}`} onClick={() => { setSelectedCourse(c); setShowCourseSelector(false); }} className={`p-6 text-left rounded-3xl border font-black uppercase transition-all ${isSolar ? 'bg-zinc-100 border-zinc-200 text-black shadow-sm active:bg-zinc-200' : 'bg-white/5 border-white/10 text-white active:bg-white/10'}`}>{c.name}</button>)}
+              {COURSES.map((c, cidx) => <button key={`dash-course-sel-${c.id}-${cidx}`} onClick={() => { setSelectedCourse(c); setShowCourseSelector(false); }} className={`p-6 text-left rounded-3xl border font-black uppercase transition-all ${isSolar ? 'bg-zinc-100 border-zinc-200 text-black shadow-sm active:bg-zinc-200' : 'bg-white/5 border-white/10 text-white active:bg-white/10'}`}>{c.name}</button>)}
             </div>
           </motion.div>
         )}

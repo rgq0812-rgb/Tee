@@ -248,13 +248,13 @@ export default function AIAnalyst() {
 
                       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 mb-6 pr-2 scrollbar-hide">
                         {chatHistory.map((msg) => (
-                           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`max-w-[85%] p-4 rounded-2xl text-xs leading-relaxed ${msg.role === 'user' ? 'bg-white/10 text-white' : 'bg-[#c9964a]/10 text-[#c9964a] italic border border-[#c9964a]/20'}`}>
-                                <div className="markdown-body prose prose-invert max-w-none prose-p:leading-relaxed prose-xs">
-                                  <ReactMarkdown>{msg.parts[0].text}</ReactMarkdown>
-                                </div>
-                              </div>
-                           </div>
+                            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                               <div className={`max-w-[85%] p-4 rounded-2xl text-[13px] leading-relaxed ${msg.role === 'user' ? 'bg-white/10 text-white border border-white/20' : 'bg-[#c9964a]/5 text-white italic border border-[#c9964a]/30 shadow-[0_10px_30px_rgba(0,0,0,0.3)]'}`}>
+                                 <div className="markdown-body prose prose-invert max-w-none prose-p:leading-relaxed prose-xs">
+                                   <ReactMarkdown>{msg.parts[0].text}</ReactMarkdown>
+                                 </div>
+                               </div>
+                            </div>
                         ))}
                         {isChatLoading && <div className="flex justify-start"><Loader2 size={16} className="text-[#c9964a] animate-spin" /></div>}
                       </div>

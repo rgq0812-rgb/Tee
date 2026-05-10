@@ -74,7 +74,7 @@ class AssetService {
       this.isInitializing = false;
       this.quotaExceeded = false;
     }, (error) => {
-      console.error("AssetService Error:", error);
+      handleFirestoreError(error, OperationType.LIST, 'hole_assets');
       if (error.message?.includes('quota') || (error as any).code === 'resource-exhausted') {
         this.quotaExceeded = true;
       }
