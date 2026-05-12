@@ -574,7 +574,7 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
                {/* Footer */}
                <div className="p-10 border-t border-white/5 bg-white/5 backdrop-blur-xl flex flex-col items-center justify-center gap-4">
                   <div className="flex items-center gap-6">
-                    <img src="/icon-192.jpg" className="h-6 w-auto grayscale opacity-50" alt="Logo" />
+                    <img src="/icon-192.png" className="h-6 w-auto grayscale opacity-50" alt="Logo" />
                     <span className="text-[10px] font-black uppercase tracking-[0.6em] text-white/40">THE CHOSE • ONYX V2</span>
                   </div>
                </div>
