@@ -170,7 +170,7 @@ export default function Academy({
       'challenger': 'CHALLENGER',
       'tour': 'TOUR PRO'
     };
-    return (selectedArenaLevel && levelMap[selectedArenaLevel]) || 'UNITÉ ONYX';
+    return (selectedArenaLevel && levelMap[selectedArenaLevel]) || 'PROTOCOLE ONYX';
   };
 
   const getLevelColor = () => {
