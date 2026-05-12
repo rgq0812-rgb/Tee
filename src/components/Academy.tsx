@@ -156,17 +156,21 @@ export default function Academy({
   const [sessionBriefing, setSessionBriefing] = useState<AcademyDrill | null>(null);
 
   const getTechnicalLevel = () => {
+    // Priority 1: Current Session
     if (activeSession) return activeSession.category;
+    // Priority 2: Previewing a Session
     if (sessionBriefing) return sessionBriefing.category;
-    if (activeTab === 'catalogue') return selectedCategory;
+    // Priority 3: Current Selected Category in Catalogue
+    if (activeTab === 'catalogue' && selectedCategory) return selectedCategory;
     
+    // Default: Arena Level
     const levelMap: Record<string, string> = {
       'rookie': 'NEW GEN',
       'grinder': 'GRINDER',
       'challenger': 'CHALLENGER',
       'tour': 'TOUR PRO'
     };
-    return (selectedArenaLevel && levelMap[selectedArenaLevel]) || 'PROTOCOLE ONYX';
+    return (selectedArenaLevel && levelMap[selectedArenaLevel]) || 'UNITÉ ONYX';
   };
 
   const getLevelColor = () => {
