@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
     ],
     build: {
-      outDir: 'android/app/src/main/assets/public',
+      outDir: 'dist',
       emptyOutDir: true,
     },
     resolve: {
