@@ -3,7 +3,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'io.tee.app',
   appName: 'Tee',
-  webDir: 'android/app/src/main/assets/public',
+  webDir: 'dist',
   bundledWebRuntime: false
 };
 

@@ -177,13 +177,13 @@ export default function Academy({
     if (level === 'TOUR PRO') return 'text-red-500';
     
     // Category Colors
-    if (level === 'WARMUP') return 'text-sky-400';
-    if (level === 'ESSENTIELS') return 'text-zinc-100';
+    if (level === 'WARMUP') return 'text-sky-300';
+    if (level === 'ESSENTIELS') return 'text-zinc-50';
     if (level === 'BIOMÉCANIQUE') return 'text-[#c9964a]';
-    if (level === 'SCORING ZONE') return 'text-emerald-400';
-    if (level === 'STRATÉGIE') return 'text-indigo-400';
-    if (level === 'MENTAL') return 'text-slate-100 shadow-[0_0_10px_rgba(255,255,255,0.2)]';
-    if (level === 'FUN') return 'text-rose-400';
+    if (level === 'SCORING ZONE') return 'text-emerald-300';
+    if (level === 'STRATÉGIE') return 'text-indigo-300';
+    if (level === 'MENTAL') return 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]';
+    if (level === 'FUN') return 'text-rose-300';
 
     return isSolar ? 'text-black' : 'text-[#c9964a]';
   };
@@ -1140,26 +1140,36 @@ export default function Academy({
              </div>
           </div>
 
-          <div className={`p-6 rounded-[2.5rem] border-2 shadow-2xl relative overflow-hidden group ${isSolar ? 'bg-white border-black' : 'bg-black/95 border-[#c9964a]/40 shadow-[#c9964a]/10'}`}>
-             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                <Target size={80} strokeWidth={1} />
+          <div className={`p-6 rounded-[2.5rem] border-2 shadow-2xl relative overflow-hidden group ${isSolar ? 'bg-white border-black' : 'bg-black/95 border-[#c9964a]/60 shadow-[#c9964a]/20 translate-y-[-2px]'}`}>
+             <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none group-hover:scale-110 transition-transform duration-1000">
+                <Target size={80} strokeWidth={1} className={getLevelColor()} />
              </div>
+             
              <motion.div 
-               animate={{ y: ['-100%', '200%'] }}
+               animate={{ y: ['-100%', '300%'] }}
                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-               className="absolute left-0 right-0 h-px bg-white/10 blur-[1px] opacity-20 w-full pointer-events-none"
+               className="absolute left-0 right-0 h-px bg-white/30 blur-[2px] opacity-40 w-full pointer-events-none"
              />
-             <div className="flex items-center gap-2 mb-3">
-               <Star size={14} className={getLevelColor()} />
-               <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40">Mode Tactique Actif</span>
+
+             <div className="flex items-center gap-2 mb-4">
+               <div className={`p-1.5 rounded-lg ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a]/20 text-[#c9964a]'}`}>
+                 <Star size={14} className={getLevelColor()} />
+               </div>
+               <span className="text-[9px] font-black uppercase tracking-[0.5em] opacity-60">SÉLECTION TACTIQUE</span>
              </div>
-             <div className="flex flex-col">
-               <p className={`text-2xl md:text-3xl font-black italic uppercase tracking-tighter leading-tight ${getLevelColor()}`}>
+
+             <div className="flex flex-col relative z-10">
+               <motion.p 
+                 key={getTechnicalLevel()}
+                 initial={{ opacity: 0, x: -10 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 className={`text-3xl md:text-5xl font-black italic uppercase tracking-tighter leading-none mb-2 ${getLevelColor()} drop-shadow-[0_0_20px_rgba(201,150,74,0.3)]`}
+               >
                  {getTechnicalLevel()}
-               </p>
-               <div className="flex items-center gap-1.5 mt-2">
-                  <div className={`w-1 h-1 rounded-full animate-ping ${isSolar ? 'bg-black' : 'bg-[#c9964a]'}`} />
-                  <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-40">Système Onyx V2 Ready</span>
+               </motion.p>
+               <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full animate-pulse shadow-[0_0_15px_rgba(201,150,74,1)] ${isSolar ? 'bg-black' : 'bg-[#c9964a]'}`} />
+                  <span className="text-[8px] font-black uppercase tracking-[0.4em] opacity-40 whitespace-nowrap">MODULE ONYX CORE V2.0.4</span>
                </div>
              </div>
           </div>
