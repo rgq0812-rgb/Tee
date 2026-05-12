@@ -739,7 +739,7 @@ export default function Academy({
                   className="flex-1 py-5 rounded-[2rem] bg-[#c9964a] text-black font-black uppercase tracking-[0.4em] text-xs shadow-2xl shadow-[#c9964a]/20 hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-3"
                 >
                   <Play size={14} fill="currentColor" />
-                  DÉPLOYER UNITÉ ONYX • {Math.floor(sessionBriefing.duration / 60)}:00
+                  DÉPLOYER PROTOCOLE ONYX • {Math.floor(sessionBriefing.duration / 60)}:00
                 </button>
               </div>
             </motion.div>
