@@ -156,23 +156,35 @@ export default function Academy({
   const [sessionBriefing, setSessionBriefing] = useState<AcademyDrill | null>(null);
 
   const getTechnicalLevel = () => {
-    if (activeSession) return activeSession.difficulty;
-    if (sessionBriefing) return sessionBriefing.difficulty;
+    if (activeSession) return activeSession.category;
+    if (sessionBriefing) return sessionBriefing.category;
+    if (activeTab === 'catalogue') return selectedCategory;
+    
     const levelMap: Record<string, string> = {
       'rookie': 'NEW GEN',
       'grinder': 'GRINDER',
       'challenger': 'CHALLENGER',
       'tour': 'TOUR PRO'
     };
-    return (selectedArenaLevel && levelMap[selectedArenaLevel]) || 'ONYX';
+    return (selectedArenaLevel && levelMap[selectedArenaLevel]) || 'PROTOCOLE ONYX';
   };
 
   const getLevelColor = () => {
     const level = getTechnicalLevel();
-    if (level === 'NEW GEN') return 'text-blue-500';
-    if (level === 'GRINDER') return 'text-emerald-500';
-    if (level === 'CHALLENGER') return 'text-amber-500';
+    if (level === 'NEW GEN') return 'text-blue-400';
+    if (level === 'GRINDER') return 'text-emerald-400';
+    if (level === 'CHALLENGER') return 'text-amber-400';
     if (level === 'TOUR PRO') return 'text-red-500';
+    
+    // Category Colors
+    if (level === 'WARMUP') return 'text-sky-400';
+    if (level === 'ESSENTIELS') return 'text-zinc-100';
+    if (level === 'BIOMÉCANIQUE') return 'text-[#c9964a]';
+    if (level === 'SCORING ZONE') return 'text-emerald-400';
+    if (level === 'STRATÉGIE') return 'text-indigo-400';
+    if (level === 'MENTAL') return 'text-slate-100 shadow-[0_0_10px_rgba(255,255,255,0.2)]';
+    if (level === 'FUN') return 'text-rose-400';
+
     return isSolar ? 'text-black' : 'text-[#c9964a]';
   };
 
@@ -611,8 +623,12 @@ export default function Academy({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                    <h6 className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40 whitespace-nowrap">ENTRAÎNEMENT ONYX ACTIF</h6>
+                    <motion.div 
+                      animate={{ opacity: [0.4, 1, 0.4] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="w-2 h-2 rounded-full bg-red-500" 
+                    />
+                    <h6 className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40 whitespace-nowrap">MISSION ONYX SÉCURISÉE</h6>
                   </div>
                   <p className="text-sm md:text-lg font-black italic uppercase tracking-tighter leading-none truncate">{activeSession.title}</p>
                 </div>
@@ -716,9 +732,10 @@ export default function Academy({
               <div className="flex gap-4">
                 <button 
                   onClick={() => confirmStartSession(sessionBriefing)}
-                  className="flex-1 py-5 rounded-2xl bg-[#c9964a] text-black font-black uppercase tracking-[0.3em] text-xs shadow-xl shadow-[#c9964a]/20 hover:scale-[1.02] transition-transform active:scale-95"
+                  className="flex-1 py-5 rounded-[2rem] bg-[#c9964a] text-black font-black uppercase tracking-[0.4em] text-xs shadow-2xl shadow-[#c9964a]/20 hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-3"
                 >
-                  DEPLOIER SUR LE TERRAIN • {Math.floor(sessionBriefing.duration / 60)}:00
+                  <Play size={14} fill="currentColor" />
+                  DÉPLOYER UNITÉ ONYX • {Math.floor(sessionBriefing.duration / 60)}:00
                 </button>
               </div>
             </motion.div>
@@ -846,26 +863,26 @@ export default function Academy({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mt-6">
-                       <button 
-                         onClick={() => setDrillReps(prev => Math.max(0, prev - 1))}
-                         className={`py-3 rounded-xl border font-black uppercase tracking-widest text-[8px] transition-all ${isSolar ? 'border-black text-black' : 'border-white/10 text-white/40 hover:border-white/20 font-sans'}`}
-                       >
-                         -1 REP
-                       </button>
-                       <button 
-                         onClick={() => {
-                           setDrillReps(prev => prev + 1);
-                           setDrillSuccess(prev => prev + 1);
-                           playPing(1200, 'sine', 0.1, 0.05);
-                         }}
-                         className={`py-3 rounded-xl font-black uppercase tracking-widest text-[8px] transition-all shadow-lg active:scale-95 ${
-                           isSolar ? 'bg-black text-white' : 'bg-emerald-500 text-black shadow-emerald-500/20'
-                         }`}
-                       >
-                         +1 SUCCÈS
-                       </button>
-                    </div>
+                   <div className="grid grid-cols-2 gap-4 mt-6">
+                      <button 
+                        onClick={() => setDrillReps(prev => Math.max(0, prev - 1))}
+                        className={`py-4 rounded-2xl border-2 font-black uppercase tracking-widest text-[8px] transition-all ${isSolar ? 'border-black text-black' : 'border-white/20 text-white/60 hover:border-white/40 hover:text-white'}`}
+                      >
+                        -1 REP
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setDrillReps(prev => prev + 1);
+                          setDrillSuccess(prev => prev + 1);
+                          playPing(1200, 'sine', 0.1, 0.05);
+                        }}
+                        className={`py-4 rounded-2xl font-black uppercase tracking-widest text-[8px] transition-all shadow-xl active:scale-95 ${
+                          isSolar ? 'bg-black text-white' : 'bg-emerald-500 text-black shadow-emerald-500/30'
+                        }`}
+                      >
+                        +1 SUCCÈS
+                      </button>
+                   </div>
                   </div>
 
                   <div className={`mt-8 p-4 rounded-2xl border bg-black/40 ${isSolar ? 'border-zinc-200' : 'border-white/5'}`}>
@@ -1107,19 +1124,44 @@ export default function Academy({
       {/* Top Stats Grid - Only show in Plan / Catalogue */}
       {activeTab !== 'competition' && (
         <div className="grid grid-cols-2 gap-4">
-          <div className={`p-6 rounded-[2rem] border-2 shadow-xl ${isSolar ? 'bg-white border-black' : 'bg-black/50 border-[#c9964a]/30'}`}>
+          <div className={`p-6 rounded-[2.5rem] border-2 shadow-2xl relative overflow-hidden group ${isSolar ? 'bg-white border-black' : 'bg-black/80 border-[#c9964a]/20 shadow-[#c9964a]/5'}`}>
+             <motion.div 
+               animate={{ x: ['100%', '-100%'] }}
+               transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+               className="absolute top-0 bottom-0 w-px bg-[#c9964a]/10 blur-[2px] opacity-30 h-full pointer-events-none"
+             />
              <div className="flex items-center gap-2 mb-3">
                <Trophy size={14} className={isSolar ? 'text-black' : 'text-[#c9964a]'} />
-               <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Missions Terminées</span>
+               <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40">Missions Terminées</span>
              </div>
-             <p className="text-2xl font-black italic font-mono">12</p>
+             <div className="flex items-end gap-2">
+               <p className="text-4xl font-black italic font-mono tracking-tighter tabular-nums">12</p>
+               <span className="text-[10px] font-black opacity-20 mb-1">UNITÉS</span>
+             </div>
           </div>
-          <div className={`p-6 rounded-[2rem] border-2 shadow-xl ${isSolar ? 'bg-white border-black' : 'bg-black/50 border-[#c9964a]/30'}`}>
+
+          <div className={`p-6 rounded-[2.5rem] border-2 shadow-2xl relative overflow-hidden group ${isSolar ? 'bg-white border-black' : 'bg-black/95 border-[#c9964a]/40 shadow-[#c9964a]/10'}`}>
+             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                <Target size={80} strokeWidth={1} />
+             </div>
+             <motion.div 
+               animate={{ y: ['-100%', '200%'] }}
+               transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+               className="absolute left-0 right-0 h-px bg-white/10 blur-[1px] opacity-20 w-full pointer-events-none"
+             />
              <div className="flex items-center gap-2 mb-3">
                <Star size={14} className={getLevelColor()} />
-               <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Niveau Technique</span>
+               <span className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40">Mode Tactique Actif</span>
              </div>
-             <p className={`text-2xl font-black italic font-mono ${getLevelColor()}`}>{getTechnicalLevel()}</p>
+             <div className="flex flex-col">
+               <p className={`text-2xl md:text-3xl font-black italic uppercase tracking-tighter leading-tight ${getLevelColor()}`}>
+                 {getTechnicalLevel()}
+               </p>
+               <div className="flex items-center gap-1.5 mt-2">
+                  <div className={`w-1 h-1 rounded-full animate-ping ${isSolar ? 'bg-black' : 'bg-[#c9964a]'}`} />
+                  <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-40">Système Onyx V2 Ready</span>
+               </div>
+             </div>
           </div>
         </div>
       )}
@@ -1691,14 +1733,15 @@ export default function Academy({
                           theory: (drill as any).theory || drill.description,
                           steps: (drill as any).steps || [drill.description]
                         })}
-                        className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] shadow-lg transition-transform active:scale-95 ${
+                        className={`w-full py-5 rounded-2xl flex items-center justify-center gap-4 font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl transition-all relative overflow-hidden group active:scale-95 ${
                           activeSession?.id === (drill.id || `program-drill-${idx}`)
-                            ? 'bg-red-500 text-white shadow-lg shadow-red-500/20'
-                            : (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/20')
+                            ? 'bg-red-500 text-white shadow-red-500/30'
+                            : (isSolar ? 'bg-black text-white' : 'bg-white text-black hover:bg-[#c9964a] shadow-white/5')
                         }`}
                       >
-                        <Play size={14} fill="currentColor" />
-                        {activeSession?.id === (drill.id || `program-drill-${idx}`) ? 'ARRÊTER' : 'ÉQUIPER TACTIQUE'}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                        <Play size={16} fill="currentColor" />
+                        {activeSession?.id === (drill.id || `program-drill-${idx}`) ? 'ARRÊTER LE PROTOCOLE' : 'DÉPLOYER TACTIQUE'}
                       </button>
                   </div>
                 </motion.div>
@@ -1752,10 +1795,10 @@ export default function Academy({
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest whitespace-nowrap border transition-all ${
+                className={`px-4 py-2.5 rounded-xl text-[8px] font-black uppercase tracking-[0.2em] whitespace-nowrap border-2 transition-all relative overflow-hidden group ${
                   selectedCategory === cat 
-                    ? (isSolar ? 'bg-black text-white border-black' : 'bg-[#c9964a] text-black border-[#c9964a]')
-                    : (isSolar ? 'bg-white border-zinc-200 text-zinc-400' : 'bg-white/5 border-white/20 text-white/80 hover:text-white hover:border-white/40 shadow-sm')
+                    ? (isSolar ? 'bg-black text-white border-black scale-105' : 'bg-[#c9964a] text-black border-[#c9964a] scale-105 shadow-[0_0_15px_rgba(201,150,74,0.3)]')
+                    : (isSolar ? 'bg-white border-zinc-200 text-zinc-400 hover:border-black hover:text-black' : 'bg-white/10 border-white/10 text-white hover:border-[#c9964a]/50 hover:bg-white/20 shadow-inner shadow-white/5')
                 }`}
               >
                 {cat}
