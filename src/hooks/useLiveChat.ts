@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { chatWithAdam, generateSpeech, speakWithBrowser } from '../services/geminiService';
 import { useVoiceInput } from './useVoiceInput';
 import { playRawPcm } from '../lib/audioUtils';
+import { useChat } from '../services/ChatContext';
 
 export interface SafeMessage {
   id: string;
@@ -41,7 +42,7 @@ export function useLiveChat({
   onWakeWord,
   autoRestartMic = false
 }: UseLiveChatProps = {}) {
-  const [messages, setMessages] = useState<SafeMessage[]>([]);
+  const { messages, setMessages, lastAdvice: globalLastAdvice, setLastAdvice: setGlobalLastAdvice } = useChat();
   const [input, setInput] = useState('');
   const [attachedImage, setAttachedImage] = useState<{ mimeType: string, data: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,6 +58,23 @@ export function useLiveChat({
   const lastTranscriptRef = useRef('');
   const handleSendRef = useRef<any>(null);
 
+  useEffect(() => {
+    localStorage.setItem('onyx_voice', isMuted ? 'false' : 'true');
+  }, [isMuted]);
+
+  const generateUniqueId = (prefix: string) => {
+    try {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return `${prefix}-${crypto.randomUUID()}`;
+      }
+    } catch (e) {}
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  };
+
+  const [lastAdvice, setLastAdvice] = useState<{ text: string, speaker?: 'ADAM' | 'LOGIC' | 'ONYX' } | null>(
+    globalLastAdvice ? { text: globalLastAdvice, speaker: (localStorage.getItem('onyx_last_speaker') as any) || 'ADAM' } : null
+  );
+
   // 1. Voice Input Hook (Must be first to provide startListening/stopListening)
   const { isListening, startListening, stopListening, error: voiceError } = useVoiceInput((text, isFinal) => {
     setLastTranscript(text);
@@ -66,7 +84,12 @@ export function useLiveChat({
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     
     // Wake word detection
-    const detectedWakeWord = wakeWords.some(word => transcript.includes(word.toLowerCase()));
+    const wakeWordsList = ['hey tee', 'tactique', 'club', 'aide moi', 'adam'];
+    const detectedWakeWord = wakeWordsList.some(word => transcript.includes(word.toLowerCase()));
+
+    if (detectedWakeWord) {
+      window.dispatchEvent(new CustomEvent('onyx_voice_wake', { detail: { wake: true } }));
+    }
 
     if (!wakeWordDetectedRef.current && detectedWakeWord) {
       wakeWordDetectedRef.current = true;
@@ -99,21 +122,6 @@ export function useLiveChat({
     }
   });
 
-  useEffect(() => {
-    localStorage.setItem('onyx_voice', isMuted ? 'false' : 'true');
-  }, [isMuted]);
-
-  const generateUniqueId = (prefix: string) => {
-    try {
-      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return `${prefix}-${crypto.randomUUID()}`;
-      }
-    } catch (e) {}
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-  };
-
-  const [lastAdvice, setLastAdvice] = useState<{ text: string, speaker?: 'ADAM' | 'LOGIC' | 'ONYX' } | null>(null);
-
   // 2. Voice output logic
   const speakText = useCallback(async (text: string, speaker?: 'ADAM' | 'LOGIC' | 'ONYX', shouldRestartMic?: boolean) => {
     if (isMuted) {
@@ -123,8 +131,12 @@ export function useLiveChat({
       return;
     }
     
-    if (speaker) setCurrentSpeaker(speaker);
+    if (speaker) {
+      setCurrentSpeaker(speaker);
+      localStorage.setItem('onyx_last_speaker', speaker);
+    }
     setLastAdvice({ text, speaker });
+    setGlobalLastAdvice(text);
     setIsSpeaking(true);
     try {
       const speakerId = speaker === 'ONYX' ? 'pred' : speaker === 'LOGIC' ? 'strat' : 'mage';

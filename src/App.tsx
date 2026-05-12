@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AuthProvider, useAuth } from './services/AuthProvider';
+import { ChatProvider } from './services/ChatContext';
 import AuthScreen from './components/AuthScreen';
 import Paywall from './components/Paywall';
 import SplashScreen from './components/SplashScreen';
@@ -14,13 +15,19 @@ import Profile from './components/Profile';
 import Community from './components/Community';
 import MissionControl from './components/MissionControl';
 import TacticalMap from './components/TacticalMap';
+import Academy from './components/Academy';
 import WelcomeTour from './utils/WelcomeTour';
 import AdamMentorModal from './components/AdamMentorModal';
 import LieScanner from './components/LieScanner';
-import { BookOpen, Sparkles } from 'lucide-react';
+import { BookOpen, Sparkles, Brain, X, Clock } from 'lucide-react';
+import { AcademyDrill } from './data/academyDrills';
+import { speakWithBrowser } from './services/geminiService';
+import { playWhistle, playSoftBell } from './lib/audioUtils';
 
 import { AppPath, HoleScore, Club } from './types';
 import { INITIAL_CLUBS, COURSES, CHALLENGES, CADDIES } from './constants';
+
+import { PowerManager } from './components/PowerManager';
 
 function AppContent() {
   const { user, loading, hasPaid } = useAuth();
@@ -41,6 +48,51 @@ function AppContent() {
     return localStorage.getItem('onyx_mission_active') === 'true';
   });
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [pseudo, setPseudo] = useState(() => localStorage.getItem('onyx_pseudo') || 'OPÉRATEUR');
+
+  // Drill Session State (Persistent)
+  const [activeSession, setActiveSession] = useState<AcademyDrill | null>(null);
+  const [sessionTimeLeft, setSessionTimeLeft] = useState<number>(0);
+  const [isSessionRunning, setIsSessionRunning] = useState(false);
+  const [showTimeUp, setShowTimeUp] = useState(false);
+
+  useEffect(() => {
+    let interval: any;
+    if (isSessionRunning && sessionTimeLeft > 0) {
+      interval = setInterval(() => {
+        setSessionTimeLeft((t) => t - 1);
+      }, 1000);
+    } else if (sessionTimeLeft === 0 && isSessionRunning) {
+      setIsSessionRunning(false);
+      setShowTimeUp(true);
+      playSoftBell();
+      setTimeout(() => setShowTimeUp(false), 5000);
+    }
+    return () => clearInterval(interval);
+  }, [isSessionRunning, sessionTimeLeft]);
+
+  const startDrillSession = (drill: AcademyDrill) => {
+    setActiveSession(drill);
+    setSessionTimeLeft(drill.duration);
+    setIsSessionRunning(true);
+    speakWithBrowser("C'est parti, n'hésite pas à me demander conseil.");
+  };
+
+  const stopDrillSession = () => {
+    setActiveSession(null);
+    setIsSessionRunning(false);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    localStorage.setItem('onyx_pseudo', pseudo);
+    localStorage.setItem('onyx_player_name', pseudo); // Sync with profile to avoid confusion
+  }, [pseudo]);
   
   const [scorecard, setScorecard] = useState<Record<number, HoleScore>>(() => {
     try {
@@ -110,6 +162,33 @@ function AppContent() {
     return localStorage.getItem('the-chose-game-mode') || 'STROKE';
   });
 
+  // Automatic Mid-Round & End-of-Round Briefing Trigger
+  useEffect(() => {
+    // Hole 9 - Mid-Round
+    if (scorecard[9] && currentHole === 10) {
+      const alerted = sessionStorage.getItem('mid_round_briefing_triggered');
+      if (!alerted) {
+        setMentorInitialMessage("MISSION UPDATE : J'ai terminé les 9 premiers trous. En tant que Mentor ADAM, effectue mon briefing automatique de mi-parcours immédiatement. Analyse mes statistiques sur l'Aller et prépare-moi techniquement pour le Retour.");
+        setShowMentorModal(true);
+        sessionStorage.setItem('mid_round_briefing_triggered', 'true');
+      }
+    } else if (currentHole < 9) {
+      sessionStorage.removeItem('mid_round_briefing_triggered');
+    }
+
+    // Hole 18 - End-of-Round
+    if (scorecard[18] && currentHole === 18) {
+      const alerted = sessionStorage.getItem('end_round_briefing_triggered');
+      if (!alerted) {
+        setMentorInitialMessage("PROCOTOLE CLUBHOUSE : J'ai terminé le parcours. Emmène-moi au 19ème trou dans le Salon VIP pour mon bilan global impitoyable et mon programme d'entraînement ONYX.");
+        setShowMentorModal(true);
+        sessionStorage.setItem('end_round_briefing_triggered', 'true');
+      }
+    } else if (currentHole < 18) {
+      sessionStorage.removeItem('end_round_briefing_triggered');
+    }
+  }, [scorecard, currentHole]);
+
   const [advice, setAdvice] = useState<string | null>(null);
   const adviceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -129,15 +208,29 @@ function AppContent() {
   const [mentorInitialMessage, setMentorInitialMessage] = useState<string | undefined>(undefined);
   const [showLieScanner, setShowLieScanner] = useState(false);
 
-  const updateScore = useCallback((holeNum: number, strokes: number, putts: number) => {
+  const updateScore = useCallback((holeNum: number, strokes: number, putts?: number) => {
     const holeData = selectedCourse.holes.find(h => h.number === holeNum);
+    const existingHole = scorecard[holeNum];
+    
+    // STRICT RULE: Default to 2 putts if not specified (even if 0 is passed, if strokes > 0 we want default 2 if not explicitly set)
+    // Actually, if the AI says 0 putts, it's possible (chip in), but usually the user wants "2 by default"
+    // User said: "il faut 2 putt d office tu comprends" -> "d'office" means "automatically/mandatory default"
+    let finalPutts = 0;
+    if (putts !== undefined && putts !== null) {
+      finalPutts = putts;
+    } else if (existingHole && existingHole.putts > 0) {
+      finalPutts = existingHole.putts;
+    } else if (strokes > 0) {
+      finalPutts = 2; // The requested default
+    }
+
     setScorecard(prev => ({
       ...prev,
       [holeNum]: {
         hole: holeNum,
         par: holeData?.par || 4,
         strokes,
-        putts,
+        putts: finalPutts,
         fairwayHit: prev[holeNum]?.fairwayHit ?? null,
         gir: prev[holeNum]?.gir ?? null,
         timestamp: Date.now()
@@ -147,7 +240,7 @@ function AppContent() {
     if (holeNum === currentHole && holeNum < 18) {
       setCurrentHole(holeNum + 1);
     }
-  }, [selectedCourse, currentHole]);
+  }, [selectedCourse, currentHole, scorecard]);
 
   // --- Persistence ---
   useEffect(() => {
@@ -224,7 +317,7 @@ function AppContent() {
   }
 
   return (
-    <>
+    <PowerManager>
       <Layout 
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
@@ -252,6 +345,7 @@ function AppContent() {
             playerForm={playerForm}
             setPlayerForm={setPlayerForm}
             handicap={handicap}
+            onUpdateScore={updateScore}
             setActiveTab={setActiveTab}
             setShowLieScanner={setShowLieScanner}
             activeCaddie={activeCaddie}
@@ -305,7 +399,23 @@ function AppContent() {
             selectedTee={selectedTee}
           />
         )}
-        {activeTab === 'circle' && <InnerCircle key="circle" displayMode={displayMode} />}
+        {activeTab === 'academy' && (
+          <Academy 
+            key="academy"
+            displayMode={displayMode}
+            scorecard={scorecard}
+            pseudo={pseudo}
+            setPseudo={setPseudo}
+            arsenal={arsenal}
+            index={handicap}
+            currentHole={currentHole}
+            activeSession={activeSession}
+            sessionTimeLeft={sessionTimeLeft}
+            isSessionRunning={isSessionRunning}
+            startDrillSession={startDrillSession}
+            stopDrillSession={stopDrillSession}
+          />
+        )}
         {activeTab === 'profile' && (
           <Profile 
             key="profile" 
@@ -327,7 +437,24 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      {/* Floating Adam Help Button */}
+      {/* Time Up Notification */}
+    <AnimatePresence>
+      {showTimeUp && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.5, y: -20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.5, y: -20 }}
+          className="fixed inset-x-0 top-12 z-[1000] flex justify-center pointer-events-none"
+        >
+          <div className="bg-[#c9964a] text-black px-8 py-4 rounded-full shadow-2xl flex items-center gap-4 border-4 border-black">
+             <Clock className="animate-bounce" />
+             <span className="font-black italic uppercase tracking-widest">TEMPS ÉCOULÉ • PROTOCOLE FINI</span>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
+    {/* Floating Adam Help Button */}
       <motion.button
         initial={{ opacity: 0, scale: 0.8, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -359,6 +486,7 @@ function AppContent() {
         playerForm={playerForm}
         onUpdateScore={updateScore}
         onSetCurrentHole={setCurrentHole}
+        onOpenScanner={() => setShowLieScanner(true)}
         displayMode={displayMode}
         selectedTee={selectedTee}
       />
@@ -367,14 +495,65 @@ function AppContent() {
       onClose={() => setShowLieScanner(false)} 
       isMuted={localStorage.getItem('onyx_voice') === 'false'}
     />
-  </>
+
+    {/* Persistent Timer Overlay (Floating, hidden if in Academy where it is pinned) */}
+    <AnimatePresence>
+      {(activeSession && activeTab !== 'academy') && (
+        <motion.div
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 100 }}
+          className="fixed bottom-24 left-4 right-4 z-[400] pointer-events-none"
+        >
+          <div className={`p-6 rounded-[2.5rem] border-2 shadow-2xl flex items-center justify-between pointer-events-auto backdrop-blur-xl ${
+            displayMode === 'solar' ? 'bg-white/90 border-black shadow-black/10' : 'bg-black/90 border-[#c9964a] shadow-[#c9964a]/20'
+          }`}>
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center animate-pulse ${
+                displayMode === 'solar' ? 'bg-black text-white' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/50'
+              }`}>
+                <Brain size={28} />
+              </div>
+              <div>
+                <h6 className="text-[8px] font-black uppercase tracking-widest opacity-40 leading-none mb-1">Session Active d'ADAM</h6>
+                <p className="text-sm font-black italic uppercase tracking-tighter leading-none">{activeSession.title}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  <span className="text-[7px] font-black uppercase tracking-[0.2em] opacity-40 text-[#c9964a]">ONYX Sync Actif</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1">Temps Restant</p>
+                <p className="text-3xl font-black font-mono tracking-tighter tabular-nums leading-none">
+                  {formatTime(sessionTimeLeft)}
+                </p>
+              </div>
+              <button 
+                onClick={stopDrillSession}
+                className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${
+                  displayMode === 'solar' ? 'border-black hover:bg-black hover:text-white' : 'border-[#c9964a]/30 hover:border-[#c9964a] text-[#c9964a]'
+                }`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </PowerManager>
 );
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ChatProvider>
+        <AppContent />
+      </ChatProvider>
     </AuthProvider>
   );
 }

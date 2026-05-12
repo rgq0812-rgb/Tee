@@ -79,13 +79,13 @@ export default function ScorecardPage({
         ? `Tu es Adam, le Mentor. C'est le bilan de mi-parcours (fin du 9). Analyse les 9 premiers trous ("L'aller"). Donne un bilan tactique chirurgical mais complice, encourage le joueur pour "Le retour" (trous 10-18) et donne un axe d'amélioration majeur basé sur ces stats. (Max 4 phrases).`
         : undefined;
 
-      const text = await getGameDebrief(scorecard, totalScore, totalStrokes, customPrompt);
+      const text = await getGameDebrief(scorecard, totalScore, totalStrokes, selectedCourse, customPrompt);
       setDebriefText(text);
       
       const isMuted = localStorage.getItem('onyx_voice') === 'false';
       if (!isMuted) {
         setIsSpeaking(true);
-        const resultData = await generateSpeech(text);
+        const resultData = await generateSpeech(text, activeCaddie);
         if (typeof resultData === 'object' && resultData.fallback) {
           speakWithBrowser(resultData.text, () => setIsSpeaking(false));
         } else if (typeof resultData === 'string') {
@@ -100,8 +100,13 @@ export default function ScorecardPage({
           setIsSpeaking(false);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      if (error?.message?.includes('429') || error?.message?.includes('Resource exhausted') || (typeof error === 'object' && error?.error?.code === 429)) {
+        setDebriefText("UNITÉ ADAM : Limite de quota atteinte. Vérifiez votre plan de facturation Google AI pour poursuivre l'analyse élite.");
+      } else {
+        setDebriefText("Échec de la connexion tactique. Adam est indisponible.");
+      }
     } finally {
       setIsLoadingDebrief(false);
     }
@@ -137,12 +142,18 @@ export default function ScorecardPage({
   };
 
   const handleRepeatScorecardAdvice = async () => {
-    if (!lastAudioData || isSpeaking) return;
+    if (isSpeaking) return;
     setIsSpeaking(true);
     try {
-      const source = await playRawPcm(lastAudioData);
-      if (source) {
-        source.onended = () => setIsSpeaking(false);
+      if (lastAudioData) {
+        const source = await playRawPcm(lastAudioData);
+        if (source) {
+          source.onended = () => setIsSpeaking(false);
+        } else {
+          setIsSpeaking(false);
+        }
+      } else if (debriefText) {
+        speakWithBrowser(debriefText, () => setIsSpeaking(false));
       } else {
         setIsSpeaking(false);
       }
@@ -220,7 +231,14 @@ export default function ScorecardPage({
   const updateScore = (holeNum: number, strokes: number, putts?: number) => {
     const holeData = scorecard[holeNum] || { strokes: 0, putts: 0 };
     // Default putts to 2 if strokes is set for the first time and putts is not specified/is 0
-    const finalPutts = (putts !== undefined) ? putts : (holeData.putts || (strokes > 0 ? 2 : 0));
+    let finalPutts = 0;
+    if (putts !== undefined && putts !== null) {
+      finalPutts = putts;
+    } else if (holeData.putts > 0) {
+      finalPutts = holeData.putts;
+    } else if (strokes > 0) {
+      finalPutts = 2; // Mandatory default as requested
+    }
     
     setScorecard({
       ...scorecard,
@@ -339,7 +357,7 @@ export default function ScorecardPage({
                 <div className={`rounded-[2.5rem] border-2 overflow-hidden shadow-sm ${isSolar ? 'bg-white border-zinc-950' : 'bg-white/5 border-white/10'}`}>
                    <div className="max-h-64 overflow-y-auto no-scrollbar divide-y divide-current/5">
                       {arsenal.map((club: any, idx: number) => (
-                        <div key={`tactical-club-edit-${club.id}-${idx}`} className="px-6 py-5 flex items-center justify-between group">
+                        <div key={`tactical-club-edit-v2-${club.id}-${idx}-${selectedCourse.id}`} className="px-6 py-5 flex items-center justify-between group">
                            <div className="flex flex-col">
                               <span className={`text-[8px] font-black uppercase opacity-40 ${isSolar ? 'text-black' : 'text-white'}`}>{club.type}</span>
                               <span className={`text-sm font-black italic uppercase ${isSolar ? 'text-black' : 'text-white'}`}>{club.name}</span>
@@ -386,7 +404,7 @@ export default function ScorecardPage({
                 <div className="space-y-2">
                   {Object.values(CADDIES).map((c: any, idx: number) => (
                     <button 
-                      key={`scorecard-caddie-sel-${c.id}-${idx}`}
+                      key={`scorecard-caddie-selector-item-${c.id}-${idx}`}
                       onClick={() => setActiveCaddie(c)}
                       className={`w-full p-6 p-4 rounded-[2rem] border-2 text-left transition-all flex items-center gap-6 shadow-sm ${activeCaddie.id === c.id ? (isSolar ? 'bg-white border-zinc-950 shadow-xl' : 'bg-[#c9964a]/10 border-[#c9964a] shadow-lg shadow-[#c9964a]/10') : (isSolar ? 'bg-white border-zinc-100 opacity-40' : 'bg-white/5 border-white/10 opacity-40')}`}
                     >
@@ -473,7 +491,7 @@ export default function ScorecardPage({
             </div>
             <div className="grid grid-cols-2 gap-3 overflow-y-auto pr-2 no-scrollbar">
               {arsenal.map((club: any, idx: number) => (
-                <div key={`arsenal-menu-${club.id}-${idx}`} className={`p-5 rounded-3xl border ${club.dist > 0 ? (isSolar ? 'bg-white border-zinc-950 shadow-md' : 'bg-white/10 border-white/20') : 'opacity-20 grayscale border-white/5'}`}>
+                <div key={`arsenal-menu-v2-${club.id}-${idx}`} className={`p-5 rounded-3xl border ${club.dist > 0 ? (isSolar ? 'bg-white border-zinc-950 shadow-md' : 'bg-white/10 border-white/20') : 'opacity-20 grayscale border-white/5'}`}>
                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-1">{club.type}</p>
                    <h5 className="text-xl font-black italic uppercase">{club.name}</h5>
                    <div className="mt-4 flex items-end gap-1">
@@ -589,12 +607,13 @@ export default function ScorecardPage({
             <span className="w-14 text-center">DIST</span>
             <span className="w-10 text-center">PAR</span>
             <span className="flex-1 text-center font-black">SCORE</span>
+            <span className="w-10 text-center opacity-40">PUTT</span>
             <span className="w-12 text-right">VAR</span>
           </div>
           <div className={`divide-y ${isSolar ? 'divide-zinc-950/10' : 'divide-white/10'}`}>
             {scorecardData.map((h: any, idx: number) => (
               <button 
-                key={`score-hole-row-${h.hole}-${idx}`} 
+                key={`score-hole-row-v3-${selectedCourse.id}-${h.hole}-${idx}`} 
                 onClick={() => { setEditingHole(h.hole); setCurrentHole(h.hole); }}
                 className={`w-full px-6 py-5 flex items-center transition-colors ${currentHole === h.hole ? (isSolar ? 'bg-zinc-100' : 'bg-red-600/10') : ''}`}
               >
@@ -606,6 +625,13 @@ export default function ScorecardPage({
                     <span className={`font-mono text-3xl font-black italic ${isSolar ? 'text-zinc-950' : 'text-white'}`}>{h.strokes}</span>
                   ) : (
                     <span className="opacity-10 text-xl font-black">----</span>
+                  )}
+                </div>
+                <div className="w-10 text-center">
+                  {h.strokes ? (
+                    <span className={`font-mono text-lg font-black ${isSolar ? 'text-zinc-400' : 'text-white/30'}`}>{h.putts}</span>
+                  ) : (
+                    <span className="opacity-5 text-sm font-black">--</span>
                   )}
                 </div>
                 <div className="w-12 text-right font-mono font-black italic text-lg">
@@ -777,10 +803,17 @@ export default function ScorecardPage({
             <div className="grid grid-cols-4 gap-3 mb-8">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((num, pidx) => (
                 <button 
-                  key={`score-pad-${editingHole}-${num}-${pidx}`}
+                  key={`score-pad-v3-field-${activeScoreField}-${editingHole}-${num}-${pidx}`}
                   onClick={() => {
-                    if (activeScoreField === 'strokes') updateScore(editingHole, num);
-                    else updateScore(editingHole, scorecard[editingHole]?.strokes || 0, num);
+                    if (activeScoreField === 'strokes') {
+                      updateScore(editingHole, num);
+                      if (editingHole === 9 && num > 0) {
+                        setMentorInitialMessage("J'ai terminé les 9 premiers trous. En tant que mentor, propose-moi maintenant mon briefing de mi-parcours automatique avec une analyse tactique de l'Aller.");
+                        setShowMentorModal(true);
+                      }
+                    } else {
+                      updateScore(editingHole, scorecard[editingHole]?.strokes || 0, num);
+                    }
                   }}
                   className={`h-16 rounded-2xl border-2 font-mono text-2xl font-black transition-all ${
                     (activeScoreField === 'strokes' ? scorecard[editingHole]?.strokes === num : scorecard[editingHole]?.putts === num) 

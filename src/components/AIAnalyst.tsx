@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { analyzeSwing, generateSpeech, chatWithAdam, speakWithBrowser } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { Upload, Video, Sparkles, AlertCircle, ChevronRight, CheckCircle2, Volume2, Loader2, Mic, Send, X, Brain } from 'lucide-react';
-import { useVoiceInput } from '../hooks/useVoiceInput';
+import { useLiveChat } from '../hooks/useLiveChat';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
 import AudioVisualizer from './AudioVisualizer';
 
@@ -17,60 +17,31 @@ export default function AIAnalyst() {
   
   // Chat state
   const [showChat, setShowChat] = useState(false);
-  const [chatHistory, setChatHistory] = useState<any[]>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [isChatLoading, setIsChatLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { isListening, startListening, stopListening } = useVoiceInput((text) => {
-    if (playPing) playPing(800, 'sine', 0.05);
-    handleSendChat(text);
+  const {
+    messages: chatHistory,
+    input: chatInput,
+    setInput: setChatInput,
+    handleSend: handleOriginalSend,
+    isLoading: isChatLoading,
+    isListening,
+    startListening,
+    stopListening
+  } = useLiveChat({
+    initialSpeaker: 'ONYX',
+    autoRestartMic: false
   });
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [chatHistory, isChatLoading]);
-
   const handleSendChat = async (textOverride?: string) => {
-    const text = textOverride || chatInput;
-    if (!text.trim() || isChatLoading) return;
-
     if (playPing) playPing(600, 'sine', 0.03);
-    const userMsg = { id: `user-${Date.now()}-${Math.random()}`, role: 'user', parts: [{ text }] };
-    const newHistory = [...chatHistory, userMsg];
-    setChatHistory(newHistory);
-    setChatInput('');
-    setIsChatLoading(true);
-
-    try {
-      const historyForApi = newHistory.map(m => ({ role: m.role, parts: m.parts }));
-      const { text } = await chatWithAdam(historyForApi);
-      const responseText = text || "...";
-      const adamMsg = { id: `adam-${Date.now()}-${Math.random()}`, role: 'model', parts: [{ text: responseText }] };
-      setChatHistory(prev => [...prev, adamMsg]);
-      
-      // Auto-speak the response
-      if (responseText) {
-        const result = await generateSpeech(responseText);
-        if (typeof result === 'object' && result.fallback) {
-          speakWithBrowser(result.text);
-        } else if (typeof result === 'string') {
-          await playRawPcm(result);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsChatLoading(false);
-    }
+    handleOriginalSend(textOverride);
   };
 
   const initChat = () => {
     if (!result) return;
     setShowChat(true);
-    setChatHistory([
-      { id: 'analyst-init', role: 'model', parts: [{ text: `Bonjour ! J'ai analysé votre swing. Score : ${result.score}/100. "${result.feedback}" Que voulez-vous savoir de plus sur votre technique ?` }] }
-    ]);
+    handleSendChat(`Je viens de faire une analyse de swing avec ONYX. Mon score est de ${result.score}/100. Voici le feedback : "${result.feedback}". Comment puis-je m'améliorer ?`);
   };
 
   const handleUpload = async () => {
@@ -251,7 +222,7 @@ export default function AIAnalyst() {
                             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                <div className={`max-w-[85%] p-4 rounded-2xl text-[13px] leading-relaxed ${msg.role === 'user' ? 'bg-white/10 text-white border border-white/20' : 'bg-[#c9964a]/5 text-white italic border border-[#c9964a]/30 shadow-[0_10px_30px_rgba(0,0,0,0.3)]'}`}>
                                  <div className="markdown-body prose prose-invert max-w-none prose-p:leading-relaxed prose-xs">
-                                   <ReactMarkdown>{msg.parts[0].text}</ReactMarkdown>
+                                   <ReactMarkdown>{msg.parts?.[0] && 'text' in msg.parts[0] ? msg.parts[0].text : ''}</ReactMarkdown>
                                  </div>
                                </div>
                             </div>

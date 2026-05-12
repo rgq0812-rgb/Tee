@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, Trophy, Share2, Heart, MessageSquare, Send, 
@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../services/AuthProvider';
 import { toPng } from 'html-to-image';
-import { useRef } from 'react';
+import { useLiveChat } from '../hooks/useLiveChat';
 
 interface Challenge {
   id: string;
@@ -47,6 +47,13 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
   const [newPostContent, setNewPostContent] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const {
+    messages, setInput, input, handleSend, isLoading, isSpeaking
+  } = useLiveChat({
+    initialSpeaker: 'ONYX',
+    autoRestartMic: false
+  });
 
   const handleExportHQ = async () => {
     if (!cardRef.current) return;
@@ -236,8 +243,8 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
               exit={{ opacity: 0, y: -20 }}
               className="space-y-6"
             >
-              {posts.map((post, idx) => (
-                <div key={post.id} className={`border rounded-[2.5rem] p-6 space-y-4 shadow-sm relative overflow-hidden group ${isSolar ? 'bg-white border-zinc-100' : 'bg-zinc-900/50 border-white/5'}`}>
+              {posts.map((post, pidx) => (
+                <div key={`community-post-item-v2-${post.id}-${pidx}`} className={`border rounded-[2.5rem] p-6 space-y-4 shadow-sm relative overflow-hidden group ${isSolar ? 'bg-white border-zinc-100' : 'bg-zinc-900/50 border-white/5'}`}>
                   {post.type === 'exploit' && (
                     <div className="absolute top-0 left-0 w-1 h-full bg-[#c9964a]" />
                   )}
@@ -320,8 +327,8 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
                 </button>
               </div>
 
-              {challenges.map((ch) => (
-                <div key={ch.id} className={`border rounded-[2.5rem] p-6 space-y-4 relative overflow-hidden group shadow-sm transition-all ${isSolar ? 'bg-white border-zinc-100 hover:border-black' : 'bg-zinc-900 border-white/5 hover:border-[#c9964a]/30'}`}>
+              {challenges.map((ch, cidx) => (
+                <div key={`community-challenge-v2-${ch.id}-${cidx}`} className={`border rounded-[2.5rem] p-6 space-y-4 relative overflow-hidden group shadow-sm transition-all ${isSolar ? 'bg-white border-zinc-100 hover:border-black' : 'bg-zinc-900 border-white/5 hover:border-[#c9964a]/30'}`}>
                   <div className={`absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-10 transition-opacity ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>
                     {ch.type === 'precision' ? <Target size={80} /> : ch.type === 'power' ? <Zap size={80} /> : <Brain size={80} />}
                   </div>
@@ -367,8 +374,60 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-4"
+              className="space-y-6"
             >
+              {/* Central Tactical Chat - Connected to Adam */}
+              <div className={`p-6 rounded-[2rem] border-2 ${isSolar ? 'bg-white border-black shadow-xl' : 'bg-black/40 border-[#c9964a]/30 shadow-2xl'} mb-8`}>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/20'}`}>
+                    <Brain size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black italic uppercase tracking-widest">TACTICAL HUB CHAT</h3>
+                    <p className={`text-[8px] font-black uppercase tracking-[0.2em] ${isSolar ? 'text-zinc-400' : 'text-white/30'}`}>Connecté au Mentor Central</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 max-h-[300px] overflow-y-auto px-1 mb-6 no-scrollbar">
+                  {messages.slice(-5).map((msg, idx) => (
+                    <div key={`hub-chat-${idx}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`p-3 rounded-2xl text-[10px] max-w-[80%] ${
+                        msg.role === 'user' 
+                          ? (isSolar ? 'bg-black text-white' : 'bg-white/10 text-white') 
+                          : (isSolar ? 'bg-zinc-100 italic border border-black/5' : 'bg-zinc-800 italic border border-white/5')
+                      }`}>
+                         {msg.parts.map((p: any) => 'text' in p ? p.text : '').join(' ')}
+                      </div>
+                    </div>
+                  ))}
+                  {messages.length === 0 && (
+                    <p className="text-[10px] text-center opacity-30 italic py-8 uppercase tracking-widest">Initialisation de la liaison cryptée...</p>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                    placeholder="COMMANDE DIRECTE..."
+                    className={`flex-1 h-12 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none border transition-all ${
+                       isSolar ? 'bg-zinc-50 border-zinc-200 focus:border-black' : 'bg-white/5 border-white/10 focus:border-[#c9964a]'
+                    }`}
+                  />
+                  <button 
+                    onClick={() => handleSend()}
+                    disabled={isLoading || !input.trim()}
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                      isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/20'
+                    } disabled:opacity-20`}
+                  >
+                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                  </button>
+                </div>
+              </div>
+
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={`community-friend-item-${i}`} className={`border rounded-[2rem] p-4 flex items-center justify-between shadow-sm ${isSolar ? 'bg-white border-zinc-100' : 'bg-white/5 border-white/5'}`}>
                   <div className="flex items-center gap-4">

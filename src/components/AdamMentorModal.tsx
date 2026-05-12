@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
-import { X, Send, BookOpen, Sparkles, User, Loader2, Volume2, VolumeX, Mic, Brain, Camera, Paperclip, Target, Map as MapIcon, Check } from 'lucide-react';
+import { X, Send, BookOpen, Sparkles, User, Loader2, Volume2, VolumeX, Mic, Brain, Camera, Paperclip, Target, Map as MapIcon, Check, Zap } from 'lucide-react';
 import { chatWithAdam, generateSpeech, isSpeechRecognitionSupported, speakWithBrowser } from '../services/geminiService';
 import { ADAM_AVATAR_URL } from '../constants';
 import AudioVisualizer from './AudioVisualizer';
@@ -22,16 +22,20 @@ interface AdamMentorModalProps {
   displayMode: 'tactical' | 'solar';
   onUpdateScore?: (hole: number, strokes: number, putts: number) => void;
   onSetCurrentHole?: (hole: number) => void;
+  onOpenScanner?: () => void;
   selectedTee: 'black' | 'white' | 'yellow' | 'blue' | 'red';
 }
 
-export default function AdamMentorModal({ isOpen, onClose, selectedCourse, currentHole, scorecard, arsenal, initialMessage, handicap = 18, playerForm = 'forme', displayMode, onUpdateScore, onSetCurrentHole, selectedTee }: AdamMentorModalProps) {
+import { resizeImage } from '../utils/imageProcessing';
+
+export default function AdamMentorModal({ isOpen, onClose, selectedCourse, currentHole, scorecard, arsenal, initialMessage, handicap = 18, playerForm = 'forme', displayMode, onUpdateScore, onSetCurrentHole, onOpenScanner, selectedTee }: AdamMentorModalProps) {
   const { playPing } = useAmbientSound();
   const [activeTacticalMode, setActiveTacticalMode] = useState<'PARCOURS' | 'STRATÉGIE' | 'ENTRAÎNEMENT'>('PARCOURS');
   const [selectedTactic, setSelectedTactic] = useState<'AGRESSIF' | 'SÉCURITÉ' | 'CRÉATIF'>('SÉCURITÉ');
   const [currentForm, setCurrentForm] = useState<'FROID' | 'FORME' | 'PUR'>('FORME');
   const [userLocation, setUserLocation] = useState<GeolocationPosition | null>(null);
   const [isHandsFree, setIsHandsFree] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const wakeWordDetectedRef = useRef(false);
   const handsFreeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastScoreUpdateRef = useRef<{ hole: number, strokes: number, putts: number } | null>(null);
@@ -165,18 +169,24 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
   const fileInputRef = useRef<HTMLInputElement>(null);
   const currentAudioSource = useRef<AudioBufferSourceNode | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 4 * 1024 * 1024) {
-      alert("Image trop lourde (max 4MB)");
-      return;
-    }
+    
+    setIsOptimizing(true);
     const reader = new FileReader();
-    reader.onload = (readerEvent) => {
-      const base64 = (readerEvent.target?.result as string).split(',')[1];
-      setAttachedImage({ mimeType: file.type, data: base64 });
-      if (playPing) playPing(1500, 'sine', 0.1);
+    reader.onload = async (readerEvent) => {
+      try {
+        const fullBase64 = (readerEvent.target?.result as string).split(',')[1];
+        // Resize image to 1024px max to save memory and avoid "Insufficient Memory" errors
+        const optimizedBase64 = await resizeImage(fullBase64, 1024);
+        setAttachedImage({ mimeType: 'image/jpeg', data: optimizedBase64 });
+        if (playPing) playPing(1500, 'sine', 0.1);
+      } catch (err) {
+        console.error("Optimization error:", err);
+      } finally {
+        setIsOptimizing(false);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -266,7 +276,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
       {isOpen && (
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className={`fixed inset-0 z-[400] ${isSolar ? 'bg-zinc-900/60' : 'bg-black/90'} backdrop-blur-2xl flex items-center justify-center p-0 sm:p-4`}
+          className={`fixed inset-0 z-[400] ${isSolar ? 'bg-zinc-900/60' : 'bg-black/40'} backdrop-blur-3xl flex items-center justify-center p-0 sm:p-4`}
           onClick={handleClose}
         >
           <motion.div
@@ -445,6 +455,46 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* HUD Commands & Power Info */}
+              <div className="px-4 pb-4 space-y-3 relative z-10">
+                <div className="flex gap-4">
+                  <div className="flex-1 space-y-4">
+                    <div className={`p-4 rounded-3xl border ${isSolar ? 'bg-zinc-50 border-zinc-200 shadow-md' : 'bg-white/5 border-white/10 backdrop-blur-xl'}`}>
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 opacity-60">Commandes HUD Actives</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { cmd: 'Hey Tee', desc: 'Réveil Onyx' },
+                          { cmd: 'Aide moi', desc: 'Conseil survie' },
+                          { cmd: 'Club', desc: 'Calcul distance' },
+                          { cmd: 'Tactique', desc: 'Analyse risque' },
+                          { cmd: 'Par/Birdie', desc: 'Score rapide' },
+                          { cmd: 'Suivant', desc: 'Coup suivant' }
+                        ].map(c => (
+                          <div key={c.cmd} className="flex flex-col">
+                            <span className={`text-[10px] font-bold ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>{c.cmd}</span>
+                            <span className="text-[8px] opacity-40 uppercase font-black">{c.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`w-32 p-4 rounded-3xl border flex flex-col items-center justify-center gap-1 ${isSolar ? 'bg-zinc-50 border-zinc-200' : 'bg-black/40 border-white/5 shadow-inner'}`}>
+                    <Zap size={16} className="text-[#c9964a] mb-2 animate-pulse" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-[#c9964a]">ONYX Power</span>
+                    <span className={`text-[14px] font-black ${isSolar ? 'text-black' : 'text-white'}`}>OPTIMISÉ</span>
+                    <span className="text-[8px] opacity-40 uppercase font-black text-center mt-2">Dimming auto</span>
+                  </div>
+                </div>
+
+                <div className={`flex items-center gap-2 p-2 px-4 rounded-full ${isSolar ? 'bg-zinc-100' : 'bg-[#c9964a]/10'} border ${isSolar ? 'border-zinc-200' : 'border-[#c9964a]/20'}`}>
+                  <Sparkles size={12} className="text-[#c9964a]" />
+                  <p className={`text-[9px] font-bold italic ${isSolar ? 'text-zinc-600' : 'text-[#c9964a]/80'}`}>
+                    "Hey Tee, quel est mon club pour 145m ?"
+                  </p>
                 </div>
               </div>
 
@@ -653,7 +703,13 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                    <motion.button 
                      whileHover={{ scale: 1.1 }}
                      whileTap={{ scale: 0.9 }}
-                     onClick={() => fileInputRef.current?.click()} 
+                     onClick={() => {
+                       if (activeTacticalMode === 'ENTRAÎNEMENT' && onOpenScanner) {
+                         onOpenScanner();
+                       } else {
+                         fileInputRef.current?.click();
+                       }
+                     }} 
                      className={`relative p-1.5 rounded-lg transition-all ${activeTacticalMode === 'ENTRAÎNEMENT' ? (isSolar ? 'text-black' : 'text-emerald-500') : (isSolar ? 'text-zinc-300' : 'text-white')}`}
                    >
                      <Camera size={20} />

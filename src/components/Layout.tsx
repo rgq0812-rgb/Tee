@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Home, Trophy, Video, User, MapPin, Award, Users, Settings, Shield, Crosshair, Sun, Moon } from 'lucide-react';
+import { Home, Trophy, Video, User, MapPin, Award, Users, Settings, Shield, Crosshair, Sun, Moon, Brain } from 'lucide-react';
 import { useAuth } from '../services/AuthProvider';
 
 interface LayoutProps {
@@ -16,7 +16,7 @@ export default function Layout({ children, activeTab, setActiveTab, displayMode,
   const tabs = [
     { id: 'dashboard', label: 'HUD', icon: MapPin },
     { id: 'tactical', label: 'Tactique', icon: Crosshair },
-    { id: 'community', label: 'Réseau', icon: Users },
+    { id: 'academy', label: 'Entraînement', icon: Brain },
     { id: 'scorecard', label: 'Score', icon: Trophy },
     { id: 'profile', label: 'Élite', icon: Shield },
   ];

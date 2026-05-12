@@ -3,6 +3,8 @@ import { Camera, X, RefreshCw, CheckCircle2, AlertCircle, Loader2, Sparkles, Bra
 import { motion, AnimatePresence } from 'motion/react';
 import { analyzeLie, analyzeGreen, generateSpeech, speakWithBrowser } from '../services/geminiService';
 import { playRawPcm } from '../lib/audioUtils';
+import { resizeImage, extractResizedFrameFromVideo } from '../utils/imageProcessing';
+import DynamicAROverlay from './DynamicAROverlay';
 
 interface LieScannerProps {
   isOpen: boolean;
@@ -65,10 +67,16 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
     mediaRecorder.onstop = async () => {
       const blob = new Blob(chunksRef.current, { type: 'video/mp4' });
       const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = (reader.result as string).split(',')[1];
-        setCapturedImage(URL.createObjectURL(blob)); // Use for preview
-        handleAnalyze(base64, 'video/mp4');
+      reader.onloadend = async () => {
+        try {
+          // Extract a frame and resize it to save memory
+          const optimizedBase64 = await extractResizedFrameFromVideo(blob, 1024);
+          setCapturedImage(URL.createObjectURL(blob)); // Use for preview
+          handleAnalyze(optimizedBase64, 'image/jpeg'); // Send resized frame instead of full video for better memory
+        } catch (err) {
+          console.error("Video processing error:", err);
+          setError("Erreur de mémoire vive. Redémarrez.");
+        }
       };
       reader.readAsDataURL(blob);
     };
@@ -98,7 +106,7 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
     }
   }, [stream]);
 
-  const capture = () => {
+  const capture = async () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -108,9 +116,18 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setCapturedImage(dataUrl);
-        stopCamera();
-        handleAnalyze(dataUrl.split(',')[1]);
+        const base64 = dataUrl.split(',')[1];
+        
+        try {
+          // Resize to 1024px max for memory safety
+          const optimizedBase64 = await resizeImage(base64, 1024);
+          setCapturedImage(`data:image/jpeg;base64,${optimizedBase64}`);
+          stopCamera();
+          handleAnalyze(optimizedBase64);
+        } catch (err) {
+          console.error("Capture optimization error:", err);
+          setError("Erreur de traitement d'image (mémoire).");
+        }
       }
     }
   };
@@ -249,6 +266,9 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
               playsInline
               className="w-full h-full object-cover grayscale-[0.2] contrast-125"
             />
+            
+            {/* Dynamic 3D Alignment Overlay */}
+            <DynamicAROverlay mode={scanMode === 'LIE' ? 'lie' : 'green'} />
             
             {/* HUD Overlay */}
             <div className="absolute inset-0 flex flex-col pointer-events-none">

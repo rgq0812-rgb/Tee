@@ -4,10 +4,17 @@ import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
+
+// Valider la config pour éviter les erreurs silencieuses sur les remixes
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('INSERT')) {
+  console.error("CRITICAL: Firebase API Key is missing or invalid. Please check firebase-applet-config.json");
+}
+
 // Initialiser Firestore avec Long Polling pour une meilleure stabilité dans les environnements restreints
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 }, firebaseConfig.firestoreDatabaseId);
+
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -25,10 +32,13 @@ export const signInWithGoogle = async () => {
   } catch (error: any) {
     console.error("Firebase Sign-In Error:", error.code, error.message);
     if (error.code === 'auth/popup-blocked') {
-      throw new Error("Le pop-up a été bloqué par votre navigateur. Veuillez autoriser les pop-ups pour ce site.");
+      throw new Error("POPUP_BLOCKED");
+    }
+    if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
+      throw new Error("POPUP_CANCELLED");
     }
     if (error.code === 'auth/unauthorized-domain') {
-      throw new Error("Ce domaine n'est pas autorisé pour l'authentification Google. Veuillez contacter l'administrateur.");
+      throw new Error("Ce domaine n'est pas autorisé. Contactez l'administrateur.");
     }
     throw error;
   }
@@ -46,28 +56,30 @@ export const registerWithEmail = async (email: string, pass: string, name: strin
 
 export const logout = () => signOut(auth);
 
-  async function testConnection() {
-  try {
-    console.log("[Firebase] Testing connection to Firestore...");
-    // Use the specially allowed test path with a timeout to prevent hanging
-    const connectionTest = getDocFromServer(doc(db, 'test', 'connection'));
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 5000));
-    
-    await Promise.race([connectionTest, timeout]);
-    console.log("[Firebase] Firestore connection healthy.");
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.message.includes('the client is offline') || error.message.includes('Connection timeout')) {
-        console.error("Firebase connection failed: Client is offline or timeout. Database may still be provisioning.");
-      } else if (error.message.includes('permission-denied')) {
-        console.log("[Firebase] Firestore reachable (Permission Denied as expected).");
+async function testConnection(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      console.log(`[Firebase] Testing connection to Firestore (Attempt ${i + 1}/${retries})...`);
+      // Use the specially allowed test path with a timeout
+      const connectionTest = getDocFromServer(doc(db, 'test', 'connection'));
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 5000));
+      
+      await Promise.race([connectionTest, timeout]);
+      console.log("[Firebase] Firestore connection healthy.");
+      return; // Success
+    } catch (error: any) {
+      console.warn(`[Firebase] Connection attempt ${i + 1} failed:`, error.message);
+      if (i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait before retry
       } else {
-        console.warn("[Firebase] Connection test warning:", error.message);
+        console.error("Firebase connection failed after multiple attempts. The database might still be initializing or the project needs re-provisioning.");
       }
     }
   }
 }
-testConnection();
+
+// Lancer le test après un court délai pour laisser le temps aux services de s'initialiser
+setTimeout(() => testConnection(), 2000);
 
 export enum OperationType {
   CREATE = 'create',

@@ -195,7 +195,8 @@ export default function Profile({
     vault: false,
     history: false,
     rounds: false,
-    academy: false
+    academy: false,
+    arsenal: false
   });
 
   const toggleSection = (section: string) => {
@@ -301,13 +302,88 @@ export default function Profile({
           <div className="grid grid-cols-2 gap-4 w-full max-w-sm mt-8">
             <div className={`border p-4 rounded-2xl flex flex-col items-center ${isSolar ? 'bg-white border-zinc-200 shadow-sm' : 'bg-white/5 border-white/10'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${isSolar ? 'text-zinc-400' : 'text-white/40'}`}>Handicap</p>
-              <p className={`text-xl font-black font-mono ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>{handicap}</p>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setHandicap(Math.max(0, Number((handicap - 0.1).toFixed(1))))}
+                  className={`p-1 rounded-lg border ${isSolar ? 'border-black/10' : 'border-white/10'}`}
+                >
+                  <Minus size={12} />
+                </button>
+                <p className={`text-xl font-black font-mono ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>{handicap}</p>
+                <button 
+                  onClick={() => setHandicap(Number((handicap + 0.1).toFixed(1)))}
+                  className={`p-1 rounded-lg border ${isSolar ? 'border-black/10' : 'border-white/10'}`}
+                >
+                  <Plus size={12} />
+                </button>
+              </div>
             </div>
             <div className={`border p-4 rounded-2xl flex flex-col items-center ${isSolar ? 'bg-white border-zinc-200 shadow-sm' : 'bg-white/5 border-white/10'}`}>
               <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${isSolar ? 'text-zinc-400' : 'text-white/40'}`}>XP Élite</p>
               <p className="text-xl font-black font-mono text-red-600">4,250</p>
             </div>
           </div>
+        </div>
+
+        {/* Arsenal Calibration (New Section) */}
+        <div className="space-y-4">
+           <button 
+             onClick={() => toggleSection('arsenal')}
+             className="w-full flex items-center justify-between px-2"
+           >
+              <div className="flex items-center gap-2">
+                <Zap size={16} className={isSolar ? "text-black" : "text-[#c9964a]"} />
+                <h3 className={`text-xs font-black tracking-[0.3em] uppercase ${isSolar ? 'text-black' : 'text-white'}`}>CALIBRATION DE L'ARSENAL</h3>
+              </div>
+              {expandedSections.arsenal ? <ChevronDown size={16} className="opacity-20" /> : <ChevronRight size={16} className="opacity-20" />}
+           </button>
+           <AnimatePresence>
+              {expandedSections.arsenal && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className={`rounded-[2rem] border-2 overflow-hidden ${isSolar ? 'bg-white border-black' : 'bg-white/5 border-white/10'}`}
+                >
+                  <div className="max-h-80 overflow-y-auto no-scrollbar divide-y divide-current/5">
+                    {arsenal.map((club: any, idx: number) => (
+                      <div key={`profile-arsenal-${club.id}-${idx}`} className="px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black uppercase opacity-40">{club.type}</span>
+                          <span className="text-sm font-black italic uppercase">{club.name}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <button 
+                            onClick={() => {
+                              const n = [...arsenal];
+                              n[idx] = { ...club, dist: Math.max(0, club.dist - 5) };
+                              setArsenal(n);
+                            }}
+                            className={`w-8 h-8 rounded-lg border flex items-center justify-center ${isSolar ? 'bg-zinc-100 border-zinc-200' : 'bg-white/5 border-white/5'}`}
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <div className="flex items-baseline gap-1 min-w-[60px] justify-center">
+                            <span className="text-xl font-black font-mono">{club.dist}</span>
+                            <span className="text-[8px] font-black uppercase opacity-40">M</span>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              const n = [...arsenal];
+                              n[idx] = { ...club, dist: club.dist + 5 };
+                              setArsenal(n);
+                            }}
+                            className={`w-8 h-8 rounded-lg border flex items-center justify-center ${isSolar ? 'bg-zinc-950 text-white' : 'bg-white/10 border-white/10'}`}
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+           </AnimatePresence>
         </div>
 
         {/* Course Tactical Profiles (Memory) */}
@@ -339,7 +415,7 @@ export default function Profile({
                      <div className="p-6 flex justify-center"><Loader2 className="animate-spin text-white/20" /></div>
                   ) : courseProfiles.length > 0 ? (
                     courseProfiles.map((p, pidx) => (
-                      <div key={`profile-card-${p.id}-${pidx}`} className={`border rounded-[2rem] overflow-hidden transition-all ${isSolar ? 'bg-white border-zinc-200 shadow-sm' : 'bg-white/5 border-white/10'}`}>
+                      <div key={`profile-card-v2-${p.id}-${pidx}`} className={`border rounded-[2rem] overflow-hidden transition-all ${isSolar ? 'bg-white border-zinc-200 shadow-sm' : 'bg-white/5 border-white/10'}`}>
                         <div className="p-5 space-y-4">
                           <div className="flex justify-between items-start">
                             <div>
@@ -371,7 +447,7 @@ export default function Profile({
                                 <p className={`text-[10px] font-black uppercase tracking-widest ${isSolar ? 'text-zinc-400' : 'text-white/20'}`}>Conseils par Trou (Mémoire)</p>
                                 <div className="grid grid-cols-1 gap-2">
                                   {Object.entries(p.holeAdvice || {}).map(([hole, advice]) => (
-                                    <div key={`hole-advice-${p.id}-${hole}`} className={`flex gap-3 p-3 rounded-xl border ${isSolar ? 'bg-white border-zinc-100' : 'bg-white/5 border-white/5'}`}>
+                                    <div key={`hole-advice-v2-${p.id}-${hole}`} className={`flex gap-3 p-3 rounded-xl border ${isSolar ? 'bg-white border-zinc-100' : 'bg-white/5 border-white/5'}`}>
                                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 font-black italic border ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black border-black shadow-sm'}`}>
                                         T{hole}
                                       </div>
@@ -441,7 +517,7 @@ export default function Profile({
                   <div className="grid grid-cols-3 gap-2">
                      {assets.map((asset, idx) => (
                        <motion.button
-                         key={`profile-vault-asset-${asset.id}-${idx}`}
+                         key={`profile-vault-asset-v2-${asset.id}-${idx}`}
                          whileTap={{ scale: 0.95 }}
                          onClick={() => setSelectedAsset(asset)}
                          className={`relative aspect-square rounded-xl overflow-hidden border group ${isSolar ? 'border-zinc-200' : 'border-white/5'}`}
@@ -491,7 +567,7 @@ export default function Profile({
                      <div className="p-6 flex justify-center"><Loader2 className="animate-spin text-white/20" /></div>
                   ) : advices.length > 0 ? (
                     advices.map((adv, idx) => (
-                      <div key={`${adv.id}-${idx}`} className="p-4 space-y-2 group">
+                      <div key={`profile-advice-v2-${adv.id}-${idx}`} className="p-4 space-y-2 group">
                         <div className="flex items-center justify-between">
                           <div className="flex flex-col">
                             <span className={`text-[8px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>{adv.caddieName} — TROU {adv.holeNumber}</span>
@@ -606,7 +682,7 @@ export default function Profile({
                >
                   {savedRounds.length > 0 ? (
                     savedRounds.map((round, sidx) => (
-                      <div key={`profile-saved-round-v3-${round.id}-${sidx}`} className={`border rounded-2xl p-5 space-y-4 relative overflow-hidden group shadow-sm ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
+                      <div key={`profile-saved-round-v4-${round.id}-${sidx}`} className={`border rounded-2xl p-5 space-y-4 relative overflow-hidden group shadow-sm ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
                           <ShieldCheck size={40} className={isSolar ? 'text-zinc-200' : 'text-[#c9964a]'} />
                         </div>
@@ -693,7 +769,7 @@ export default function Profile({
             { label: 'Relancer le Tutoriel', icon: Zap, color: 'text-emerald-600', bg: isSolar ? 'bg-emerald-50' : 'bg-emerald-500/10', action: () => { localStorage.removeItem('tourSeen'); setTourSeen(false); } },
           ].map((item, idx) => (
             <button
-              key={`profile-action-central-${idx}-${item.label}`}
+              key={`profile-action-central-v2-${idx}-${item.label}`}
               onClick={() => item.action && item.action()}
               className={`w-full p-5 rounded-2xl border flex items-center justify-between transition-all group ${
                 item.label.includes('CONFIGURATION') 
@@ -930,7 +1006,7 @@ export default function Profile({
                   <p className={`text-[9px] font-black uppercase tracking-widest px-2 ${isSolar ? 'text-zinc-500' : 'text-[#c9964a]'}`}>DISTANCES DE RÉFÉRENCE ({units === 'yards' ? 'YARDS' : 'MÈTRES'})</p>
                   <div className="grid gap-3 pb-32">
                     {arsenal.map((club, idx) => (
-                      <div key={`arsenal-club-${club.id}-${idx}`} className={`border p-5 rounded-3xl flex items-center justify-between shadow-sm transition-all ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
+                      <div key={`arsenal-club-v2-${club.id}-${idx}`} className={`border p-5 rounded-3xl flex items-center justify-between shadow-sm transition-all ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
                         <div className="flex items-center gap-5">
                           <div className={`w-12 h-12 rounded-xl border flex items-center justify-center font-mono font-black italic ${isSolar ? 'bg-zinc-100 border-zinc-200 text-black shadow-inner' : 'bg-black/40 border-white/5 text-orange-500'}`}>
                             {club.type.charAt(0)}

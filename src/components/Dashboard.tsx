@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { collection, query, where, orderBy, getDocs, limit, setDoc, doc, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../services/firebase';
 import { useAuth } from '../services/AuthProvider';
+import { useChat } from '../services/ChatContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Mic, Trophy, ChevronLeft, ChevronRight, MapPin, Brain, Cloud, 
@@ -32,6 +33,7 @@ export default function Dashboard({
   selectedMode, setSelectedMode,
   playerForm, setPlayerForm,
   handicap,
+  onUpdateScore,
   setActiveTab,
   setShowLieScanner,
   activeCaddie,
@@ -50,6 +52,7 @@ export default function Dashboard({
   const [showCaddieSelector, setShowCaddieSelector] = useState(false);
   const [showArsenalMenu, setShowArsenalMenu] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
+  const { messages } = useChat();
 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [lastSpeechData, setLastSpeechData] = useState<any>(null);
@@ -330,8 +333,40 @@ export default function Dashboard({
         generateAdvice("J'ai raté mon coup. Sois mon mentor et analyse l'erreur possible.");
       } else if (transcript.includes('score') || transcript.includes('combien')) {
         generateAdvice("Fais un point sur mon score actuel et donne-moi ton ressenti de mentor.");
-      } else if (transcript.trim().length > 3) {
-        generateAdvice(transcript);
+      } else {
+        // Enregistrement rapide du score via mot-clé
+        const words = transcript.split(' ');
+        const scoreKeywords: Record<string, number> = {
+          'albatros': -3, 'eagle': -2, 'birdie': -1, 'par': 0, 'bogey': 1, 'double': 2, 'triple': 3, 'quadruple': 4
+        };
+        
+        let foundScore = null;
+        for (const [kw, offset] of Object.entries(scoreKeywords)) {
+          if (transcript.includes(kw)) {
+            const holePar = selectedCourse.holes[currentHole - 1]?.par || 4;
+            foundScore = holePar + offset;
+            break;
+          }
+        }
+
+        // Détection de score numérique type "score de 5" ou "5 coups"
+        if (foundScore === null) {
+          const scoreMatch = transcript.match(/(?:score de|noter|marque|fait)\s*(\d+)/i) || transcript.match(/(\d+)\s*(?:coups|frappes)/i);
+          if (scoreMatch) {
+            foundScore = parseInt(scoreMatch[1]);
+          }
+        }
+        
+        if (foundScore !== null && onUpdateScore) {
+          onUpdateScore(currentHole, foundScore, 2); // 2 putts d'office comme demandé
+          if (currentHole === 9) {
+            generateAdvice("J'ai fini le trou 9. Fais-moi mon briefing de mi-parcours automatique maintenant avec ton analyse mentor.");
+          } else {
+            generateAdvice(`Entendu. Score enregistré sur le ${currentHole}. 2 putts d'office. On passe au suivant.`);
+          }
+        } else if (transcript.trim().length > 3) {
+          generateAdvice(transcript);
+        }
       }
       
       stopListening();
@@ -434,7 +469,7 @@ export default function Dashboard({
 
       // Voice confirmation of connection
       try {
-        const welcomeResult = await generateSpeech("Système Onyx activé. Connexion établie. Bonne partie.");
+        const welcomeResult = await generateSpeech("Connecté");
         if (typeof welcomeResult === 'object' && welcomeResult.fallback) {
           speakWithBrowser(welcomeResult.text);
         } else if (typeof welcomeResult === 'string') {
@@ -772,7 +807,7 @@ export default function Dashboard({
           <motion.div key="course-selector" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className={`fixed inset-0 z-[500] ${isSolar ? 'bg-white' : 'bg-black'} p-6 pt-16`}>
             <button onClick={() => setShowCourseSelector(false)} className={`${isSolar ? 'text-black border-black shadow-md' : 'text-white/40 border-white/10'} uppercase text-[10px] border px-4 py-2 rounded-full mb-8 font-black`}>Fermer</button>
             <div className="grid gap-4">
-              {COURSES.map((c, cidx) => <button key={`dash-course-sel-${c.id}-${cidx}`} onClick={() => { setSelectedCourse(c); setShowCourseSelector(false); }} className={`p-6 text-left rounded-3xl border font-black uppercase transition-all ${isSolar ? 'bg-zinc-100 border-zinc-200 text-black shadow-sm active:bg-zinc-200' : 'bg-white/5 border-white/10 text-white active:bg-white/10'}`}>{c.name}</button>)}
+                {COURSES.map((c, cidx) => <button key={`dash-course-sel-v2-${c.id}-${cidx}`} onClick={() => { setSelectedCourse(c); setShowCourseSelector(false); }} className={`p-6 text-left rounded-3xl border font-black uppercase transition-all ${isSolar ? 'bg-zinc-100 border-zinc-200 text-black shadow-sm active:bg-zinc-200' : 'bg-white/5 border-white/10 text-white active:bg-white/10'}`}>{c.name}</button>)}
             </div>
           </motion.div>
         )}
@@ -820,9 +855,9 @@ export default function Dashboard({
                   <Brain size={14} className={isSolar ? 'text-black' : 'text-[#c9964a]'} />
                   <h4 className={`text-[10px] font-black uppercase tracking-[0.3em] italic ${isSolar ? 'text-zinc-400' : 'text-white/40'}`}>Unités Caddie</h4>
                 </div>
-                {Object.values(CADDIES).map((c: any, idx: number) => (
-                  <motion.button
-                    key={`caddie-dash-sel-${idx}-${c.id}`}
+                  {Object.values(CADDIES).map((c: any, cidx: number) => (
+                    <motion.button
+                      key={`caddie-dash-sel-v3-${c.id}-${cidx}`}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => { setActiveCaddie(c); }}
                     className={`w-full p-6 text-left rounded-[2rem] border transition-all flex items-center gap-5 ${
@@ -839,6 +874,36 @@ export default function Dashboard({
                   </motion.button>
                 ))}
               </div>
+
+              {/* Connected Chat Liaison Preview */}
+              <button 
+                onClick={() => { setShowCaddieSelector(false); (window as any).document.getElementById('floating-adam-btn')?.click(); }}
+                className={`p-6 rounded-[2rem] border-2 shadow-xl text-left transition-all active:scale-[0.98] ${isSolar ? 'bg-zinc-50 border-black shadow-lg' : 'bg-white/5 border-white/5 shadow-2xl shadow-[#c9964a]/5'}`}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/20'}`}>
+                    <Brain size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-black italic uppercase tracking-widest leading-none mb-1">Liaison ONYX Directe</h4>
+                    <p className={`text-[7px] font-black uppercase tracking-[0.2em] ${isSolar ? 'text-zinc-400' : 'text-white/20'}`}>Centralisé & Connecté</p>
+                  </div>
+                </div>
+                
+                <div className={`p-4 rounded-2xl border ${isSolar ? 'bg-white border-black/10' : 'bg-white/5 border-white/5'} mb-3`}>
+                  <p className={`text-[10px] italic leading-relaxed ${isSolar ? 'text-zinc-600' : 'text-white/60'}`}>
+                    {messages.length > 0 
+                      ? (messages[messages.length - 1].parts.map((p: any) => 'text' in p ? p.text : '').join(' ').substring(0, 80) + '...')
+                      : "Liaison cryptée active. En attente de transmission tactique par le Mentor ADAM."
+                    }
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>Ouvrir le canal central</span>
+                  <ChevronRight size={14} className={isSolar ? 'text-black' : 'text-[#c9964a]'} />
+                </div>
+              </button>
 
               <div className={`pt-4 border-t ${isSolar ? 'border-zinc-200' : 'border-white/5'}`}>
                 <button 
@@ -885,12 +950,12 @@ export default function Dashboard({
 
             <div className="flex-1 overflow-y-auto pb-32 no-scrollbar relative z-10 px-1">
               <div className="grid gap-4">
-                {arsenal.map((club: any, idx: number) => (
+                {arsenal.map((club: any, aidx: number) => (
                   <motion.div 
-                    key={`arsenal-dash-item-${idx}-${club.id}`} 
+                    key={`arsenal-dash-item-v3-${aidx}-${club.id}`} 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.02 }}
+                    transition={{ delay: aidx * 0.02 }}
                     className="bg-zinc-900 border-2 border-white/20 p-4 rounded-[2rem] flex items-center justify-between group relative overflow-hidden shadow-xl"
                   >
                     <span className="absolute -left-2 -top-2 text-[45px] font-black text-white/[0.05] italic select-none uppercase">{club.type}</span>
@@ -908,7 +973,7 @@ export default function Dashboard({
                         <button 
                           onClick={() => {
                             const newArsenal = [...arsenal];
-                            newArsenal[idx].dist = (newArsenal[idx].dist || 0) + 5;
+                            newArsenal[aidx].dist = (newArsenal[aidx].dist || 0) + 5;
                             setArsenal(newArsenal);
                           }}
                           className="w-12 h-9 rounded-xl bg-[#c9964a] flex items-center justify-center text-black active:scale-95 transition-all shadow-lg"
@@ -918,7 +983,7 @@ export default function Dashboard({
                         <button 
                           onClick={() => {
                             const newArsenal = [...arsenal];
-                            newArsenal[idx].dist = Math.max(0, (newArsenal[idx].dist || 0) - 5);
+                            newArsenal[aidx].dist = Math.max(0, (newArsenal[aidx].dist || 0) - 5);
                             setArsenal(newArsenal);
                           }}
                           className="w-12 h-9 rounded-xl bg-zinc-800 border-2 border-white/20 flex items-center justify-center text-white active:scale-95 transition-all"
@@ -965,13 +1030,13 @@ export default function Dashboard({
             </div>
 
             <div className="flex-1 space-y-4">
-               {[
-                 { id: GameMode.STROKE, name: 'STROKE PLAY', desc: 'Score classique brut vs par. Standard tactique.', color: 'border-white/10' },
-                 { id: GameMode.STABLEFORD, name: 'STABLEFORD', desc: 'Calcul de points net. Analyse de performance.', color: 'border-[#c9964a]/30' },
-                 { id: GameMode.MATCHPLAY, name: 'MATCH PLAY', desc: 'Face-à-face tactique. Domination de trous.', color: 'border-red-600/30' },
-               ].map((mode, idx) => (
-                 <motion.button
-                   key={`gamemode-dash-${idx}-${mode.id}`}
+                {[
+                  { id: GameMode.STROKE, name: 'STROKE PLAY', desc: 'Score classique brut vs par. Standard tactique.', color: 'border-white/10' },
+                  { id: GameMode.STABLEFORD, name: 'STABLEFORD', desc: 'Calcul de points net. Analyse de performance.', color: 'border-[#c9964a]/30' },
+                  { id: GameMode.MATCHPLAY, name: 'MATCH PLAY', desc: 'Face-à-face tactique. Domination de trous.', color: 'border-red-600/30' },
+                ].map((mode, idx) => (
+                  <motion.button
+                    key={`gamemode-dash-v2-${idx}-${mode.id}`}
                    whileTap={{ scale: 0.98 }}
                    onClick={() => { setSelectedMode(mode.id); setShowModeSelector(false); }}
                    className={`w-full bg-white/5 p-8 text-left rounded-[2rem] border transition-all ${mode.color} ${selectedMode === mode.id ? 'bg-white/10 scale-[1.02]' : ''}`}

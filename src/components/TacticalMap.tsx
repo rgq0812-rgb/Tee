@@ -119,6 +119,19 @@ const LineOverlay = ({ points, isSolar }: { points: any[], isSolar?: boolean }) 
 
 export default function TacticalMap({ selectedCourse, currentHole, activeCaddie, displayMode, selectedTee }: TacticalMapProps & { displayMode?: 'tactical' | 'solar' }) {
   const isSolar = displayMode === 'solar';
+  const [mapError, setMapError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Catch Google Maps auth errors globally
+    (window as any).gm_authFailure = () => {
+      console.error("Google Maps Authentication Failure");
+      setMapError("ERREUR D'AUTHENTIFICATION : La clé API est invalide ou restreinte.");
+    };
+    return () => {
+      (window as any).gm_authFailure = null;
+    };
+  }, []);
+
   const hole = selectedCourse.holes.find((h: any) => h.number === currentHole) || selectedCourse.holes[0];
   const [mire, setMire] = useState<any>({ 
     lat: (hole.teeBox.lat + hole.green.middle.lat) / 2, 
@@ -147,11 +160,20 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
      return () => clearTimeout(timeout);
   }, [mire.lat, mire.lng]);
 
-  if (!hasValidKey) return <AIScreen isSolar={isSolar} />;
+  if (!hasValidKey || mapError) return <AIScreen isSolar={isSolar} />;
 
   return (
     <div className={`h-[calc(100vh-8rem)] w-full rounded-[2.5rem] overflow-hidden border relative shadow-2xl ${isSolar ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-white/10'}`}>
-      <APIProvider apiKey={API_KEY} version="weekly" language="fr">
+      <APIProvider 
+        apiKey={API_KEY} 
+        version="weekly" 
+        language="fr"
+        onLoad={() => console.log("Maps API Loaded Successfully")}
+        onError={(err) => {
+          console.error("Maps API Load Error:", err);
+          setMapError("ERREUR DE CHARGEMENT : Impossible de contacter les satellites Google.");
+        }}
+      >
         <Map
           mapId="DEMO_MAP_ID"
           defaultCenter={mire}

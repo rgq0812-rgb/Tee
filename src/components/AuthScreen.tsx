@@ -22,7 +22,11 @@ export default function AuthScreen({ onGuest }: { onGuest: () => void }) {
       await signInWithGoogle();
     } catch (err: any) {
       console.error("Login error:", err);
-      if (err.message?.includes('unauthorized domain')) {
+      if (err.message === 'POPUP_BLOCKED') {
+        setError("Pop-up bloqué ! Veuillez autoriser les pop-ups ou ouvrez l'application dans un nouvel onglet.");
+      } else if (err.message === 'POPUP_CANCELLED') {
+        setError("Connexion annulée. Veuillez réessayer en gardant la fenêtre ouverte.");
+      } else if (err.message?.includes('unauthorized domain')) {
         setError("Domaine non autorisé pour Google Auth. Utilisez l'email ou le mode invité.");
       } else {
         setError(err.message || "Échec de la connexion. Veuillez réessayer.");
@@ -85,11 +89,18 @@ export default function AuthScreen({ onGuest }: { onGuest: () => void }) {
         </motion.div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="z-10 w-full max-w-md crystal-panel p-8 md:p-12 rounded-[3rem] flex flex-col items-center relative"
-      >
+        <motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  className="z-10 w-full max-w-md crystal-panel p-8 md:p-12 rounded-[3rem] flex flex-col items-center relative"
+>
+  {window.self !== window.top && (
+    <div className="absolute -top-12 left-0 right-0 text-center">
+      <p className="text-[9px] font-black uppercase tracking-widest text-[#c9964a] animate-pulse">
+        Utilisez le bouton "Open in New Tab" pour une connexion Google fluide
+      </p>
+    </div>
+  )}
         {mode !== 'initial' && (
           <button 
             onClick={() => { setMode('initial'); setError(null); }}

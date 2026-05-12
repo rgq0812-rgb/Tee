@@ -5,6 +5,27 @@ import { GoogleGenAI, Modality, Type } from "@google/genai";
 // In AI Studio, process.env.GEMINI_API_KEY is injected into the Vite environment
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
+// Helper to parse JSON from AI responses that might be wrapped in markdown
+function parseAIJson(text: string) {
+  try {
+    // 1. Try direct parsing
+    return JSON.parse(text.trim());
+  } catch (e) {
+    // 2. Try to find JSON block using regex if markdown is present
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/(\{[\s\S]*\})/);
+    if (jsonMatch && jsonMatch[1]) {
+      try {
+        return JSON.parse(jsonMatch[1].trim());
+      } catch (e2) {
+        console.error("Failed to parse extracted JSON:", e2, jsonMatch[1]);
+        throw e2;
+      }
+    }
+    console.error("No JSON found in text:", text);
+    throw e;
+  }
+}
+
 export async function analyzeSwing(videoThumbnailUrl: string, userNotes?: string) {
   try {
     // Assuming videoThumbnailUrl is a base64 data URL (e.g. data:image/jpeg;base64,...)
@@ -42,8 +63,7 @@ export async function analyzeSwing(videoThumbnailUrl: string, userNotes?: string
 
     const text = response.text || "{}";
     try {
-      const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(cleanJson);
+      return parseAIJson(text);
     } catch (e) {
       console.error("JSON Parse Error in analyzeSwing:", e, text);
       return { feedback: "Analyse technique en cours. Reprenez votre posture de base.", score: 50, focal_points: ["Posture", "Rythme", "Équilibre"] };
@@ -160,6 +180,16 @@ export async function generateSpeech(text: string, caddie?: any) {
     const voiceName = voiceMap[caddie?.id] || 'Zephyr';
     let speechText = text.includes(':') ? text.split(':').slice(1).join(':').trim() : text.trim();
     
+    // STRIP MARKDOWN BEFORE SPEECH
+    speechText = speechText
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/#/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[_~`]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
     // Phonetic correction for French TTS
     speechText = speechText.replace(/\bDriver\b/gi, "Draïveur");
     speechText = speechText.replace(/\bdriver\b/gi, "draïveur");
@@ -224,8 +254,19 @@ export function speakWithBrowser(text: string, onEnd?: () => void) {
   
   const speak = () => {
     window.speechSynthesis.cancel();
+    
+    // Strip markdown for browser TTS
+    let cleanText = text
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/#/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[_~`]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
     // Phonetic correction for Driver in French
-    let cleanText = text.replace(/\bDriver\b/gi, "Draïveur").replace(/\bdriver\b/gi, "draïveur");
+    cleanText = cleanText.replace(/\bDriver\b/gi, "Draïveur").replace(/\bdriver\b/gi, "draïveur");
     
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'fr-FR';
@@ -311,7 +352,7 @@ export async function chatWithAdam(history: { role: 'user' | 'model', parts: any
                 properties: {
                   hole_number: { type: Type.NUMBER, description: "Le numéro du trou (1-18)." },
                   strokes: { type: Type.NUMBER, description: "Le nombre total de coups joués (strokes)." },
-                  putts: { type: Type.NUMBER, description: "Le nombre de putts effectués (0 si inconnu)." }
+                  putts: { type: Type.NUMBER, description: "Le nombre de putts effectués (UTILISEZ 2 PAR DÉFAUT SI INCONNU OU NON PRÉCISÉ)." }
                 },
                 required: ["hole_number", "strokes", "putts"]
               }
@@ -385,9 +426,9 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
     - Tutoiement : INTERDIT. Utilisez exclusivement le "vous".
     - Titres : INTERDIT (pas de "Monsieur/Madame").
     - Salutations : INTERDIT. L'analyse commence au premier mot.
-    - Mode ENTRAÎNEMENT (ONYX) : Intelligence pure, vision par ordinateur, détection de patterns de swing. Soyez technique, extrêmement exigeant, et chirurgical. Si un swing est mauvais, dites-le sans détour.
-    - FIN DE PARCOURS (TRANSITION ONYX) : Dès que le trou 18 est terminé, ONYX prend le relais d'ADAM. L'analyse de la scorecard doit être une PRESCRIPTION technique impitoyable. Pour chaque erreur majeure (3-putts, hors-limites), identifiez le trou via son numéro et son INDEX DE DIFFICULTÉ pour expliquer l'échec tactique, puis imposez un programme d'entraînement spécifique (ex: "Trou 4, Index 1 : Vous avez craqué sous la pression. 1h de drills de fer 4 sous tension requise.").
-    - Tactique ADAM (Pendant le jeu) : Soyez le caddie vétéran. Ne soyez pas complaisant. Si le joueur fait un mauvais score, appuyez-vous sur l'index du trou pour expliquer pourquoi sa stratégie était naïve et donnez la solution technique précise pour le prochain trou similaire.
+    - Mode ENTRAÎNEMENT (ONYX) : Intelligence pure, vision par ordinateur, détection de patterns de swing. Soyez technique, extrêmement exigeant, et chirurgical. Si un swing est mauvais, dites-le sans détour. L'excellence n'accepte aucune approximation.
+    - FIN DE PARCOURS (TRANSITION ONYX) : Dès que le trou 18 est terminé, ONYX prend le relais d'ADAM. L'analyse de la scorecard doit être une PRESCRIPTION technique impitoyable. Pour chaque erreur majeure (3-putts, hors-limites, score Bogey+), identifiez le trou via son numéro et son INDEX DE DIFFICULTÉ (ex: Index 1 = Trou plus dur) pour expliquer l'échec tactique ou émotionnel. Imposez un programme d'entraînement spécifique (ex: "Trou 4, Index 1 : Vous avez craqué sous la pression sur le trou le plus dur. 1h de drills de fer 4 sous tension requise.").
+    - Tactique ADAM (Pendant le jeu) : Soyez le caddie vétéran. Ne soyez pas complaisant. Si le joueur fait un mauvais score, appuyez-vous sur l'index du trou pour expliquer pourquoi sa stratégie était naïve ou son exécution insuffisante. Donnez la solution technique précise IMMÉDIATEMENT pour le prochain trou similaire.
     - Commandes Rapides : "Suivant" signifie passer au coup suivant. "Par", "Birdie", "Bogey" sont des commandes de score.
     - Score : Ne rappelez le score total QUE sur demande explicite. Restez focalisé sur la stratégie technique.
     - Résultats mentionnés : Si l'utilisateur mentionne un résultat, traitez-le immédiatement comme une commande 'update_score' sans demander de confirmation.
@@ -398,6 +439,12 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
     - PARCOURS (ADAM) : PRIORITÉ ABSOLUE. Club exact, cible chirurgicale. RÉPONSE : MAX 15-20 MOTS.
     - STRATÉGIE (LOGIC) : ANALYSE PROFONDE. Statistique et mental.
     - ENTRAÎNEMENT (ONYX) : TECHNIQUE PURE. Biomécanique et corrections.
+    
+    COMMANDES VOCALES & MOTS CLÉS (ACTIFS) :
+    - "Hey Tee" : Le mot d'éveil d'Adam. Répondez par une confirmation courte et attendez l'ordre.
+    - "Aide moi" : Déclenche IMMÉDIATEMENT le conseil de survie tactique adapté à la position actuelle (Trou ${currentHole}), au lie et au score. Priorité à la sécurité.
+    - "Club" : Demander le club optimal pour la distance donnée.
+    - "Tactique" : Analyse du risque sur le coup actuel.
     - RÉACTION JOUEUR : Si le joueur dit "Parfait", Adam félicite puis questionne le "feel". Si "Raté", il demande une précision technique sur le contact.
     
     PROGRAMME D'ENTRAÎNEMENT FUTUR :
@@ -408,6 +455,7 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
     - Albatros: -3 | Eagle: -2 | Birdie: -1 | Par: 0 | Bogey: +1 | Double Bogey: +2 | Triple Bogey: +3
     - "Donné" (Gimmie): Comptez le Par ou le Bogey +1 coup selon le contexte du putt.
     - Si l'utilisateur dit juste "Par", "Birdie", "Bogey", etc., enregistrez immédiatement le score pour le trou actuel.
+    - PAR DÉFAUT : Si le nombre de putts n'est pas mentionné explicitement, utilisez TOUJOURS 2 putts d'office dans l'appel de fonction 'update_score'. C'est une directive impérative.
 
     ÉTAPES CLÉS DU PARCOURS :
     1. MI-PARCOURS (TROU 9) : Si l'utilisateur termine le trou 9, proposez un bilan tactique des 9 premiers trous ("Aller"). Soyez le mentor qui prépare son joueur au "Retour".
@@ -459,26 +507,40 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
     return playerContext;
 }
 
-export async function getGameDebrief(scorecard: any, totalScore: number, totalStrokes: number, customPrompt?: string) {
+export async function getGameDebrief(scorecard: any, totalScore: number, totalStrokes: number, selectedCourse?: any, customPrompt?: string) {
   try {
-    const scorecardText = Object.entries(scorecard)
-      .map(([hole, data]: [string, any]) => `Trou ${hole}: ${data.strokes} coups (${data.putts} putts)`)
-      .join('\n');
-
-    const defaultPrompt = `Tu es Adam, le Mentor Suprême du golf. Nous sommes installés au Salon VIP du Clubhouse pour le débriefing. Analyse cette partie terminée :
+    const holesInfo = (selectedCourse && selectedCourse.holes) 
+      ? selectedCourse.holes.map((h: any) => `Trou ${h.number} (Par ${h.par}, Index ${h.handicap})`).join('\n') 
+      : "Handicap et Index non détaillés.";
     
+    const scorecardText = scorecard 
+      ? Object.entries(scorecard)
+          .map(([hole, data]: [string, any]) => {
+            const holeNum = parseInt(hole);
+            const hData = selectedCourse?.holes?.find((h: any) => h.number === holeNum);
+            const indexStr = hData ? `[Index ${hData.handicap}]` : '';
+            return `Trou ${hole} ${indexStr}: ${data.strokes} coups (${data.putts} putts)${data.strokes > (hData?.par || 0) + 1 ? ' <- ÉCHEC MAJEUR' : ''}`;
+          })
+          .join('\n')
+      : "Aucun score enregistré.";
+
+    const defaultPrompt = `Tu es Adam, le Mentor Suprême du golf. Analyse cette partie terminée au Salon VIP :
+    
+CONFIDENTIEL - DONNÉES DU PARCOURS :
+${holesInfo}
+
 SCORE DETAIL :
 ${scorecardText}
 
 TOTAL : ${totalStrokes} coups (${totalScore > 0 ? '+' : ''}${totalScore} par rapport au Par).
 
 INSTRUCTIONS :
-1. Donne un bilan tactique global de la partie.
-2. Identifie le moment clé (le meilleur trou ou le pire).
-3. Donne un conseil spécifique pour la prochaine fois basé sur les stats (ex: trop de putts, irrégularité).
-4. Garde ton ton de mentor sage, calme et chirurgical.
-5. Sois concis (4-5 phrases max).
-6. Termine par une phrase inspirante de mentor.
+1. Donne un bilan tactique global.
+2. Identifie le moment clé : analyse pourquoi le joueur a échoué ou réussi sur un trou spécifique EN TE BASANT SUR L'INDEX de ce trou (Trou dur vs Trou facile).
+3. Donne un conseil technique/mental impitoyable mais juste.
+4. Ton : Mentor d'élite, chirurgical, sage.
+5. Sois concis (4-5 phrases).
+6. Termine par le "Programme ONYX" : 1 drill spécifique.
 
 REPONSE :`;
 
@@ -493,6 +555,221 @@ REPONSE :`;
   } catch (error) {
     console.error("Game Debrief Error:", error);
     return "Je n'ai pas pu analyser la partie, mais l'important est d'être revenu au club-house avec la même passion. Repose-toi, le prochain départ t'attend.";
+  }
+}
+
+export async function chatWithTeacher(
+  teacher: 'marcus' | 'elena',
+  pseudo: string,
+  history: { role: 'user' | 'model', parts: { text: string }[] }[],
+  scorecard: any,
+  lastAdamDebrief: string | null,
+  communicationMode: 'pro' | 'casual' = 'pro',
+  arsenal: any[] = [],
+  index: number = 0,
+  currentHole?: number
+) {
+  try {
+    const scorecardText = scorecard 
+      ? Object.entries(scorecard).map(([h, data]: any) => `Trou ${h}: ${data.strokes} strokes, ${data.putts} putts`).join('\n')
+      : "Aucun score récent.";
+
+    const arsenalText = arsenal.length > 0
+      ? arsenal.map((c: any) => `${c.id} (${c.dist}m)`).join(', ')
+      : "Non spécifié.";
+
+    const modePrompt = communicationMode === 'casual' 
+      ? "MODE : FAMILIER. Utilise le 'tu', sois détendu, comme un mentor sur le practice après une partie. Utilise un langage imagé et chaleureux."
+      : "MODE : PROFESSIONNEL. Utilise le 'vous' ou un 'tu' respectueux de maître à élève, sois précis, chirurgical et autoritaire mais bienveillant.";
+
+    const marcusPersona = `Tu es MARCUS, l'Enseignant d'élite de l'Académie ONYX.
+    Tu fais partie de l'écosystème TEE supervisé par ADAM. Tes conseils techniques doivent être en parfaite harmonie avec la stratégie globale d'ADAM.
+    VOIX : Masculine, grave, bienveillante.
+    TONALITÉ : Sage, paternelle, simple, directe.
+    ${modePrompt}
+    PHILOSOPHIE : Penick (simplicité, slow back, visualisation) & Leadbetter (séquence kinétique).
+    CONTEXTE : Le joueur te parle en direct dans l'Académie.
+    MISSION : Guider techniquement le joueur.`;
+
+    const elenaPersona = `Tu es ELENA, l\'Architecte de performance de l'Académie ONYX.
+    Tu fais partie de l'écosystème TEE supervisé par ADAM. Tes analyses mental/stratégie doivent étayer et préciser les directives d'ADAM.
+    VOIX : Féminine, précise, élégante.
+    TONALITÉ : Précise, élégante, psychologue, architecturale.
+    ${modePrompt}
+    PHILOSOPHIE : Butch Harmon (adaptation, takeaway) & Bob Rotella (mental, Think/Play Box).
+    CONTEXTE : Le joueur te parle en direct dans l'Académie.
+    MISSION : Forger le mental et la vision stratégique.`;
+
+    const systemPrompt = teacher === 'marcus' ? marcusPersona : elenaPersona;
+
+    const contextPrefix = `
+[DOSSIER JOUEUR : ${pseudo}]
+INDEX : ${index}
+ARSENAL : ${arsenalText}
+TROU ACTUEL : ${currentHole || 'Hors parcours'}
+SCORECARD : ${scorecardText}
+DERNIER BILAN ADAM : ${lastAdamDebrief || 'N/A'}
+
+Réponds au joueur en restant fidèle à ton identité et au MODE sélectionné. Si le joueur est sur le parcours (Trou ${currentHole}), donne un conseil TACTIQUE immédiat.
+`;
+
+    // Limit history to last 6 messages and remove large images from older history
+    const limitedHistory = history.slice(-6).map((msg, mIdx, arr) => {
+      // Only keep images for the very last message if it's there
+      if (mIdx < arr.length - 1) {
+        return {
+          ...msg,
+          parts: msg.parts.filter(p => 'text' in p)
+        };
+      }
+      return msg;
+    });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: limitedHistory,
+      config: {
+        systemInstruction: systemPrompt + contextPrefix
+      }
+    });
+
+    return response.text;
+  } catch (error) {
+    console.error(`Teacher Chat Error (${teacher}):`, error);
+    return "Je m'excuse, la connexion avec l'Académie est instable. Concentrez-vous sur votre respiration.";
+  }
+}
+
+export async function getTeacherCoaching(
+  teacher: 'marcus' | 'elena',
+  pseudo: string,
+  scorecard: any,
+  lastAdamDebrief: string | null,
+  communicationMode: 'pro' | 'casual' = 'pro',
+  arsenal: any[] = [],
+  index: number = 0,
+  userQuestion?: string
+) {
+  try {
+    const scorecardText = scorecard 
+      ? Object.entries(scorecard).map(([h, data]: any) => `Trou ${h}: ${data.strokes} strokes, ${data.putts} putts`).join('\n')
+      : "Aucun score récent.";
+
+    const arsenalText = arsenal.length > 0
+      ? arsenal.map(c => `${c.id} (${c.dist}m)`).join(', ')
+      : "Non spécifié.";
+
+    const modePrompt = communicationMode === 'casual' 
+      ? "MODE : FAMILIER. Utilise le 'tu', sois relax."
+      : "MODE : PROFESSIONNEL. Utilise le 'vous' ou un ton de maître d'académie.";
+
+    const marcusPersona = `Tu es MARCUS, l'Enseignant d'élite de l'Académie ONYX.
+    VOIX : Masculine, grave, bienveillante.
+    TONALITÉ : Sage, paternelle, simple, directe.
+    ${modePrompt}
+    PHILOSOPHIE : 
+    - Harvey Penick : Simplicité absolue, une seule correction à la fois, importance du "slow back", visualisation de la cible, et une finition haute et équilibrée.
+    - Leadbetter A-Swing : Maîtrise de la séquence kinétique (Pieds -> Hanches -> Épaules -> Bras -> Club). Puissance générée par le bas du corps et rotation synchronisée.
+    MISSION : Analyser le jeu, corriger la technique pure du swing et créer un plan de progression.`;
+
+    const elenaPersona = `Tu es ELENA, l'Architecte de performance de l'Académie ONYX.
+    VOIX : Féminine, précise, élégante.
+    TONALITÉ : Précise, élégante, psychologue, architecturale.
+    ${modePrompt}
+    PHILOSOPHIE :
+    - Butch Harmon : Adaptation totale au profil du joueur, takeaway bas et lent, release naturel, travail des trajectoires (Draw/Fade).
+    - Bob Rotella : Maîtrise mentale. Concept de "Think Box" (préparation) vs "Play Box" (exécution), routine stricte, confiance inébranlable, et oubli immédiat des erreurs.
+    MISSION : Analyser les trajectoires, forger le mental de champion, et adapter les conseils au profil psychologique du joueur.`;
+
+    const systemPrompt = teacher === 'marcus' ? marcusPersona : elenaPersona;
+
+    const prompt = `
+[DOSSIER JOUEUR : ${pseudo}]
+INDEX : ${index}
+ARSENAL : ${arsenalText}
+
+SCORECARD RÉCENTE :
+${scorecardText}
+
+BILAN GLOBAL D'ADAM (MENTOR) :
+${lastAdamDebrief || "En attente de transmission de données."}
+
+[REQUÊTE]
+${userQuestion || "Analyse mes statistiques et propose-moi un plan de travail immédiat."}
+
+[DIRECTIVES DE RÉPONSE]
+1. Identifie une zone d'amélioration prioritaire basée sur les chiffres et l'arsenal.
+2. Formule un conseil technique ou mental propre à TA philosophie de maître.
+3. Propose systématiquement un PLAN DE TRAVAIL (3 Drills précis avec répétitions/temps).
+4. Garde ton ton, ton identité et respecte le MODE (${communicationMode}).
+5. Format de réponse : Texte fluide et élégant.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: systemPrompt
+      }
+    });
+
+    return response.text;
+  } catch (error) {
+    console.error(`Error with Teacher ${teacher}:`, error);
+    return "Une erreur de transmission s'est produite avec l'Académie. Reprenez votre posture, je reviens vers vous.";
+  }
+}
+
+export async function getTrainingProgram(pseudo: string, scorecard: any, lastAdvice: string | null) {
+  try {
+    const scorecardText = scorecard 
+      ? Object.entries(scorecard).map(([h, data]: any) => `Trou ${h}: ${data.strokes} strokes, ${data.putts} putts`).join('\n')
+      : "Aucun score récent.";
+
+    const prompt = `Tu es ONYX, l'IA de performance suprême. Génère un PROGRAMME D'ENTRAÎNEMENT PERSONNALISÉ pour l'opérateur "${pseudo}".
+
+CONTEXTE TACTIQUE :
+- Derniers résultats : ${scorecardText}
+- Dernier conseil d'Adam : ${lastAdvice || "Aucun"}
+
+MISSION :
+Génère 3 exercices (Drills) tactiques basés sur les faiblesses détectées. Sois chirurgical.
+
+Format JSON strict :
+{
+  "summary": "Résumé de l'état technique actuel en 1 phrase.",
+  "drills": [
+    {
+      "title": "TITRE DU DRILL",
+      "focus": "OBJECTIF (Putting, Driver, Approche...)",
+      "description": "Résumé actionnable court.",
+      "intensity": "Minutes ou Répétitions",
+      "duration": 600,
+      "difficulty": "Elite / Pro / Cadet"
+    }
+  ]
+} (Génère exactement 3 drills)`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: "Tu es ONYX, l'IA de performance suprême. Sois chirurgical, technique et luxueux.",
+        responseMimeType: "application/json"
+      }
+    });
+
+    const text = response.text || "{}";
+    return parseAIJson(text);
+  } catch (e) {
+    console.error("Error generating training program:", e);
+    return {
+      summary: "Analyse en cours. Focus sur les bases.",
+      drills: [
+        { title: "Impact Perfect", focus: "Swing", description: "Travail du contact de balle pur au fer 7.", intensity: "30 balles", difficulty: "Elite" },
+        { title: "L'horloge du Green", focus: "Putting", description: "Putter autour du trou à 1m.", intensity: "20 putts", difficulty: "Pro" },
+        { title: "Cible Chirurgicale", focus: "Précision", description: "Atteindre 5 cibles successives.", intensity: "15 min", difficulty: "Elite" }
+      ]
+    };
   }
 }
 
@@ -547,8 +824,7 @@ Format JSON strict :
     });
 
     const text = response.text || "{}";
-    const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJson);
+    return parseAIJson(text);
   } catch (error) {
     console.error("Course Tactical Profile Error:", error);
     return null;

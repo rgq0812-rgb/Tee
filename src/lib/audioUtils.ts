@@ -25,8 +25,8 @@ export async function playRawPcm(base64Data: string, sampleRate = 24000) {
       await audioContext.resume();
     }
 
-    // Convert base64 to ArrayBuffer
-    const binaryString = window.atob(base64Data);
+    // Convert base64 to ArrayBuffer (sanitize whitespace)
+    const binaryString = window.atob(base64Data.replace(/\s/g, ''));
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
@@ -67,5 +67,93 @@ export async function playRawPcm(base64Data: string, sampleRate = 24000) {
   } catch (error) {
     console.error("Error playing PCM audio:", error);
     throw error;
+  }
+}
+
+export function playPing(freq = 800, type: OscillatorType = 'sine', duration = 0.1, volume = 0.1) {
+  try {
+    const audioContext = sharedAudioContext || new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (audioContext.state === 'suspended') audioContext.resume();
+    
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioContext.currentTime);
+    
+    gain.gain.setValueAtTime(volume, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+    
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
+    
+    osc.start();
+    osc.stop(audioContext.currentTime + duration);
+  } catch (e) {
+    console.error("Audio trigger error:", e);
+  }
+}
+
+export function playWhistle() {
+  try {
+    const audioContext = sharedAudioContext || new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (audioContext.state === 'suspended') audioContext.resume();
+
+    const freq = 1200;
+    const duration = 0.6;
+    
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    
+    osc.type = 'sine';
+    // Whistle effect: slight frequency modulation
+    osc.frequency.setValueAtTime(freq, audioContext.currentTime);
+    osc.frequency.linearRampToValueAtTime(freq + 100, audioContext.currentTime + 0.1);
+    osc.frequency.linearRampToValueAtTime(freq - 50, audioContext.currentTime + 0.3);
+    osc.frequency.linearRampToValueAtTime(freq, audioContext.currentTime + duration);
+
+    gain.gain.setValueAtTime(0, audioContext.currentTime);
+    gain.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.1);
+    gain.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.4);
+    gain.gain.linearRampToValueAtTime(0, audioContext.currentTime + duration);
+
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
+
+    osc.start();
+    osc.stop(audioContext.currentTime + duration);
+  } catch (e) {
+    console.error("Whistle error:", e);
+  }
+}
+
+export function playSoftBell() {
+  try {
+    const audioContext = sharedAudioContext || new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (audioContext.state === 'suspended') audioContext.resume();
+
+    const duration = 2.5;
+    const now = audioContext.currentTime;
+
+    // Harmonic bell sound
+    [1, 2, 3.5].forEach((mult, i) => {
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880 * mult, now);
+      
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.1 / (i + 1), now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      
+      osc.start(now);
+      osc.stop(now + duration);
+    });
+  } catch (e) {
+    console.error("Soft bell error:", e);
   }
 }

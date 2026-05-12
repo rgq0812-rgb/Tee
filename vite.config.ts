@@ -10,6 +10,10 @@ export default defineConfig(({ mode }) => {
       react(), 
       tailwindcss(),
     ],
+    build: {
+      outDir: 'android/app/src/main/assets/public',
+      emptyOutDir: true,
+    },
     resolve: {
       alias: {
         '@': path.resolve(process.cwd(), './src'),
