@@ -332,7 +332,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
               <div className="relative z-10 p-4 pt-10 sm:pt-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center overflow-hidden shadow-2xl ${isSolar ? 'border-black bg-white' : 'border-[#c9964a] bg-black shadow-[#c9964a]/20'}`}>
-                    <img src="/logo.svg" alt="ONYX Logo" className="w-8 h-8 object-contain" />
+                    <img src="/icon-192.png" alt="ONYX Logo" className="w-8 h-8 object-contain" />
                   </div>
                   <div>
                     <h2 className={`text-lg font-black italic uppercase tracking-tighter ${isSolar ? 'text-black' : 'text-white'}`}>ADAM <span className={isSolar ? 'text-[#856424]' : 'text-[#c9964a]'}>ONYX</span></h2>

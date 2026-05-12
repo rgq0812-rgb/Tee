@@ -27,7 +27,7 @@
     {
       "src": "/screenshot-mobile.png",
       "sizes": "1080x1920",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "Tactical Interface Overview"
     }
