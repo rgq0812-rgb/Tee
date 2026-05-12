@@ -6,6 +6,7 @@ const ASSETS_TO_CACHE = [
   '/icon-192.png',
   '/icon-512.png',
   '/screenshot-mobile.png',
+  '/screenshot-desktop.png',
   '/src/main.tsx',
   '/src/App.tsx',
   '/src/index.css'
