@@ -17,16 +17,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --frozen-lockfile || npm install
 
       - name: Build Web App
-        run: |
-          CI=false npm run build
-          ls -la dist/
+        run: CI=false npm run build
 
       - name: Capacitor Sync
         run: npx cap sync android
@@ -41,12 +39,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build Android App
-        run: |
-          cd android
-          gradle assembleDebug --stacktrace
+        working-directory: android
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: android-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
