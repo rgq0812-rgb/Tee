@@ -107,6 +107,10 @@ export default function AudioVisualizer({ isActive, mode = 'idle', isSolar = fal
         ctx.shadowBlur = 0;
       }
 
+      if (!isActive) {
+        ctx.clearRect(0, 0, width, height);
+        return;
+      }
       animationFrame = requestAnimationFrame(render);
     };
 

@@ -86,7 +86,12 @@ export default function Dashboard({
       setIsMuted(localStorage.getItem('onyx_voice') === 'false');
     };
     window.addEventListener('storage', handleStorage);
-    const interval = setInterval(handleStorage, 2000);
+    const interval = setInterval(() => {
+       const savedUnits = localStorage.getItem('onyx_units') || 'meters';
+       const savedMuted = localStorage.getItem('onyx_voice') === 'false';
+       if (savedUnits !== units) setUnits(savedUnits);
+       if (savedMuted !== isMuted) setIsMuted(savedMuted);
+    }, 2000);
     return () => {
       window.removeEventListener('storage', handleStorage);
       clearInterval(interval);
@@ -754,7 +759,7 @@ export default function Dashboard({
         {advice && (
           <div className="fixed bottom-32 left-6 right-6 z-[60]">
             <motion.div 
-              key={`advice-box-v4-${advice.length}-${advice.substring(0, 30)}-${Date.now()}`}
+              key={`advice-box-v5-${advice.substring(0, 50)}`}
               initial={{ opacity: 0, y: 20, scale: 0.95 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: 10 }}

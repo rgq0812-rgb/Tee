@@ -22,6 +22,31 @@ class AssetService {
   private isInitializing = false;
   private quotaExceeded = false;
 
+  private authUnsubscribe: (() => void) | null = null;
+
+  constructor() {
+    this.setupAuth();
+  }
+
+  private setupAuth() {
+    if (this.authUnsubscribe) return;
+    
+    this.authUnsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        if (!this.unsubscribe && !this.isInitializing) {
+          this.init();
+        }
+      } else {
+        if (this.unsubscribe) {
+          this.unsubscribe();
+          this.unsubscribe = null;
+          this.assets = [];
+          this.listeners.forEach(cb => cb([]));
+        }
+      }
+    });
+  }
+
   subscribe(callback: AssetCallback, onError?: ErrorCallback) {
     this.listeners.add(callback);
     if (onError) this.errorListeners.add(onError);
@@ -31,27 +56,8 @@ class AssetService {
     }
     
     if (this.quotaExceeded && onError) {
-      const error = { message: 'quota exceeded' } as FirestoreError;
+      const error = { message: 'quota exceeded' } as unknown as FirestoreError;
       onError(error);
-    }
-
-    if (!this.unsubscribe && !this.isInitializing && !this.quotaExceeded) {
-       // Wait for auth before init
-       const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-         if (user) {
-           if (!this.unsubscribe && !this.isInitializing) {
-             this.init();
-           }
-         } else {
-           // User logged out, clean up
-           if (this.unsubscribe) {
-             this.unsubscribe();
-             this.unsubscribe = null;
-             this.assets = [];
-             this.listeners.forEach(cb => cb([]));
-           }
-         }
-       });
     }
 
     return () => {
