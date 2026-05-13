@@ -1505,17 +1505,20 @@ export default function Academy({
                         </div>
 
                         <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto no-scrollbar pb-4">
-                          {teacherChat.map((msg, idx) => (
-                            <div key={`teacher-msg-v2-${selectedTeacher}-${idx}-${msg.role}-${msg.parts[0].text.substring(0, 10)}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
-                                msg.role === 'user' 
-                                  ? (isSolar ? 'bg-black text-white shadow-xl' : 'bg-[#c9964a] text-black font-bold shadow-lg shadow-[#c9964a]/20') 
-                                  : (isSolar ? 'bg-zinc-100 border border-zinc-200 text-zinc-800' : 'bg-white/5 border border-white/10 text-white/90 backdrop-blur-md')
-                              }`}>
-                                {msg.parts[0].text}
+                          {teacherChat.map((msg, idx) => {
+                            const text = msg.parts && msg.parts[0] ? msg.parts[0].text : '';
+                            return (
+                              <div key={`aca-msg-v7-${idx}-${selectedTeacher}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
+                                  msg.role === 'user' 
+                                    ? (isSolar ? 'bg-black text-white shadow-xl' : 'bg-[#c9964a] text-black font-bold shadow-lg shadow-[#c9964a]/20') 
+                                    : (isSolar ? 'bg-zinc-100 border border-zinc-200 text-zinc-800' : 'bg-white/5 border border-white/10 text-white/90 backdrop-blur-md')
+                                }`}>
+                                  {msg.parts && msg.parts[0] ? msg.parts[0].text : '...'}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                           {isTeacherLoading && (
                             <div key={`teacher-loading-indicator-${selectedTeacher}`} className="flex justify-start">
                               <div className="bg-white/5 p-4 rounded-2xl flex items-center gap-4">

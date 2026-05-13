@@ -99,7 +99,6 @@ export default function TacticalHoleView({ hole, customImage, userLocation, sele
           src={customImage || hole.customImage} 
           alt={`Hole ${hole.number} drawing`}
           loading="lazy"
-          decoding="async"
           className="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-lighten z-0 scale-105"
         />
       )}

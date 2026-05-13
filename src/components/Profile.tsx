@@ -105,7 +105,8 @@ export default function Profile({
     const handleStorage = () => setUnits(localStorage.getItem('onyx_units') || 'meters');
     window.addEventListener('storage', handleStorage);
     const interval = setInterval(() => {
-      setUnits(localStorage.getItem('onyx_units') || 'meters');
+      const saved = localStorage.getItem('onyx_units') || 'meters';
+      setUnits(prev => saved !== prev ? saved : prev);
     }, 2000);
     return () => {
       window.removeEventListener('storage', handleStorage);

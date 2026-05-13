@@ -25,7 +25,7 @@ class AssetService {
   private authUnsubscribe: (() => void) | null = null;
 
   constructor() {
-    this.setupAuth();
+    // We'll call setupAuth on first use or subscribe to ensure auth is ready
   }
 
   private setupAuth() {
@@ -41,13 +41,14 @@ class AssetService {
           this.unsubscribe();
           this.unsubscribe = null;
           this.assets = [];
-          this.listeners.forEach(cb => cb([]));
+          [...this.listeners].forEach(cb => cb([]));
         }
       }
     });
   }
 
   subscribe(callback: AssetCallback, onError?: ErrorCallback) {
+    this.setupAuth();
     this.listeners.add(callback);
     if (onError) this.errorListeners.add(onError);
 
