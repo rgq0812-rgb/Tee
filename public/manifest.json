@@ -6,19 +6,19 @@
   "icons": [
     {
       "src": "https://tee-rcgw.vercel.app/icon-192.png",
-      "type": "image/png",
+      "type": "image/jpeg",
       "sizes": "1024x1024",
       "purpose": "any"
     },
     {
       "src": "https://tee-rcgw.vercel.app/icon-512.png",
-      "type": "image/png",
+      "type": "image/jpeg",
       "sizes": "1024x1024",
       "purpose": "any"
     },
     {
       "src": "https://tee-rcgw.vercel.app/icon-512.png",
-      "type": "image/png",
+      "type": "image/jpeg",
       "sizes": "1024x1024",
       "purpose": "maskable"
     }
@@ -27,14 +27,14 @@
     {
       "src": "https://tee-rcgw.vercel.app/screenshot-mobile.png",
       "sizes": "1080x1920",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "narrow",
       "label": "Tactical Mobile Interface"
     },
     {
       "src": "https://tee-rcgw.vercel.app/screenshot-desktop.png",
       "sizes": "1920x1080",
-      "type": "image/png",
+      "type": "image/jpeg",
       "form_factor": "wide",
       "label": "Tactical Desktop Dashboard"
     }
