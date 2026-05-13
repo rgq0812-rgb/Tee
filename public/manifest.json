@@ -5,13 +5,19 @@
   "categories": ["productivity", "games", "utilities"],
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "https://tee-rcgw.vercel.app/icon-192.png",
       "type": "image/png",
       "sizes": "1024x1024",
       "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "https://tee-rcgw.vercel.app/icon-512.png",
+      "type": "image/png",
+      "sizes": "1024x1024",
+      "purpose": "any"
+    },
+    {
+      "src": "https://tee-rcgw.vercel.app/icon-512.png",
       "type": "image/png",
       "sizes": "1024x1024",
       "purpose": "maskable"
@@ -19,21 +25,21 @@
   ],
   "screenshots": [
     {
-      "src": "screenshot-mobile.png",
+      "src": "https://tee-rcgw.vercel.app/screenshot-mobile.png",
       "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Tactical Mobile Interface"
     },
     {
-      "src": "screenshot-desktop.png",
+      "src": "https://tee-rcgw.vercel.app/screenshot-desktop.png",
       "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Tactical Desktop Dashboard"
     }
   ],
-  "start_url": "/",
+  "start_url": "https://tee-rcgw.vercel.app/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#c9964a",
