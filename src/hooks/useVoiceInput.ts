@@ -81,7 +81,14 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
       };
 
       recognition.onerror = (event: any) => {
-        const errorType = event.error;
+        const errorType = String(event.error || '').toLowerCase();
+        
+        if (errorType === 'aborted') {
+          // Log as warning rather than error, often happens on tab change or rapid stop/start
+          console.warn("[ONYX] Speech recognition aborted gracefully.");
+          return;
+        }
+
         console.error("[ONYX] Speech Recognition Error:", errorType);
         
         if (errorType === 'not-allowed') {

@@ -618,7 +618,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                          <div className="absolute inset-0 flex items-center justify-center">
                            <div className="grid grid-cols-6 grid-rows-4 w-full h-full opacity-20">
                              {Array.from({ length: 24 }).map((_, i) => (
-                               <div key={i} className={`border-[0.5px] ${isSolar ? 'border-black' : 'border-emerald-500/50'}`} />
+                               <div key={`ar-grid-v-${i}`} className={`border-[0.5px] ${isSolar ? 'border-black' : 'border-emerald-500/50'}`} />
                              ))}
                            </div>
                          </div>

@@ -523,7 +523,25 @@ export default function Academy({
       }
     };
 
-    rec.onend = () => { if (isHandsFree) rec.start(); };
+    rec.onerror = (event: any) => {
+      const errorType = String(event.error || '').toLowerCase();
+      if (errorType === 'aborted') {
+        console.warn("[Academy Speech] Aborted gracefully.");
+        return;
+      }
+      console.error("[Academy Speech] Error:", errorType);
+    };
+
+    rec.onend = () => { if (isHandsFree) {
+       // Short delay to avoid rapid-fire restarts
+       setTimeout(() => {
+         if (isHandsFree && !isTeacherSpeaking) {
+           try {
+             rec.start();
+           } catch (e) {}
+         }
+       }, 200);
+    }};
     rec.onstart = () => console.log("[Academy Speech] Listening...");
     
     rec.start();
@@ -704,7 +722,7 @@ export default function Academy({
                      <h6 className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-3">POINTS DE PASSAGE</h6>
                      <div className="space-y-2">
                         {(sessionBriefing.masteryPoints || ['Impact centré', 'Rythme régulier', 'Poste propre']).map((pt, i) => (
-                           <div key={i} className="flex items-center gap-3">
+                           <div key={`briefing-opt-${i}`} className="flex items-center gap-3">
                               <div className="w-1.5 h-1.5 rounded-full bg-[#c9964a]" />
                               <span className="text-[10px] font-black uppercase tracking-tight">{pt}</span>
                            </div>
@@ -990,7 +1008,7 @@ export default function Academy({
                   </div>
                 ) : (
                   teacherChat.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div key={`faculty-chat-msg-${i}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] p-4 rounded-2xl text-xs leading-relaxed ${
                         msg.role === 'user' 
                           ? 'bg-[#c9964a] text-black font-bold rounded-tr-none' 

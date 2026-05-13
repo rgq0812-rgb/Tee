@@ -104,7 +104,7 @@ const ValidationTouchpad = ({ onComplete, isReady, isSolar }: { onComplete: () =
             </span>
             <div className="flex gap-1 mt-1">
               {[1,2,3,4,5].map(i => (
-                <div key={i} className={`w-4 h-1 rounded-full transition-colors ${progress >= (i * 20) ? 'bg-[#c9964a]' : 'bg-white/5'}`} />
+                <div key={`mission-tick-${i}`} className={`w-4 h-1 rounded-full transition-colors ${progress >= (i * 20) ? 'bg-[#c9964a]' : 'bg-white/5'}`} />
               ))}
             </div>
           </div>

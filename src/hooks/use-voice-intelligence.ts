@@ -27,8 +27,25 @@ export function useVoiceIntelligence(onScoreDetected?: (score: number, par: numb
         processCommand(result);
       };
 
+      recognitionRef.current.onerror = (event: any) => {
+        const errorType = String(event.error || '').toLowerCase();
+        if (errorType === 'aborted') {
+          console.warn("[Voice Intelligence] Aborted gracefully.");
+          return;
+        }
+        console.error("[Voice Intelligence] Error:", errorType);
+      };
+
       recognitionRef.current.onend = () => {
-        if (isListening) recognitionRef.current.start();
+        if (isListening) {
+          setTimeout(() => {
+            if (isListening && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) {}
+            }
+          }, 200);
+        }
       };
     }
   }, [isListening]);

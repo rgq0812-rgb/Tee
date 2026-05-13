@@ -309,11 +309,16 @@ export function startListening(onResult: (text: string) => void, onEnd: () => vo
   };
 
   recognition.onerror = (event: any) => {
-    let errorMessage = event.error;
-    if (event.error === 'not-allowed') {
+    const errorType = String(event.error || '').toLowerCase();
+    
+    if (errorType === 'aborted') {
+      console.warn("Speech Recognition Aborted gracefully.");
+      return;
+    }
+
+    let errorMessage = errorType;
+    if (errorType === 'not-allowed') {
       errorMessage = "Accès micro refusé. Vérifiez les paramètres de votre navigateur.";
-    } else if (event.error === 'aborted') {
-      errorMessage = "Reconnaissance vocale interrompue.";
     }
     console.error("Speech Recognition Error:", errorMessage);
     if (onError) onError(errorMessage);
