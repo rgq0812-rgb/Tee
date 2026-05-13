@@ -43,6 +43,6 @@
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#c9964a",
-  "orientation": "landscape",
+  "orientation": "portrait",
   "scope": "/"
 }
