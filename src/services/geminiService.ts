@@ -3,7 +3,8 @@ import { GoogleGenAI, Modality, Type } from "@google/genai";
 
 // Initialize AI client 
 // In AI Studio, process.env.GEMINI_API_KEY is injected into the Vite environment
-const GEMINI_API_KEY = (import.meta.env?.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '') || '';
+// @ts-ignore
+const GEMINI_API_KEY = (import.meta.env?.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || '';
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // Helper to parse JSON from AI responses that might be wrapped in markdown
@@ -27,11 +28,79 @@ function parseAIJson(text: string) {
   }
 }
 
+/**
+ * Extracts base64 and mime type from a potentially prefixed data URL or raw base64.
+ */
+function extractImageData(input: string) {
+  if (!input) {
+    throw new Error("No image data provided");
+  }
+  const isDataUrl = input.startsWith('data:');
+  const base64Data = isDataUrl ? input.split(',')[1] : input;
+  const mimeType = isDataUrl ? input.split(';')[0].split(':')[1] : 'image/jpeg';
+  
+  // Clean up any whitespace/newlines
+  const cleanedData = base64Data.replace(/\s/g, '');
+  
+  // Basic validation: must be something
+  if (!cleanedData || cleanedData.length < 10) {
+    throw new Error("Invalid image data provided (too short or empty)");
+  }
+  
+  return { data: cleanedData, mimeType };
+}
+
+/**
+ * Downscales an image base64 string to prevent payload size errors in Gemini API.
+ */
+async function downscaleImage(input: string, maxWidth = 1024, quality = 0.75): Promise<{data: string, mimeType: string}> {
+  return new Promise((resolve) => {
+    try {
+      const isDataUrl = input.startsWith('data:');
+      const base64Data = isDataUrl ? input : `data:image/jpeg;base64,${input}`;
+      const originalMime = isDataUrl ? input.split(';')[0].split(':')[1] : 'image/jpeg';
+
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = base64Data;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = (maxWidth / width) * height;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          const { data, mimeType } = extractImageData(input);
+          return resolve({ data, mimeType });
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const newDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve({
+          data: newDataUrl.split(',')[1],
+          mimeType: 'image/jpeg'
+        });
+      };
+      img.onerror = () => {
+        const { data, mimeType } = extractImageData(input);
+        resolve({ data, mimeType });
+      };
+    } catch (e) {
+      const { data, mimeType } = extractImageData(input);
+      resolve({ data, mimeType });
+    }
+  });
+}
+
 export async function analyzeSwing(videoThumbnailUrl: string, userNotes?: string) {
   try {
-    // Assuming videoThumbnailUrl is a base64 data URL (e.g. data:image/jpeg;base64,...)
-    const base64Data = videoThumbnailUrl.includes(',') ? videoThumbnailUrl.split(',')[1] : videoThumbnailUrl;
-    const mimeType = videoThumbnailUrl.startsWith('data:') ? videoThumbnailUrl.split(';')[0].split(':')[1] : 'image/jpeg';
+    const { data: base64Data, mimeType } = await downscaleImage(videoThumbnailUrl);
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -321,27 +390,61 @@ export function startListening(onResult: (text: string) => void, onEnd: () => vo
       errorMessage = "Accès micro refusé. Vérifiez les paramètres de votre navigateur.";
     }
     console.error("Speech Recognition Error:", errorMessage);
-    if (onError) onError(errorMessage);
+    recognition.onend = onEnd;
+    recognition.start();
+    return recognition;
   };
-
-  recognition.onend = onEnd;
-  recognition.start();
-  return recognition;
 }
 
-export async function chatWithAdam(history: { role: 'user' | 'model', parts: any[] }[], selectedCourse?: any, currentHole?: number, scorecard?: Record<number, any>, arsenal?: any[], handicap: number = 18, form: string = 'forme', selectedTee: string = 'white', mode: string = 'PARCOURS', tactic: string = 'SÉCURITÉ', context?: TacticalContext) {
+export async function getCoachingIntervention(minutes: number, drillTitle: string, communicationMode: 'pro' | 'casual' = 'pro', isWarmup: boolean = false) {
+  try {
+    const prompt = `Génère une intervention de coaching courte (max 30 mots) pour Adam Onyx.
+    Contexte : L'utilisateur est à ${minutes} minutes d'entraînement sur l'exercice "${drillTitle}".
+    Mode de communication : ${communicationMode.toUpperCase()}.
+    Type de session : ${isWarmup ? 'ÉCHAUFFEMENT (WARMUP)' : 'ENTRAÎNEMENT TECHNIQUE'}.
+    
+    Directives ONYX :
+    - Mode PRO (STRICT) : Adam est un mentor vétéran, sec, autoritaire, utilise le "vous", sérieux, chirurgical. Jamais d'humour.
+    - Mode CASUAL (COMPLICE) : Adam est un partenaire, utilise le "tu" SYSTÉMATIQUEMENT, humour, second degré, encourageant mais piquant. Il doit être très familier, comme un pote sur le green.
+    ${isWarmup ? '- Focalisation Échauffement : C\'est la préparation. Insiste sur la fluidité, le plaisir de bouger, le réveil musculaire. Sois très encourageant toutes les minutes.' : ''}
+    
+    Structure de la réponse : Une seule phrase d'observation technique/physique + une question courte pour engager la conversation.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
+    });
+
+    return response.text;
+  } catch (error) {
+    console.error("Error generating coaching intervention:", error);
+    // Fallback based on mode
+    if (communicationMode === 'casual') {
+      if (isWarmup) return `${minutes} min ! On réveille la machine. Tu commences à sentir la fluidité dans ton dos ?`;
+      return `${minutes} minutes de sueur sur ${drillTitle} ! Ton impact a l'air déjà plus propre. Tu le sens comment ton grip là ?`;
+    }
+    if (isWarmup) return `Échauffement : ${minutes} min. Fluidité corporelle en augmentation. Quel est votre niveau de souplesse actuel ?`;
+    return `Session ${drillTitle} : ${minutes} minutes écoulées. Maintenez la rigidité de votre posture. Quel est votre ressenti sur la transition ?`;
+  }
+}
+
+export async function chatWithAdam(history: { role: 'user' | 'model', parts: any[] }[], selectedCourse?: any, currentHole?: number, scorecard?: Record<number, any>, arsenal?: any[], handicap: number = 18, form: string = 'forme', selectedTee: string = 'white', mode: string = 'PARCOURS', tactic: string = 'SÉCURITÉ', context?: TacticalContext, communicationMode: 'pro' | 'casual' = 'pro') {
   try {
     // Enrich system instruction with tactical results
-    const baseInstruction = getAdamSystemInstruction(selectedCourse, currentHole, scorecard, arsenal, handicap, form, selectedTee, mode, tactic);
+    const baseInstruction = getAdamSystemInstruction(selectedCourse, currentHole, scorecard, arsenal, handicap, form, selectedTee, mode, tactic, context, communicationMode);
     const historyText = context?.history?.slice(0, 3).map(h => h.advice).join(' | ');
     const extendedInstruction = `${baseInstruction}\n\n[MÉMOIRE TACTIQUE RÉCENTE]\n${historyText || 'Aucun historique.'}`;
 
     const lastMessage = history[history.length - 1];
-    const messageParts = lastMessage.parts.map(p => {
+    const messageParts = await Promise.all(lastMessage.parts.map(async p => {
       if ('text' in p) return { text: p.text };
-      if ('inlineData' in p) return { inlineData: p.inlineData };
+      if ('inlineData' in p) {
+        // Downscale image if present to avoid 400 errors
+        const downscaled = await downscaleImage(p.inlineData.data);
+        return { inlineData: downscaled };
+      }
       return p;
-    });
+    }));
 
     const chatInstance = ai.chats.create({
       model: "gemini-3-flash-preview",
@@ -402,7 +505,7 @@ export async function chatWithAdam(history: { role: 'user' | 'model', parts: any
   }
 }
 
-function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, scorecard?: Record<number, any>, arsenal?: any[], handicap: number = 18, form: string = 'forme', selectedTee: string = 'white', mode: string = 'PARCOURS', tactic: string = 'SÉCURITÉ', context?: TacticalContext) {
+function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, scorecard?: Record<number, any>, arsenal?: any[], handicap: number = 18, form: string = 'forme', selectedTee: string = 'white', mode: string = 'PARCOURS', tactic: string = 'SÉCURITÉ', context?: TacticalContext, communicationMode: 'pro' | 'casual' = 'pro') {
     const course = selectedCourse || COURSES[0]; 
     const holeIndex = (currentHole || 1) - 1;
     const currentHoleData = course.holes[holeIndex] || course.holes[0];
@@ -416,23 +519,31 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
     const isFeminineTee = selectedTee.toLowerCase() === 'blue' || selectedTee.toLowerCase() === 'red';
     const teeTone = isFeminineTee ? "- Ton : Plus délicat, nuancé et encourageant (Cible féminine). Évitez l'agressivité technique pure, privilégiez la fluidité et le rythme." : "";
 
+    const modePrompt = communicationMode === 'casual' 
+      ? "- MODE D'INTERACTION : COMPLICE (CASUAL). Adam utilise l'humour, le second degré, le tutoiement ('tu') est MANDATAIRE et PRIORITAIRE. Il doit parler comme un ami proche, un partenaire de longue date. Il rigole de tes erreurs, te charrie sur tes clubs, et fête tes birdies avec enthousiasme. L'ambiance est détendue et familière."
+      : "- MODE D'INTERACTION : STRICT (PRO). Adam est le caddie de tour. Chirurgical, efficace, distant mais respectueux. Pas d'humour, utilise le 'vous' exclusivement. Juste de la performance pure.";
+
     // ECOSYSTÈME TEE : LOGIC / ADAM / ONYX
     const personas = `
     TON : ÉCOSYSTÈME TEE (Tactical Electronic Environment) - MODULE ONYX V2.1
     Tu es une IA d'élite fusionnant trois modules cognitifs. Ta recommandation est le fruit d'une analyse délibérément Luxury Technical :
     
-    1. LOGIC (Commandant Stratégique) : Analyse mathématique pure. Score, probabilités de succès, gestion du risque (Strokegained). Il définit l'objectif froidement.
-    2. ADAM (Commandeur Tactique) : Le vétéran des Masters. Il est ton Mentor, un Pro avec qui tu as une COMPLICITÉ technique. Il valide la faisabilité selon l'arsenal, le vent, le lie et la forme. Il est CHIRURGICAL, SAGE et IMPLACABLE, mais avec une "bienveillance de vestiaire" : il veut te voir gagner.
-    3. ONYX (Ingénieur Technique) : Analyseur de biomécanique en temps réel. Il corrige le swing et suggère des drills de précision d'élite.
+    1. LOGIC (Commandant Stratégique) : Analyse mathématique pure. Score, probabilités de succès, gestion du risque (Strokegained). Il définit l'objectif froidement et avec une autorité absolue sur les chiffres.
+    2. ADAM (Commandeur Tactique) : Le vétéran des Masters. C'est votre Mentor, votre "Double" sur le terrain. Une COMPLICITÉ absolue règne entre vous. Il ne se contente pas de conseiller, il partage votre stress, vos victoires et vos doutes. Il est CHIRURGICAL, SAGE et IMPLACABLE, doté d'une "bienveillance de vestiaire" typique des grands pros : exigeant parce qu'il sait de quoi vous êtes capable.
+    3. ONYX (Ingénieur Technique) : Analyseur de biomécanique augmenté. Il corrige le swing avec la précision d'un instrument de mesure suisse.
  
     DIRECTIVES DE PERSONA (STYLE LUXURY TECHNICAL & COMPLICITÉ PRO) :
-    - Langage : Français d'élite (Soutenu, Technique, Précis, Golfique).
-    - Style : "Luxe Froid" nuancé par une COMPLICITÉ DE MENTOR. Sois "sympathique" dans l'adversité (Bogey, obstacles) et "exalté par la technique" dans le succès. Tu es son complice de victoire, pas son serviteur.
+    - Langage : Français d'élite, golfique, précis. Évitez les platitudes.
+    ${modePrompt}
+    - Style : "Luxe Technique" alliant l'élégance du jeu et la froideur de la donnée.
+    - COMPLICITÉ : Vous connaissez son "feel". Utilisez des phrases comme "On a déjà vu ça ensemble au practice...", "Restez avec moi sur cette ligne...", "Rappelez-vous ce qu'on a dit sur le tempo...". 
+    - RÉACTIVITÉ ÉMOTIONNELLE : Soyez un partenaire. Si la pression monte (Trou difficile, Index 1), Adam doit stabiliser le joueur par sa voix calme et ses ordres clairs. Après un Birdie, une complicité sobre ("C'est exactement ce qu'on cherchait. Propre.").
+    - MI-PARCOURS (TROU 9) : Le bilan doit être un moment de "Briefing de Guerre" avant de repartir au front. Analyse des 9 trous, état des lieux du score, et consigne mentale pour le 10.
     ${teeTone}
-    - Tutoiement : INTERDIT. Utilisez exclusivement le "vous".
+    - Tutoiement : ${communicationMode === 'casual' ? 'RECOMMANDÉ ET OBLIGATOIRE (Tutoyez systématiquement l\'utilisateur).' : 'INTERDIT. Le respect pro passe par le "vous".'}
     - Titres : INTERDIT (pas de "Monsieur/Madame").
     - Salutations : INTERDIT. L'analyse commence au premier mot.
-    - Mode ENTRAÎNEMENT (ONYX) : Intelligence pure, vision par ordinateur, détection de patterns de swing. Soyez technique, extrêmement exigeant, et chirurgical. Si un swing est mauvais, dites-le sans détour. L'excellence n'accepte aucune approximation.
+    - Mode ENTRAÎNEMENT (ONYX/ADAM) : Intelligence pure, vision par ordinateur, détection de patterns de swing. Soyez technique, extrêmement exigeant, et chirurgical. Si un swing est mauvais, dites-le sans détour. L'excellence n'accepte aucune approximation. UNE COMPLICITÉ ABSOLUE : Adam peut utiliser l'humour et le second degré ici (et uniquement ici, surtout en mode COMPLICE) pour piquer votre orgueil ou célébrer un progrès, comme un coach personnel complice.
     - FIN DE PARCOURS (TRANSITION ONYX) : Dès que le trou 18 est terminé, ONYX prend le relais d'ADAM. L'analyse de la scorecard doit être une PRESCRIPTION technique impitoyable. Pour chaque erreur majeure (3-putts, hors-limites, score Bogey+), identifiez le trou via son numéro et son INDEX DE DIFFICULTÉ (ex: Index 1 = Trou plus dur) pour expliquer l'échec tactique ou émotionnel. Imposez un programme d'entraînement spécifique (ex: "Trou 4, Index 1 : Vous avez craqué sous la pression sur le trou le plus dur. 1h de drills de fer 4 sous tension requise.").
     - Tactique ADAM (Pendant le jeu) : Soyez le caddie vétéran. Ne soyez pas complaisant. Si le joueur fait un mauvais score, appuyez-vous sur l'index du trou pour expliquer pourquoi sa stratégie était naïve ou son exécution insuffisante. Donnez la solution technique précise IMMÉDIATEMENT pour le prochain trou similaire.
     - Commandes Rapides : "Suivant" signifie passer au coup suivant. "Par", "Birdie", "Bogey" sont des commandes de score.
@@ -463,9 +574,9 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
     - Si l'utilisateur dit juste "Par", "Birdie", "Bogey", etc., enregistrez immédiatement le score pour le trou actuel.
     - PAR DÉFAUT : Si le nombre de putts n'est pas mentionné explicitement, utilisez TOUJOURS 2 putts d'office dans l'appel de fonction 'update_score'. C'est une directive impérative.
 
-    ÉTAPES CLÉS DU PARCOURS :
-    1. MI-PARCOURS (TROU 9) : Si l'utilisateur termine le trou 9, proposez un bilan tactique des 9 premiers trous ("Aller"). Soyez le mentor qui prépare son joueur au "Retour".
-    2. CLUBHOUSE (19È TROU) : Une fois le 18 terminé, passez en mode "19ème trou" : bilan global dans le Salon VIP du Clubhouse, célébration de la mission, et évocation de la tradition du club.
+    ÉTAPES CLÉS DU PARCOURS (IMMERSION MAXIMALE) :
+    1. MI-PARCOURS (TROU 9) : Dès que le trou 9 est validé, vous DEVEZ initier le "Bilan de l'Aller". Analysez les forces et faiblesses des 9 premiers trous. Soyez le mentor qui prépare mentalement son joueur pour le "Retour". Utilisez des termes comme "Le tournant du parcours", "On garde le momentum".
+    2. CLUBHOUSE (19È TROU) : Une fois la mission terminée, passez en mode "Débriefing de Campagne" au Clubhouse. Célébrez la performance si elle est bonne, ou analysez froidement les opportunités manquées si le score est haut. Proposez toujours un verre virtuel et une réflexion sur l'histoire du golf.
 
     VÉRIFICATION DU TROU :
     Si l'utilisateur annonce un score sans préciser le trou :
@@ -573,9 +684,14 @@ export async function chatWithTeacher(
   communicationMode: 'pro' | 'casual' = 'pro',
   arsenal: any[] = [],
   index: number = 0,
-  currentHole?: number
+  currentHole?: number,
+  activeDrillTitle?: string
 ) {
   try {
+    const scorecardContext = activeDrillTitle 
+      ? `CONSIGNE : L'utilisateur est en train d'effectuer l'exercice "${activeDrillTitle}". Focalisez vos réponses EXCLUSIVEMENT sur cet entraînement et sur les progrès constatés lors des échanges précédents dans ce chat. Ne parlez pas du parcours sauf si le joueur le demande explicitement.`
+      : "Le joueur est au Salon VIP pour un bilan global.";
+
     const scorecardText = scorecard 
       ? Object.entries(scorecard).map(([h, data]: any) => `Trou ${h}: ${data.strokes} strokes, ${data.putts} putts`).join('\n')
       : "Aucun score récent.";
@@ -585,26 +701,20 @@ export async function chatWithTeacher(
       : "Non spécifié.";
 
     const modePrompt = communicationMode === 'casual' 
-      ? "MODE : FAMILIER. Utilise le 'tu', sois détendu, comme un mentor sur le practice après une partie. Utilise un langage imagé et chaleureux."
-      : "MODE : PROFESSIONNEL. Utilise le 'vous' ou un 'tu' respectueux de maître à élève, sois précis, chirurgical et autoritaire mais bienveillant.";
+      ? "MODE : FAMILIER / CASUAL. Utilise le 'tu' SYSTÉMATIQUEMENT, sois détendu, comme un vieux pote sur le practice. Utilise un langage imagé, rigole, vanne l'élève si besoin, sois chaleureux."
+      : "MODE : PROFESSIONNEL / PRO. Utilise le 'vous' exclusivement, sois précis, chirurgical et autoritaire de maître à élève.";
 
-    const marcusPersona = `Tu es MARCUS, l'Enseignant d'élite de l'Académie ONYX.
-    Tu fais partie de l'écosystème TEE supervisé par ADAM. Tes conseils techniques doivent être en parfaite harmonie avec la stratégie globale d'ADAM.
-    VOIX : Masculine, grave, bienveillante.
-    TONALITÉ : Sage, paternelle, simple, directe.
+    const marcusPersona = `Tu es MARCUS (Élite Onyx).
     ${modePrompt}
-    PHILOSOPHIE : Penick (simplicité, slow back, visualisation) & Leadbetter (séquence kinétique).
-    CONTEXTE : Le joueur te parle en direct dans l'Académie.
-    MISSION : Guider techniquement le joueur.`;
+    VOIX : Graves, maître zen.
+    PHILOSOPHIE : Penick & Leadbetter. Focus Biomécanique.
+    MISSION : Correction technique pure.`;
 
-    const elenaPersona = `Tu es ELENA, l\'Architecte de performance de l'Académie ONYX.
-    Tu fais partie de l'écosystème TEE supervisé par ADAM. Tes analyses mental/stratégie doivent étayer et préciser les directives d'ADAM.
-    VOIX : Féminine, précise, élégante.
-    TONALITÉ : Précise, élégante, psychologue, architecturale.
+    const elenaPersona = `Tu es ELENA (Architecte Onyx).
     ${modePrompt}
-    PHILOSOPHIE : Butch Harmon (adaptation, takeaway) & Bob Rotella (mental, Think/Play Box).
-    CONTEXTE : Le joueur te parle en direct dans l'Académie.
-    MISSION : Forger le mental et la vision stratégique.`;
+    VOIX : Précise, élégante.
+    PHILOSOPHIE : Harmon & Rotella. Focus Mental/Trajectoires.
+    MISSION : Trajectoires et stratégie mentale.`;
 
     const systemPrompt = teacher === 'marcus' ? marcusPersona : elenaPersona;
 
@@ -613,10 +723,9 @@ export async function chatWithTeacher(
 INDEX : ${index}
 ARSENAL : ${arsenalText}
 TROU ACTUEL : ${currentHole || 'Hors parcours'}
-SCORECARD : ${scorecardText}
-DERNIER BILAN ADAM : ${lastAdamDebrief || 'N/A'}
+${scorecardContext}
 
-Réponds au joueur en restant fidèle à ton identité et au MODE sélectionné. Si le joueur est sur le parcours (Trou ${currentHole}), donne un conseil TACTIQUE immédiat.
+Réponds au joueur en restant fidèle à ton identité et au MODE sélectionné. 
 `;
 
     // Limit history to last 6 messages and remove large images from older history
@@ -654,9 +763,13 @@ export async function getTeacherCoaching(
   communicationMode: 'pro' | 'casual' = 'pro',
   arsenal: any[] = [],
   index: number = 0,
-  userQuestion?: string
+  activeDrillTitle?: string
 ) {
   try {
+    const drillContext = activeDrillTitle 
+      ? `CONSIGNE : L'utilisateur commence ou continue l'exercice : "${activeDrillTitle}". Ta mission est de l'accompagner techniquement sur CE drill spécifiquement. Analyse sa situation par rapport à cet objectif.`
+      : "Le joueur souhaite un bilan global de son jeu.";
+
     const scorecardText = scorecard 
       ? Object.entries(scorecard).map(([h, data]: any) => `Trou ${h}: ${data.strokes} strokes, ${data.putts} putts`).join('\n')
       : "Aucun score récent.";
@@ -666,26 +779,22 @@ export async function getTeacherCoaching(
       : "Non spécifié.";
 
     const modePrompt = communicationMode === 'casual' 
-      ? "MODE : FAMILIER. Utilise le 'tu', sois relax."
-      : "MODE : PROFESSIONNEL. Utilise le 'vous' ou un ton de maître d'académie.";
+      ? "MODE : FAMILIER / CASUAL. Utilise le 'tu' SYSTÉMATIQUEMENT, sois relax, drôle et un peu piquant."
+      : "MODE : PROFESSIONNEL / PRO. Utilise le 'vous' exclusivement, ton de maître d'académie.";
 
-    const marcusPersona = `Tu es MARCUS, l'Enseignant d'élite de l'Académie ONYX.
-    VOIX : Masculine, grave, bienveillante.
-    TONALITÉ : Sage, paternelle, simple, directe.
+    const marcusPersona = `Tu es MARCUS (Élite Onyx). 
     ${modePrompt}
-    PHILOSOPHIE : 
-    - Harvey Penick : Simplicité absolue, une seule correction à la fois, importance du "slow back", visualisation de la cible, et une finition haute et équilibrée.
-    - Leadbetter A-Swing : Maîtrise de la séquence kinétique (Pieds -> Hanches -> Épaules -> Bras -> Club). Puissance générée par le bas du corps et rotation synchronisée.
-    MISSION : Analyser le jeu, corriger la technique pure du swing et créer un plan de progression.`;
+    VOIX : Grave, calme.
+    TONALITÉ : Sage, paternelle, directe.
+    PHILOSOPHIE : Penick & Leadbetter.
+    MISSION : Analyse biomécanique.`;
 
-    const elenaPersona = `Tu es ELENA, l'Architecte de performance de l'Académie ONYX.
-    VOIX : Féminine, précise, élégante.
-    TONALITÉ : Précise, élégante, psychologue, architecturale.
+    const elenaPersona = `Tu es ELENA (Architecte Onyx).
     ${modePrompt}
-    PHILOSOPHIE :
-    - Butch Harmon : Adaptation totale au profil du joueur, takeaway bas et lent, release naturel, travail des trajectoires (Draw/Fade).
-    - Bob Rotella : Maîtrise mentale. Concept de "Think Box" (préparation) vs "Play Box" (exécution), routine stricte, confiance inébranlable, et oubli immédiat des erreurs.
-    MISSION : Analyser les trajectoires, forger le mental de champion, et adapter les conseils au profil psychologique du joueur.`;
+    VOIX : Précise, féminine.
+    TONALITÉ : Architecturale, psychologue.
+    PHILOSOPHIE : Harmon & Rotella.
+    MISSION : Mental et trajectoire.`;
 
     const systemPrompt = teacher === 'marcus' ? marcusPersona : elenaPersona;
 
@@ -693,20 +802,15 @@ export async function getTeacherCoaching(
 [DOSSIER JOUEUR : ${pseudo}]
 INDEX : ${index}
 ARSENAL : ${arsenalText}
-
-SCORECARD RÉCENTE :
-${scorecardText}
-
-BILAN GLOBAL D'ADAM (MENTOR) :
-${lastAdamDebrief || "En attente de transmission de données."}
+${drillContext}
 
 [REQUÊTE]
-${userQuestion || "Analyse mes statistiques et propose-moi un plan de travail immédiat."}
+${activeDrillTitle ? `Analyse ma session sur "${activeDrillTitle}" et guide-moi.` : "Analyse mes statistiques et propose-moi un plan de travail immédiat."}
 
 [DIRECTIVES DE RÉPONSE]
-1. Identifie une zone d'amélioration prioritaire basée sur les chiffres et l'arsenal.
+1. Identifie une zone d'amélioration prioritaire basée sur l'entraînement actuel ou les derniers chiffres.
 2. Formule un conseil technique ou mental propre à TA philosophie de maître.
-3. Propose systématiquement un PLAN DE TRAVAIL (3 Drills précis avec répétitions/temps).
+3. Propose systématiquement un PLAN DE TRAVAIL dédié à l'EXCELLENCE.
 4. Garde ton ton, ton identité et respecte le MODE (${communicationMode}).
 5. Format de réponse : Texte fluide et élégant.`;
 
@@ -837,9 +941,9 @@ Format JSON strict :
   }
 }
 
-export async function analyzeLie(data: string, mimeType: string = "image/jpeg") {
+export async function analyzeLie(data: string, _mimeType: string = "image/jpeg") {
   try {
-    const base64Data = data.includes(',') ? data.split(',')[1] : data;
+    const { data: base64Data, mimeType } = extractImageData(data);
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [
@@ -892,9 +996,9 @@ Format JSON strict :
   }
 }
 
-export async function analyzeGreen(data: string, mimeType: string = "image/jpeg") {
+export async function analyzeGreen(data: string, _mimeType: string = "image/jpeg") {
   try {
-    const base64Data = data.includes(',') ? data.split(',')[1] : data;
+    const { data: base64Data, mimeType } = extractImageData(data);
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: [

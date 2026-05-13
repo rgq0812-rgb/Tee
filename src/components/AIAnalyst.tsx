@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { analyzeSwing, generateSpeech, chatWithAdam, speakWithBrowser } from '../services/geminiService';
+import { extractResizedFrameFromVideo } from '../utils/imageProcessing';
 import { playRawPcm } from '../lib/audioUtils';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -34,7 +35,6 @@ export default function AIAnalyst() {
   });
 
   const handleSendChat = async (textOverride?: string) => {
-    if (playPing) playPing(600, 'sine', 0.03);
     handleOriginalSend(textOverride);
   };
 
@@ -48,10 +48,27 @@ export default function AIAnalyst() {
     if (!file) return;
     setAnalyzing(true);
     try {
-      const mockResult = await analyzeSwing("placeholder_url", "Working on my backswing rotation.");
-      setResult(mockResult);
+      let base64Image = '';
+      if (file.type.startsWith('video/')) {
+        base64Image = await extractResizedFrameFromVideo(file);
+      } else {
+        // Read image as base64
+        base64Image = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.includes(',') ? result.split(',')[1] : result);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+      
+      const result = await analyzeSwing(base64Image, "Analyse mon swing s'il te plait.");
+      setResult(result);
     } catch (err) {
       console.error(err);
+      alert("Erreur lors de l'analyse : " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setAnalyzing(false);
     }

@@ -17,6 +17,7 @@ interface AdamMentorModalProps {
   scorecard?: Record<number, any>;
   arsenal?: any[];
   initialMessage?: string;
+  initialTacticalMode?: 'PARCOURS' | 'STRATÉGIE' | 'ENTRAÎNEMENT';
   handicap?: number;
   playerForm?: string;
   displayMode: 'tactical' | 'solar';
@@ -28,11 +29,14 @@ interface AdamMentorModalProps {
 
 import { resizeImage } from '../utils/imageProcessing';
 
-export default function AdamMentorModal({ isOpen, onClose, selectedCourse, currentHole, scorecard, arsenal, initialMessage, handicap = 18, playerForm = 'forme', displayMode, onUpdateScore, onSetCurrentHole, onOpenScanner, selectedTee }: AdamMentorModalProps) {
+export default function AdamMentorModal({ isOpen, onClose, selectedCourse, currentHole, scorecard, arsenal, initialMessage, initialTacticalMode, handicap = 18, playerForm = 'forme', displayMode, onUpdateScore, onSetCurrentHole, onOpenScanner, selectedTee }: AdamMentorModalProps) {
   const { playPing } = useAmbientSound();
-  const [activeTacticalMode, setActiveTacticalMode] = useState<'PARCOURS' | 'STRATÉGIE' | 'ENTRAÎNEMENT'>('PARCOURS');
+  const [activeTacticalMode, setActiveTacticalMode] = useState<'PARCOURS' | 'STRATÉGIE' | 'ENTRAÎNEMENT'>(initialTacticalMode || 'PARCOURS');
   const [selectedTactic, setSelectedTactic] = useState<'AGRESSIF' | 'SÉCURITÉ' | 'CRÉATIF'>('SÉCURITÉ');
   const [currentForm, setCurrentForm] = useState<'FROID' | 'FORME' | 'PUR'>('FORME');
+  const [commMode, setCommMode] = useState<'pro' | 'casual'>(() => {
+    return (localStorage.getItem('onyx_chat_mode') as any) || 'pro';
+  });
   const [userLocation, setUserLocation] = useState<GeolocationPosition | null>(null);
   const [isHandsFree, setIsHandsFree] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -70,15 +74,22 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
           onUpdateScore(hole_number, strokes, putts);
           setLastScoreUpdate({ hole: hole_number, strokes, putts });
           setTimeout(() => setLastScoreUpdate(null), 4000);
-          if (playPing) playPing(1000, 'sine', 0.1);
         } else if (call.name === 'set_current_hole' && onSetCurrentHole) {
           const { hole_number } = call.args;
           onSetCurrentHole(hole_number);
-          if (playPing) playPing(880, 'sine', 0.05);
         }
       });
     }
   });
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isLoading]);
 
   const isSolar = displayMode === 'solar';
 
@@ -90,82 +101,36 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
     }
   }, [isOpen]);
 
-  // Initialize messages carefully
-  const initializedRef = useRef<string | boolean>(false);
-
-  // Function to create a unique ID - robust and collision-resistant
-  const generateUniqueId = (prefix: string) => {
-    try {
-      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return `${prefix}-${crypto.randomUUID()}`;
-      }
-    } catch (e) {
-      // Fallback if crypto fails
+  useEffect(() => {
+    if (isOpen && initialMessage) {
+      setIsHandsFree(true);
+      wakeWordDetectedRef.current = true; // Open the conversation window immediately
     }
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);
-    return `${prefix}-${timestamp}-${random}`;
-  };
+  }, [isOpen, initialMessage]);
 
+  useEffect(() => {
+    localStorage.setItem('onyx_chat_mode', commMode);
+  }, [commMode]);
+
+  // Initialization is handled by the useLiveChat hook
   useEffect(() => {
     if (isOpen) {
-      // If we have an initial message from props AND we haven't initialized it yet for THIS initialMessage
-      const msgHash = initialMessage ? initialMessage.substring(0, 20) : 'none';
-      const initKey = `init-${msgHash}`;
-      
-      if (initialMessage && initializedRef.current !== initKey) {
-        setMessages([
-          {
-            id: generateUniqueId('msg-init-prop'),
-            role: 'model',
-            parts: [{ text: initialMessage }]
-          }
-        ]);
-        initializedRef.current = initKey;
-        if (localStorage.getItem('onyx_voice') !== 'false') {
-          speakText(initialMessage, 'ADAM');
-        }
-      } else if (messages.length === 0 && !initializedRef.current) {
-        const welcomeMessages = {
-          'PARCOURS': "Bonjour. Je suis ADAM. Je gère votre parcours et votre tactique en temps réel. Quel est votre prochain coup ?",
-          'STRATÉGIE': "Bonjour. Je suis LOGIC. Mon rôle est d'analyser vos statistiques et de définir la stratégie de victoire. Que voulez-vous planifier ?",
-          'ENTRAÎNEMENT': "Bonjour. Je suis ONYX. Je traduis vos faiblesses en exercices de précision. Prêt pour l'entraînement technique ?"
-        };
-        const speakerMap: Record<string, 'ADAM' | 'LOGIC' | 'ONYX'> = {
-          'PARCOURS': 'ADAM',
-          'STRATÉGIE': 'LOGIC',
-          'ENTRAÎNEMENT': 'ONYX'
-        };
-        const welcomeSpeaker = speakerMap[activeTacticalMode];
-        const welcomeText = welcomeMessages[activeTacticalMode];
-        
-        setCurrentSpeaker(welcomeSpeaker);
-        setMessages([
-          {
-            id: generateUniqueId('msg-welcome'),
-            role: 'model',
-            parts: [{ text: welcomeText }],
-            speaker: welcomeSpeaker as any
-          }
-        ]);
-        initializedRef.current = 'true';
-        if (localStorage.getItem('onyx_voice') !== 'false') {
-          speakText(welcomeText, welcomeSpeaker);
-        }
-      }
+      const handleShowScorecard = () => {
+        onClose();
+      };
+      window.addEventListener('onyx_show_scorecard', handleShowScorecard);
+      return () => {
+        window.removeEventListener('onyx_show_scorecard', handleShowScorecard);
+      };
     }
-  }, [isOpen, initialMessage, activeTacticalMode]);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (isOpen && currentHole && initializedRef.current) {
-      // If hole changes, we could potentially inject a context reminder 
-      // but the chatWithAdam call already uses the fresh currentHole.
-      // However, it's good to clear any "Old Hole" mental state from the AI.
+    if (isOpen && currentHole) {
       console.log(`[ONYX] Context sync: hole ${currentHole}`);
     }
   }, [currentHole, isOpen]);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const currentAudioSource = useRef<AudioBufferSourceNode | null>(null);
 
@@ -181,7 +146,6 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
         // Resize image to 1024px max to save memory and avoid "Insufficient Memory" errors
         const optimizedBase64 = await resizeImage(fullBase64, 1024);
         setAttachedImage({ mimeType: 'image/jpeg', data: optimizedBase64 });
-        if (playPing) playPing(1500, 'sine', 0.1);
       } catch (err) {
         console.error("Optimization error:", err);
       } finally {
@@ -211,7 +175,6 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
         return;
     }
 
-    if (playPing) playPing(1200, 'sine', 0.05);
     toggleListening();
   };
 
@@ -226,13 +189,11 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
     } else {
       setIsHandsFree(true);
       startListening(true, 45000);
-      if (playPing) playPing(1500, 'sine', 0.1);
       
       if (handsFreeTimeoutRef.current) clearTimeout(handsFreeTimeoutRef.current);
       handsFreeTimeoutRef.current = setTimeout(() => {
         setIsHandsFree(false);
         stopListening();
-        if (playPing) playPing(400, 'sine', 0.05);
       }, 45000);
     }
   };
@@ -423,7 +384,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
               </div>
 
               {/* TACTICAL QUICK SELECTORS - FIXED BELOW PILLARS */}
-              <div className="px-4 pb-3 grid grid-cols-2 gap-2 relative z-10">
+              <div className="px-4 pb-3 grid grid-cols-3 gap-2 relative z-10">
                 <div className="space-y-1">
                   <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
                     {['AGRESSIF', 'SÉCURITÉ', 'CRÉATIF'].map(t => (
@@ -431,7 +392,6 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                         key={t}
                         onClick={() => {
                           setSelectedTactic(t as any);
-                          if (playPing) playPing(1000, 'sine', 0.05);
                         }}
                         className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${selectedTactic === t ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-400' : 'text-white/40')}`}
                       >
@@ -447,11 +407,28 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                         key={f}
                         onClick={() => {
                           setCurrentForm(f as any);
-                          if (playPing) playPing(1200, 'sine', 0.05);
                         }}
                         className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${currentForm === f ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-500' : 'text-white/40')}`}
                       >
                         {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
+                    {[
+                      { id: 'pro', label: 'PRO' },
+                      { id: 'casual', label: 'CAS' }
+                    ].map(m => (
+                      <button 
+                        key={m.id}
+                        onClick={() => {
+                          setCommMode(m.id as any);
+                        }}
+                        className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${commMode === m.id ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-500' : 'text-white/40')}`}
+                      >
+                        {m.label}
                       </button>
                     ))}
                   </div>
@@ -501,28 +478,28 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
             </div>
 
             {/* SCROLLING CONVERSATION */}
-            <div ref={scrollRef} className={`relative z-20 flex-1 overflow-y-auto px-6 py-6 scrollbar-hide ${isSolar ? 'bg-zinc-50/50' : 'bg-transparent'}`}>
-              
-              {messages.slice(-10).map((msg) => (
-                <motion.div key={msg.id} initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }} animate={{ opacity: 1, x: 0 }} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}>
-                  <div className={`max-w-[85%] ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                      <div className={`inline-block p-4 rounded-2xl text-[14px] font-medium leading-relaxed shadow-2xl ${
-                        msg.role === 'user' 
-                          ? (isSolar ? 'bg-black text-white' : 'bg-white/10 text-white rounded-tr-none border border-white/20 backdrop-blur-md') 
-                          : (isSolar 
-                              ? `bg-white text-black italic border shadow-xl ${
-                                   msg.speaker === 'ONYX' 
-                                    ? 'border-[#c9964a]' 
-                                    : 'border-zinc-950'
-                                 }`
-                              : `bg-black text-white italic border rounded-tl-none shadow-[0_10px_40px_rgba(0,0,0,0.8)] ${
-                                msg.speaker === 'ONYX' 
-                                  ? 'border-[#c9964a]/60 ring-1 ring-[#c9964a]/10 shadow-[#c9964a]/5' 
-                                  : msg.speaker === 'LOGIC' 
-                                    ? 'border-zinc-700/50 ring-1 ring-zinc-700/10 shadow-zinc-700/5' 
-                                    : 'border-white/30 ring-1 ring-white/5 shadow-white/5'
-                                }`)
-                      }`}>
+            <div ref={scrollRef} className={`relative z-20 flex-1 overflow-y-auto px-6 py-6 scrollbar-hide overflow-anchor-none ${isSolar ? 'bg-zinc-50/50' : 'bg-transparent'}`}>
+              <div className="flex flex-col min-h-full">
+                {messages.map((msg, idx) => (
+                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-6 relative`}>
+                    <div className={`max-w-[85%] ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                        <div className={`inline-block p-4 rounded-2xl text-[14px] font-medium leading-relaxed shadow-xl ${
+                          msg.role === 'user' 
+                            ? (isSolar ? 'bg-black text-white' : 'bg-white/10 text-white rounded-tr-none border border-white/20 backdrop-blur-md') 
+                            : (isSolar 
+                                ? `bg-white text-black italic border shadow-lg ${
+                                     msg.speaker === 'ONYX' 
+                                      ? 'border-[#c9964a]' 
+                                      : 'border-zinc-950'
+                                   }`
+                                : `bg-black text-white italic border rounded-tl-none shadow-[0_10px_40px_rgba(0,0,0,0.8)] ${
+                                  msg.speaker === 'ONYX' 
+                                    ? 'border-[#c9964a]/60 ring-1 ring-[#c9964a]/10 shadow-[#c9964a]/5' 
+                                    : msg.speaker === 'LOGIC' 
+                                      ? 'border-zinc-700/50 ring-1 ring-zinc-700/10 shadow-zinc-700/5' 
+                                      : 'border-white/30 ring-1 ring-white/5 shadow-white/5'
+                                  }`)
+                        }`}>
                         {msg.parts.map((part: any, pIdx) => {
                           if ('text' in part) return (
                             <div key={pIdx} className="markdown-body prose prose-invert max-w-none prose-p:leading-relaxed prose-sm">
@@ -552,7 +529,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                       }`} />
                     </div>
                   </div>
-                </motion.div>
+                </div>
               ))}
 
               {isLoading && (
@@ -563,20 +540,21 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                 </div>
               )}
             </div>
+          </div>
 
             {/* TACTICAL INPUT CONSOLE - Robust for Sunlight */}
             <div className={`relative z-30 p-4 pb-6 border-t border-white/5 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] ${isSolar ? 'bg-white border-zinc-950' : 'bg-[#0a0a0a]'}`}>
-               
-               {/* Live Transcription HUD */}
-               <AnimatePresence>
-                 {(isListening || (lastTranscript && !isLoading)) && (
-                   <motion.div 
-                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                     className={`mb-4 p-4 rounded-2xl border-2 flex flex-col gap-1 items-center justify-center text-center shadow-2xl relative overflow-hidden ${isSolar ? 'bg-zinc-100 border-zinc-950' : 'bg-zinc-900 border-[#c9964a]/30'}`}
-                   >
-                     {isListening && (
+               {/* Live Transcription HUD - Absolute to avoid layout shifts */}
+               <div className="absolute left-4 right-4 bottom-[calc(100%+10px)] z-50 pointer-events-none">
+                 <AnimatePresence mode="wait">
+                   {(isListening || (lastTranscript && !isLoading)) && (
+                     <motion.div 
+                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                       animate={{ opacity: 1, y: 0, scale: 1 }}
+                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                       className={`p-4 rounded-2xl border-2 flex flex-col gap-1 items-center justify-center text-center shadow-2xl relative overflow-hidden pointer-events-auto ${isSolar ? 'bg-zinc-100 border-zinc-950' : 'bg-zinc-900 border-[#c9964a]/30'}`}
+                     >
+                       {isListening && (
                        <div className="absolute inset-0 opacity-10 pointer-events-none">
                          <AudioVisualizer isActive={true} isSolar={isSolar} />
                        </div>
@@ -590,6 +568,8 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                    </motion.div>
                  )}
                </AnimatePresence>
+
+               </div>
 
                {attachedImage && (
                  <motion.div 

@@ -49,7 +49,7 @@ const AcademyBackground = React.memo(({ isSolar }: { isSolar: boolean }) => {
       <div className="absolute inset-0 overflow-hidden">
         {[...Array(15)].map((_, i) => (
           <motion.div
-            key={`line-${i}`}
+            key={`aca-floating-line-${i}`}
             initial={{ x: i % 2 === 0 ? '-100%' : '100%', y: (i * 10) + '%', rotate: i % 2 === 0 ? 15 : -15, opacity: 0 }}
             animate={{ 
               x: i % 2 === 0 ? '150%' : '-150%',
@@ -70,7 +70,7 @@ const AcademyBackground = React.memo(({ isSolar }: { isSolar: boolean }) => {
       <div className="absolute inset-0">
         {relics.map((relic, i) => (
           <motion.div
-             key={`relic-${i}`}
+             key={`aca-relic-float-${i}-${relic.x}-${relic.y}`}
              initial={{ 
                x: relic.x, 
                y: relic.y, 
@@ -154,6 +154,11 @@ export default function Academy({
   });
   const [showTeacherChat, setShowTeacherChat] = useState(false);
   const [sessionBriefing, setSessionBriefing] = useState<AcademyDrill | null>(null);
+  const [commMode, setCommMode] = useState<'pro' | 'casual'>(() => (localStorage.getItem('onyx_chat_mode') as any) || 'pro');
+
+  useEffect(() => {
+    localStorage.setItem('onyx_chat_mode', commMode);
+  }, [commMode]);
 
   const getTechnicalLevel = () => {
     // Priority 1: Current Session
@@ -225,6 +230,12 @@ export default function Academy({
   const confirmStartSession = (drill: AcademyDrill) => {
     startDrillSession(drill);
     setSessionBriefing(null);
+    // Enable hands-free for interactive feel
+    setIsHandsFree(true);
+    
+    // Give a starting instruction
+    const startText = `Protocole ${drill.title} activé. Je surveille ton exécution. Dès qu'un coup est joué, dis-le moi.`;
+    handleTeacherSpeak(startText, 'strat');
   };
 
   const validateDrill = (drillId: string) => {
@@ -250,7 +261,6 @@ export default function Academy({
   const [teacherAnalysis, setTeacherAnalysis] = useState<string | null>(null);
   const [isTeacherLoading, setIsTeacherLoading] = useState(false);
   const [isTeacherSpeaking, setIsTeacherSpeaking] = useState(false);
-  const [commMode, setCommMode] = useState<'pro' | 'casual'>('pro');
   const [isHandsFree, setIsHandsFree] = useState(false);
   const recognitionRef = useRef<any>(null);
   const wakeWordDetectedRef = useRef(false);
@@ -316,7 +326,8 @@ export default function Academy({
         commMode,
         arsenal,
         index,
-        currentHole
+        currentHole,
+        activeSession?.title
       );
       
       if (response) {
@@ -342,7 +353,7 @@ export default function Academy({
     setTeacherAnalysis(null);
     setTeacherChat([]);
     try {
-      const analysis = await getTeacherCoaching(teacherKey, pseudo, scorecard, lastAdvice, commMode, arsenal, index);
+      const analysis = await getTeacherCoaching(teacherKey, pseudo, scorecard, lastAdvice, commMode, arsenal, index, activeSession?.title);
       setTeacherAnalysis(analysis);
       setTeacherChat([{ role: 'model', parts: [{ text: analysis }] }]);
       
@@ -436,6 +447,19 @@ export default function Academy({
   };
 
   useEffect(() => {
+    const handleTeacherMessage = (e: any) => {
+      const { text } = e.detail;
+      if (text && selectedTeacher) {
+        setTeacherChat(prev => [...prev, { role: 'model', parts: [{ text }] }]);
+        handleTeacherSpeak(text, TEACHERS[selectedTeacher].voiceId);
+      }
+    };
+
+    window.addEventListener('onyx_teacher_message', handleTeacherMessage);
+    return () => window.removeEventListener('onyx_teacher_message', handleTeacherMessage);
+  }, [selectedTeacher, isTeacherSpeaking]);
+
+  useEffect(() => {
     if (activeSession) {
       handleDrillSpeak(activeSession);
     }
@@ -473,7 +497,7 @@ export default function Academy({
       // 1. Wake Word Detection or Follow-up window
       if (transcript.includes('hey tee') || transcript.includes('hey t') || wakeWordDetectedRef.current) {
         if (!wakeWordDetectedRef.current) {
-          playWhistle(); // Audio feedback for wake word
+          // No feedback
         }
         
         wakeWordDetectedRef.current = true;
@@ -550,7 +574,7 @@ export default function Academy({
     return () => {
       if (recognitionRef.current) recognitionRef.current.stop();
     };
-  }, [isHandsFree, selectedTeacher, activeSession, program, conversationTimeout]);
+  }, [isHandsFree, selectedTeacher, activeSession, program, conversationTimeout, isTeacherSpeaking]);
 
   useEffect(() => {
     if (activeDrill !== null && isHandsFree && selectedTeacher && program) {
@@ -722,7 +746,7 @@ export default function Academy({
                      <h6 className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-3">POINTS DE PASSAGE</h6>
                      <div className="space-y-2">
                         {(sessionBriefing.masteryPoints || ['Impact centré', 'Rythme régulier', 'Poste propre']).map((pt, i) => (
-                           <div key={`briefing-opt-${i}`} className="flex items-center gap-3">
+                           <div key={`aca-briefing-opt-${i}-${pt.substring(0, 5)}`} className="flex items-center gap-3">
                               <div className="w-1.5 h-1.5 rounded-full bg-[#c9964a]" />
                               <span className="text-[10px] font-black uppercase tracking-tight">{pt}</span>
                            </div>
@@ -834,7 +858,7 @@ export default function Academy({
                   <div className="space-y-4 flex-1">
                     {(activeSession.masteryPoints || ['Impact centré', 'Rythme Onyx', 'Poste Parfait']).map((point, i) => (
                       <button 
-                        key={`mastery-point-${i}`}
+                        key={`aca-mastery-point-${i}-${activeSession.id}-${point.substring(0, 5)}`}
                         onClick={() => togglePoint(point)}
                         className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all group ${
                           validatedPoints.includes(point)
@@ -896,7 +920,6 @@ export default function Academy({
                         onClick={() => {
                           setDrillReps(prev => prev + 1);
                           setDrillSuccess(prev => prev + 1);
-                          playPing(1200, 'sine', 0.1, 0.05);
                         }}
                         className={`py-4 rounded-2xl font-black uppercase tracking-widest text-[8px] transition-all shadow-xl active:scale-95 ${
                           isSolar ? 'bg-black text-white' : 'bg-emerald-500 text-black shadow-emerald-500/30'
@@ -1007,8 +1030,8 @@ export default function Academy({
                     </p>
                   </div>
                 ) : (
-                  teacherChat.map((msg, i) => (
-                    <div key={`faculty-chat-msg-${i}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  teacherChat.map((msg: any, i) => (
+                    <div key={`faculty-chat-msg-${msg.timestamp || i}-${msg.role}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[85%] p-4 rounded-2xl text-xs leading-relaxed ${
                         msg.role === 'user' 
                           ? 'bg-[#c9964a] text-black font-bold rounded-tr-none' 
@@ -1126,7 +1149,7 @@ export default function Academy({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`relative flex-1 h-12 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest transition-all ${
+            className={`relative flex-1 h-12 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all ${
               activeTab === tab 
                 ? (isSolar ? 'bg-black text-white shadow-lg' : 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/20') 
                 : (isSolar ? 'text-black/40 hover:text-black hover:bg-black/5' : 'text-white/60 hover:text-white hover:bg-white/5')
@@ -1460,9 +1483,12 @@ export default function Academy({
                       </div>
                     </div>
                     <button 
-                      onClick={() => setSelectedTeacher(null)}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${
-                        isSolar ? 'border-zinc-200 hover:bg-zinc-100' : 'border-white/10 hover:bg-white/5'
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedTeacher(null);
+                      }}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all relative z-50 ${
+                        isSolar ? 'border-zinc-200 hover:bg-zinc-100 bg-white' : 'border-white/10 hover:bg-white/5 bg-zinc-900'
                       }`}
                     >
                       <X size={18} />
@@ -1505,10 +1531,10 @@ export default function Academy({
                         </div>
 
                         <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto no-scrollbar pb-4">
-                          {teacherChat.map((msg, idx) => {
+                          {teacherChat.map((msg: any, idx) => {
                             const text = msg.parts && msg.parts[0] ? msg.parts[0].text : '';
                             return (
-                              <div key={`aca-msg-v12-${idx}-${selectedTeacher}-${text.substring(0, 10)}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              <div key={`aca-msg-v12-${msg.timestamp || idx}-${selectedTeacher}-${text.substring(0, 10)}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
                                   msg.role === 'user' 
                                     ? (isSolar ? 'bg-black text-white shadow-xl' : 'bg-[#c9964a] text-black font-bold shadow-lg shadow-[#c9964a]/20') 
@@ -1556,6 +1582,7 @@ export default function Academy({
                                 className={`group relative w-12 h-12 rounded-full flex items-center justify-center transition-all ${
                                   isHandsFree ? 'bg-[#c9964a] text-black shadow-lg shadow-[#c9964a]/40' : (isSolar ? 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200' : 'bg-white/10 text-white/70 hover:text-[#c9964a] hover:bg-white/20')
                                 }`}
+                                title={isHandsFree ? "MODE INTERACTIF ON" : "ACTIVER MODE INTERACTIF"}
                               >
                                 {isHandsFree && (
                                   <motion.div 
@@ -1821,23 +1848,33 @@ export default function Academy({
   {activeTab === 'catalogue' && (
     <>
       <div className="space-y-6">
-        <div className="flex items-center justify-between px-2">
-          <div className="flex items-center gap-2">
-            <Filter size={16} className={isSolar ? 'text-black' : 'text-[#c9964a]'} />
-            <h3 className="text-xs font-black uppercase tracking-[0.3em] italic">Catalogue Académie</h3>
+        <div className="flex flex-col gap-4 px-2">
+          <div className="flex items-center gap-2 mb-2">
+            <Filter size={18} className={isSolar ? 'text-black' : 'text-[#c9964a]'} />
+            <h3 className="text-sm font-black uppercase tracking-[0.3em] italic">Catalogue Académie</h3>
           </div>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-            {['WARMUP', 'ESSENTIELS', 'BIOMÉCANIQUE', 'SCORING ZONE', 'MENTAL', 'STRATÉGIE', 'FUN', 'TOUS'].map(cat => (
+          <div className="flex overflow-x-auto no-scrollbar gap-3 pb-4 -mx-2 px-2">
+            {[
+              { id: 'WARMUP', icon: Flame },
+              { id: 'ESSENTIELS', icon: ShieldCheck },
+              { id: 'BIOMÉCANIQUE', icon: Activity },
+              { id: 'SCORING ZONE', icon: Target },
+              { id: 'MENTAL', icon: Brain },
+              { id: 'STRATÉGIE', icon: Flag },
+              { id: 'FUN', icon: Sparkles },
+              { id: 'TOUS', icon: Filter }
+            ].map(cat => (
               <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2.5 rounded-xl text-[8px] font-black uppercase tracking-[0.2em] whitespace-nowrap border-2 transition-all relative overflow-hidden group ${
-                  selectedCategory === cat 
-                    ? (isSolar ? 'bg-black text-white border-black scale-105' : 'bg-[#c9964a] text-black border-[#c9964a] scale-105 shadow-[0_0_15px_rgba(201,150,74,0.3)]')
-                    : (isSolar ? 'bg-white border-zinc-200 text-zinc-400 hover:border-black hover:text-black' : 'bg-white/10 border-white/10 text-white hover:border-[#c9964a]/50 hover:bg-white/20 shadow-inner shadow-white/5')
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`flex-shrink-0 flex items-center gap-3 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.1em] transition-all relative overflow-hidden group border-2 ${
+                  selectedCategory === cat.id 
+                    ? (isSolar ? 'bg-black text-white border-black shadow-lg scale-105 z-10' : 'bg-[#c9964a] text-black border-[#c9964a] shadow-[0_0_20px_rgba(201,150,74,0.4)] scale-105 z-10')
+                    : (isSolar ? 'bg-white border-zinc-200 text-zinc-500 hover:border-black hover:text-black' : 'bg-white/5 border-white/10 text-white/60 hover:border-[#c9964a] hover:text-white hover:bg-white/10')
                 }`}
               >
-                {cat}
+                <cat.icon size={16} className={selectedCategory === cat.id ? '' : 'opacity-40'} />
+                <span>{cat.id}</span>
               </button>
             ))}
           </div>

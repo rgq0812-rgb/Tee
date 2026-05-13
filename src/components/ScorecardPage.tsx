@@ -402,10 +402,10 @@ export default function ScorecardPage({
                 </div>
                 
                 <div className="space-y-2">
-                  {Object.values(CADDIES).map((c: any, idx: number) => (
-                    <button 
-                      key={`scorecard-caddie-selector-item-${c.id}-${idx}`}
-                      onClick={() => setActiveCaddie(c)}
+            {Object.values(CADDIES).map((c: any, idx: number) => (
+              <button 
+                key={`scorecard-caddie-selector-item-${c.id}-${idx}-${isSolar ? 'solar' : 'dark'}`}
+                onClick={() => setActiveCaddie(c)}
                       className={`w-full p-6 p-4 rounded-[2rem] border-2 text-left transition-all flex items-center gap-6 shadow-sm ${activeCaddie.id === c.id ? (isSolar ? 'bg-white border-zinc-950 shadow-xl' : 'bg-[#c9964a]/10 border-[#c9964a] shadow-lg shadow-[#c9964a]/10') : (isSolar ? 'bg-white border-zinc-100 opacity-40' : 'bg-white/5 border-white/10 opacity-40')}`}
                     >
                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${activeCaddie.id === c.id ? (isSolar ? 'bg-zinc-950 text-white' : 'bg-black text-[#c9964a]') : 'bg-white/10'}`}>
@@ -611,12 +611,12 @@ export default function ScorecardPage({
             <span className="w-12 text-right">VAR</span>
           </div>
           <div className={`divide-y ${isSolar ? 'divide-zinc-950/10' : 'divide-white/10'}`}>
-            {scorecardData.map((h: any, idx: number) => (
-              <button 
-                key={`score-hole-row-v3-${selectedCourse.id}-${h.hole}-${idx}`} 
-                onClick={() => { setEditingHole(h.hole); setCurrentHole(h.hole); }}
-                className={`w-full px-6 py-5 flex items-center transition-colors ${currentHole === h.hole ? (isSolar ? 'bg-zinc-100' : 'bg-red-600/10') : ''}`}
-              >
+              {scorecardData.map((h: any, idx: number) => (
+                <button 
+                  key={`score-hole-row-v3-final-${selectedCourse.id}-${h.hole}-${idx}-${isSolar ? 'solar' : 'dark'}`} 
+                  onClick={() => { setEditingHole(h.hole); setCurrentHole(h.hole); }}
+                  className={`w-full px-6 py-5 flex items-center transition-colors ${currentHole === h.hole ? (isSolar ? 'bg-zinc-100' : 'bg-red-600/10') : ''}`}
+                >
                 <span className={`w-10 font-mono text-lg font-black ${isSolar ? 'text-zinc-300' : 'text-white/30'}`}>{h.hole < 10 ? `0${h.hole}` : h.hole}</span>
                 <span className={`w-14 text-center font-mono text-xs font-bold opacity-60`}>{h.distance}m</span>
                 <span className={`w-10 text-center font-mono text-lg font-bold opacity-30`}>{h.par}</span>
@@ -803,7 +803,7 @@ export default function ScorecardPage({
             <div className="grid grid-cols-4 gap-3 mb-8">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((num, pidx) => (
                 <button 
-                  key={`score-pad-v3-field-${activeScoreField}-${editingHole}-${num}-${pidx}`}
+                  key={`score-pad-v4-field-${activeScoreField}-${editingHole}-${num}-${pidx}-${isSolar ? 'solar' : 'dark'}`}
                   onClick={() => {
                     if (activeScoreField === 'strokes') {
                       updateScore(editingHole, num);

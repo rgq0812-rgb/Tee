@@ -32,6 +32,8 @@ interface UseLiveChatProps {
   autoRestartMic?: boolean;
 }
 
+let globalMsgCounter = 0;
+
 export function useLiveChat({ 
   initialMessage, 
   initialSpeaker = 'ADAM',
@@ -63,17 +65,27 @@ export function useLiveChat({
   }, [isMuted]);
 
   const generateUniqueId = (prefix: string) => {
+    globalMsgCounter++;
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 9);
     try {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return `${prefix}-${crypto.randomUUID()}`;
       }
     } catch (e) {}
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    return `${prefix}-${timestamp}-${random}-${globalMsgCounter}-${Math.floor(Math.random() * 1000)}`;
+  };
+
+  const clearTranscript = () => {
+    setLastTranscript('');
+    lastTranscriptRef.current = '';
   };
 
   const [lastAdvice, setLastAdvice] = useState<{ text: string, speaker?: 'ADAM' | 'LOGIC' | 'ONYX' } | null>(
     globalLastAdvice ? { text: globalLastAdvice, speaker: (localStorage.getItem('onyx_last_speaker') as any) || 'ADAM' } : null
   );
+
+  const isProcessingRef = useRef(false);
 
   // 1. Voice Input Hook (Must be first to provide startListening/stopListening)
   const { isListening, startListening, stopListening, error: voiceError } = useVoiceInput((text, isFinal) => {
@@ -83,6 +95,13 @@ export function useLiveChat({
     
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     
+    // Immediate send if final and long enough
+    if (isFinal && text.trim().length > 3 && !isProcessingRef.current) {
+      if (handleSendRef.current) handleSendRef.current(text);
+      stopListening();
+      return;
+    }
+
     // Wake word detection
     const wakeWordsList = ['hey tee', 'tactique', 'club', 'aide moi', 'adam'];
     const detectedWakeWord = wakeWordsList.some(word => transcript.includes(word.toLowerCase()));
@@ -179,10 +198,25 @@ export function useLiveChat({
   const handleSend = useCallback(async (textOverride?: string, imageOverride?: { mimeType: string, data: string }) => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     
+    if (isProcessingRef.current) {
+      console.warn("[ONYX] Send blocked: isProcessingRef is true");
+      return;
+    }
+    
     const textToSend = textOverride || input;
     const imageToSend = imageOverride || attachedImage;
-    if (!textToSend.trim() && !imageToSend || isLoading) return;
+    
+    if (!textToSend.trim() && !imageToSend) {
+      console.log("[ONYX] Send ignored: empty input");
+      return;
+    }
 
+    if (isLoading) {
+      console.warn("[ONYX] Send blocked: isLoading is true");
+      return;
+    }
+
+    isProcessingRef.current = true;
     const parts: any[] = [{ text: textToSend }];
     if (imageToSend) {
       parts.push({ inlineData: imageToSend });
@@ -198,6 +232,9 @@ export function useLiveChat({
     setInput('');
     setAttachedImage(null);
     setIsLoading(true);
+    clearTranscript();
+
+    const communicationMode = (localStorage.getItem('onyx_chat_mode') as any) || 'pro';
 
     try {
       const historyForApi = [...messages, userMessage].map(m => ({ role: m.role, parts: m.parts }));
@@ -220,7 +257,8 @@ export function useLiveChat({
             return { advice: 'text' in firstPart ? firstPart.text : 'Image' };
           }),
           activeMode: courseContext.activeTacticalMode || 'PARCOURS'
-        }
+        },
+        communicationMode
       );
       
       if (toolCalls && toolCalls.length > 0 && onToolCall) {
@@ -247,11 +285,20 @@ export function useLiveChat({
       
       if (speaker) setCurrentSpeaker(speaker);
       setMessages(prev => [...prev, adamMessage]);
+      
+      // Emit event for mid-round or final summary to switch UI
+      const lowerResponse = responseText.toLowerCase();
+      if ((lowerResponse.includes('bilan') || lowerResponse.includes('score')) && (courseContext.currentHole === 9 || courseContext.currentHole === 10 || courseContext.currentHole === 18)) {
+        console.log("[ONYX] Bilan détecté, déclenchement du basculement vers le score.");
+        window.dispatchEvent(new CustomEvent('onyx_show_scorecard'));
+      }
+
       if (responseText) speakText(responseText, speaker || undefined, autoRestartMic);
     } catch (error) {
-      console.error(error);
+      console.error("[ONYX] Chat processing error:", error);
     } finally {
       setIsLoading(false);
+      isProcessingRef.current = false;
     }
   }, [input, attachedImage, isLoading, messages, courseContext, onToolCall, speakText, autoRestartMic]);
 
@@ -262,6 +309,7 @@ export function useLiveChat({
       stopListening();
     } else {
       setLastTranscript('');
+      lastTranscriptRef.current = '';
       startListening(false, 30000);
     }
   };
@@ -269,16 +317,49 @@ export function useLiveChat({
   // Initialization
   useEffect(() => {
     if (initialMessage && !initializedRef.current) {
-      setMessages([{
-        id: generateUniqueId('init'),
-        role: 'model',
-        parts: [{ text: initialMessage }],
-        speaker: initialSpeaker
-      }]);
-      initializedRef.current = true;
+      setMessages(prev => {
+        // Check if already initialized in history to avoid duplication
+        const alreadyHasInit = prev.some(m => m.parts.some(p => 'text' in p && p.text === initialMessage));
+        if (alreadyHasInit) return prev;
+        
+        return [...prev, {
+          id: generateUniqueId('init'),
+          role: 'model',
+          parts: [{ text: initialMessage }] as any,
+          speaker: initialSpeaker
+        }];
+      });
       speakText(initialMessage, initialSpeaker);
+      initializedRef.current = true;
     }
-  }, [initialMessage, initialSpeaker, speakText]);
+  }, [initialMessage, initialSpeaker, speakText, setMessages]);
+
+  // External message injection (for coaching interventions)
+  useEffect(() => {
+    const handleInject = (e: any) => {
+      const { text, speaker } = e.detail;
+      if (!text) return;
+
+      const newMsg: SafeMessage = {
+        id: generateUniqueId('injected'),
+        role: 'model' as const,
+        parts: [{ text }] as any,
+        speaker: speaker || initialSpeaker
+      };
+
+      setMessages(prev => {
+        // Prevent duplicate injection if the last message is identical
+        const lastMsg = prev[prev.length - 1];
+        if (lastMsg && lastMsg.parts.some(p => 'text' in p && p.text === text)) return prev;
+        return [...prev, newMsg];
+      });
+
+      speakText(text, speaker || initialSpeaker);
+    };
+
+    window.addEventListener('onyx_inject_message', handleInject);
+    return () => window.removeEventListener('onyx_inject_message', handleInject);
+  }, [initialSpeaker, speakText, setMessages]);
 
   return {
     messages,

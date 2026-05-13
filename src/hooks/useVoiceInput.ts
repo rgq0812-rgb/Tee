@@ -2,9 +2,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void) => {
   const [isListening, setIsListening] = useState(false);
+  const isListeningRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   
+  const updateIsListening = (val: boolean) => {
+    setIsListening(val);
+    isListeningRef.current = val;
+  };
+
   // Cette variable permet de savoir si on doit relancer le micro automatiquement
   const isAutoRestarting = useRef(false);
   const durationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -21,7 +27,6 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
     
     if (recognitionRef.current) {
       try {
-        // Supprimer le onend pour éviter les boucles de redémarrage lors de l'arrêt volontaire
         recognitionRef.current.onend = null;
         recognitionRef.current.onresult = null;
         recognitionRef.current.onerror = null;
@@ -31,7 +36,7 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
       }
       recognitionRef.current = null;
     }
-    setIsListening(false);
+    updateIsListening(false);
   }, []);
 
   const startListening = useCallback((continuousMode = false, timeoutMs?: number) => {
@@ -42,18 +47,20 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
       return;
     }
 
-    // Reset potential previous instance
+    // Proactive cleanup to avoid "already started" errors
     if (recognitionRef.current) {
       try {
         recognitionRef.current.onend = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
         recognitionRef.current.stop();
       } catch (e) {}
+      recognitionRef.current = null;
     }
 
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = 'fr-FR';
-      // Toujours utiliser le mode continu pour éviter que le mobile ne coupe le flux trop vite
       recognition.continuous = true; 
       recognition.interimResults = true; 
       recognition.maxAlternatives = 3; 
@@ -72,10 +79,10 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
         }
         
         const currentText = (fullTranscript + interimTranscript).trim();
-        const isSomeFinal = event.results[event.results.length - 1].isFinal;
+        const lastResult = event.results[event.results.length - 1];
+        const isSomeFinal = lastResult.isFinal;
         
         if (currentText && onResultRef.current) {
-          // Pass the combined text and whether the very last part is final
           onResultRef.current(currentText, isSomeFinal);
         }
       };
@@ -84,59 +91,51 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
         const errorType = String(event.error || '').toLowerCase();
         
         if (errorType === 'aborted') {
-          // Log as warning rather than error, often happens on tab change or rapid stop/start
-          console.warn("[ONYX] Speech recognition aborted gracefully.");
+          console.warn("[ONYX] Speech recognition aborted.");
           return;
         }
 
         console.error("[ONYX] Speech Recognition Error:", errorType);
         
         if (errorType === 'not-allowed') {
-          setError("Accès Micro Refusé - Vérifiez les réglages");
-          setIsListening(false);
+          setError("Accès Micro Refusé - Cliquez ici ou autorisez dans la barre d'adresse");
+          updateIsListening(false);
           isAutoRestarting.current = false;
         } else if (errorType === 'network') {
           setError("Erreur Réseau - Connexion instable");
-          setIsListening(false);
+          updateIsListening(false);
           isAutoRestarting.current = false;
         } else if (errorType === 'no-speech') {
-          // Keep it quiet for no-speech, just log it
-          console.log("[ONYX] Aucun son détecté, maintien de la session...");
+          console.log("[ONYX] Aucun son détecté.");
         } else {
           setError(`Erreur: ${errorType}`);
-          setIsListening(false);
+          updateIsListening(false);
           isAutoRestarting.current = false;
         }
       };
 
       recognition.onstart = () => {
-        setIsListening(true);
+        updateIsListening(true);
         setError(null);
-        if (window.navigator?.vibrate) window.navigator.vibrate(20);
       };
 
       recognition.onend = () => {
-        // Redémarrage automatique si mobile timeout ou no-speech
-        if (isAutoRestarting.current || (isListening && !error)) {
+        // Essential: if we are supposed to be listening but the browser stopped us (e.g. Android timeout)
+        // we RECREATE the instance in the next startListening call
+        if (isAutoRestarting.current || (isListeningRef.current && !error)) {
+          console.log("[ONYX] Automatic restart triggered by onend");
           setTimeout(() => {
-            if (recognitionRef.current && isListening) {
-              try {
-                recognitionRef.current.start();
-              } catch (e) {
-                // Already started or failed
-              }
-            }
-          }, 200);
+            // Re-call startListening to get a FRESH instance
+            if (isListeningRef.current) startListening(isAutoRestarting.current, timeoutMs);
+          }, 300);
         } else {
-          setIsListening(false);
+          updateIsListening(false);
         }
       };
 
       isAutoRestarting.current = continuousMode;
       recognitionRef.current = recognition;
       
-      // On mobile, start() MUST be called directly in the touch start handler
-      // which Dashboard does (onClick calling startListening)
       recognition.start();
 
       if (timeoutMs) {
@@ -148,9 +147,9 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
     } catch (err) {
       console.error("Speech Recognition Start Failed:", err);
       setError("Échec démarrage micro");
-      setIsListening(false);
+      updateIsListening(false);
     }
-  }, [stopListening]);
+  }, [error]);
 
   useEffect(() => {
     return () => {

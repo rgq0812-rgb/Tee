@@ -1,50 +1,80 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Static imports for API handlers to ensure they are bundled by esbuild
+// Note: These imports will be resolved by esbuild during the build step
+import webhookHandler from './api/webhook';
+import syncHandler from './api/auth/sync';
+import checkoutHandler from './api/create-checkout-session';
+import spotifyUrlHandler from './api/auth/spotify/url';
+import spotifyCallbackHandler from './api/auth/spotify/callback';
+import youtubeUrlHandler from './api/auth/youtube/url';
+import youtubeCallbackHandler from './api/auth/youtube/callback';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Helper to wrap dynamic Vercel handlers for Express
-  const wrap = (pathStr: string) => async (req: any, res: any) => {
+  // Resolve dist path
+  const distPath = path.join(process.cwd(), 'dist');
+
+  // Health check for deployment monitoring
+  app.get('/api/health', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      mode: process.env.NODE_ENV,
+      port: PORT,
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Webhook handler - IMPORTANT: Must be defined BEFORE express.json()
+  // as it needs to consume the raw request stream for Stripe signature verification.
+  app.post('/api/webhook', async (req: any, res: any) => {
     try {
-      const module = await import(pathStr);
-      const handler = module.default;
-      if (!handler) throw new Error(`Handler not found at ${pathStr}`);
+      // The handler in api/webhook.ts uses its own buffer logic to read req stream
+      await webhookHandler(req, res);
+    } catch (err: any) {
+      console.error('Webhook Error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    }
+  });
+
+  // JSON Body Parser for other routes
+  app.use(express.json());
+
+  // Helper for API routes to handle errors consistently
+  const handle = (handler: any) => async (req: any, res: any) => {
+    try {
       await handler(req, res);
     } catch (err: any) {
-      console.error(`Handler Error [${pathStr}]:`, err);
+      console.error('API Error:', err);
       if (!res.headersSent) {
-        res.status(500).json({ error: err.message || 'Internal Server Error' });
+        res.status(500).json({ error: 'Internal Server Error' });
       }
     }
   };
 
-  // Webhook FIRST without express.json()
-  app.post('/api/webhook', wrap('./api/webhook.ts'));
-
-  app.use(express.json());
-
-  // Essential API Routes (Non-AI)
-  app.post('/api/auth/sync', wrap('./api/auth/sync.ts'));
-  app.post('/api/create-checkout-session', wrap('./api/create-checkout-session.ts'));
-  app.get('/api/auth/spotify/url', wrap('./api/auth/spotify/url.ts'));
-  app.get('/api/auth/spotify/callback', wrap('./api/auth/spotify/callback.ts'));
-  app.get('/api/auth/youtube/url', wrap('./api/auth/youtube/url.ts'));
-  app.get('/api/auth/youtube/callback', wrap('./api/auth/youtube/callback.ts'));
+  // API Routes
+  app.all('/api/auth/sync', handle(syncHandler));
+  app.all('/api/create-checkout-session', handle(checkoutHandler));
+  app.all('/api/auth/spotify/url', handle(spotifyUrlHandler));
+  app.all('/api/auth/spotify/callback', handle(spotifyCallbackHandler));
+  app.all('/api/auth/youtube/url', handle(youtubeUrlHandler));
+  app.all('/api/auth/youtube/callback', handle(youtubeCallbackHandler));
   
-  // Custom rewrites from vercel.json
-  app.get('/auth/spotify/callback', wrap('./api/auth/spotify/callback.ts'));
-  app.get('/auth/youtube/callback', wrap('./api/auth/youtube/callback.ts'));
+  // SEO/Legacy rewrites for OAuth callbacks
+  app.get('/auth/spotify/callback', handle(spotifyCallbackHandler));
+  app.get('/auth/youtube/callback', handle(youtubeCallbackHandler));
 
-  // Vite middleware for development
+  // Mode-specific configuration
   if (process.env.NODE_ENV !== 'production') {
+    // Development mode with Vite middleware
     const vite = await createViteServer({
       server: { 
         middlewareMode: true,
@@ -54,16 +84,27 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
+    // Production mode serving static assets from dist/
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
+    // SPA fallback: send index.html for any unknown routes
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
+  // Bind to 0.0.0.0 for container accessibility
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running at http://localhost:${PORT}`);
   });
 }
 
-startServer();
+// Global error handling for unhandled rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});

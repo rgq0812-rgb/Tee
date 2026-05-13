@@ -21,8 +21,8 @@ import AdamMentorModal from './components/AdamMentorModal';
 import LieScanner from './components/LieScanner';
 import { BookOpen, Sparkles, Brain, X, Clock } from 'lucide-react';
 import { AcademyDrill } from './data/academyDrills';
-import { speakWithBrowser } from './services/geminiService';
-import { playWhistle, playSoftBell } from './lib/audioUtils';
+import { speakWithBrowser, generateSpeech, getCoachingIntervention } from './services/geminiService';
+import { playWhistle, playSoftBell, playRawPcm } from './lib/audioUtils';
 
 import { AppPath, HoleScore, Club } from './types';
 import { INITIAL_CLUBS, COURSES, CHALLENGES, CADDIES } from './constants';
@@ -55,6 +55,63 @@ function AppContent() {
   const [sessionTimeLeft, setSessionTimeLeft] = useState<number>(0);
   const [isSessionRunning, setIsSessionRunning] = useState(false);
   const [showTimeUp, setShowTimeUp] = useState(false);
+  const coachingMilestonesRef = useRef<Set<number>>(new Set());
+
+  // Mentor/Coaching state
+  const [showMentorModal, setShowMentorModal] = useState(false);
+  const [mentorInitialMessage, setMentorInitialMessage] = useState<string | undefined>(undefined);
+  const [mentorTacticalMode, setMentorTacticalMode] = useState<'PARCOURS' | 'STRATÉGIE' | 'ENTRAÎNEMENT' | undefined>(undefined);
+
+  // Coaching Interventions logic
+  const speakTactical = useCallback(async (text: string) => {
+    try {
+      const audioData = await generateSpeech(text, { id: 'strat' }); // Use Adam's tactical voice
+      if (typeof audioData === 'string') {
+        await playRawPcm(audioData);
+      } else {
+        speakWithBrowser(text);
+      }
+    } catch (e) {
+      console.error("[ONYX] Coaching Speech Error:", e);
+      speakWithBrowser(text);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isSessionRunning || !activeSession) {
+      coachingMilestonesRef.current.clear();
+      return;
+    }
+
+    const elapsedSeconds = activeSession.duration - sessionTimeLeft;
+    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+
+    // Trigger every 5 minutes
+    const interval = activeSession.category === 'WARMUP' ? 1 : 5;
+    
+    if (elapsedMinutes > 0 && elapsedMinutes % interval === 0 && !coachingMilestonesRef.current.has(elapsedMinutes)) {
+      coachingMilestonesRef.current.add(elapsedMinutes);
+      
+      const triggerIntervention = async () => {
+        const commMode = (localStorage.getItem('onyx_chat_mode') as any) || 'pro';
+        const isWarmup = activeSession.category === 'WARMUP';
+        const message = await getCoachingIntervention(elapsedMinutes, activeSession.title, commMode, isWarmup);
+        
+        if (message) {
+          setMentorTacticalMode('ENTRAÎNEMENT');
+          setMentorInitialMessage(message);
+          setShowMentorModal(true);
+          
+          // Dispatch event for existing chat session if already open
+          window.dispatchEvent(new CustomEvent('onyx_inject_message', { 
+            detail: { text: message, speaker: 'ONYX' } 
+          }));
+        }
+      };
+
+      triggerIntervention();
+    }
+  }, [sessionTimeLeft, isSessionRunning, activeSession, setShowMentorModal, setMentorInitialMessage]);
 
   useEffect(() => {
     let interval: any;
@@ -188,6 +245,17 @@ function AppContent() {
       sessionStorage.removeItem('end_round_briefing_triggered');
     }
   }, [scorecard, currentHole]);
+  
+  useEffect(() => {
+    const handleShowScorecard = () => {
+      setActiveTab('scorecard');
+      setShowMentorModal(false);
+      setMentorInitialMessage(undefined);
+      setMentorTacticalMode(undefined);
+    };
+    window.addEventListener('onyx_show_scorecard', handleShowScorecard);
+    return () => window.removeEventListener('onyx_show_scorecard', handleShowScorecard);
+  }, []);
 
   const [advice, setAdvice] = useState<string | null>(null);
   const adviceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -204,8 +272,6 @@ function AppContent() {
     };
   }, [advice]);
 
-  const [showMentorModal, setShowMentorModal] = useState(false);
-  const [mentorInitialMessage, setMentorInitialMessage] = useState<string | undefined>(undefined);
   const [showLieScanner, setShowLieScanner] = useState(false);
 
   const updateScore = useCallback((holeNum: number, strokes: number, putts?: number) => {
@@ -476,12 +542,14 @@ function AppContent() {
         onClose={() => {
           setShowMentorModal(false);
           setMentorInitialMessage(undefined);
+          setMentorTacticalMode(undefined);
         }} 
         selectedCourse={selectedCourse}
         currentHole={currentHole}
         scorecard={scorecard}
         arsenal={arsenal}
         initialMessage={mentorInitialMessage}
+        initialTacticalMode={mentorTacticalMode}
         handicap={handicap}
         playerForm={playerForm}
         onUpdateScore={updateScore}

@@ -202,7 +202,6 @@ export default function Dashboard({
   }, [user]);
 
   const navigateHole = useCallback((direction: 'next' | 'prev') => {
-    if (playPing) playPing(direction === 'next' ? 880 : 440, 'sine', 0.05);
     if (direction === 'next' && currentHole < 18) {
       setCurrentHole(currentHole + 1);
     }
@@ -242,6 +241,95 @@ export default function Dashboard({
       setIsSpeaking(false);
     }
   }, [isSpeaking, lastSpeechData]);
+
+   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+   const isProcessingRef = useRef(false);
+ 
+   const generateAdviceRef = useRef<any>(null);
+ 
+   // Voice Command Handler
+   const { isListening, startListening, stopListening, error: voiceError } = useVoiceInput((text, isFinal) => {
+     setLastTranscript(text);
+ 
+     if (silenceTimerRef.current) {
+       clearTimeout(silenceTimerRef.current);
+       silenceTimerRef.current = null;
+     }
+ 
+    const processCommand = (finalText: string) => {
+       const transcript = finalText.toLowerCase().trim();
+       if (!transcript || transcript.length < 2 || isProcessingRef.current) return;
+       isProcessingRef.current = true;
+       
+       console.log("[ONYX] Commande vocale traitée:", transcript);
+      
+      if (transcript.includes('suivant') || transcript.includes('prochain')) {
+        if (currentHole < 18) {
+          navigateHole('next');
+          generateAdviceRef.current?.("Passage au trou suivant. Analyse la ligne de jeu immédiatement.");
+        }
+      } else if (transcript.includes('paysage') || transcript.includes('alentour') || transcript.includes('regarde')) {
+        generateAdviceRef.current?.("Décris-moi le paysage, la lumière et les dangers avec ton œil de pro complicit.");
+      } else if (transcript.includes('anecdote') || transcript.includes('histoire') || transcript.includes('raconte')) {
+        generateAdviceRef.current?.("Raconte-moi une anecdote historique sur le golf ou ce parcours pour détendre l'atmosphère.");
+      } else if (transcript.includes('répète') || transcript.includes('encore') || transcript.includes('quoi')) {
+        repeatLastAdvice();
+      } else if (transcript.includes('parfait') || transcript.includes('génial') || transcript.includes('top')) {
+        generateAdviceRef.current?.("Le dernier coup était parfait ! Rebondis sur ma réussite.");
+      } else if (transcript.includes('raté') || transcript.includes('nul') || transcript.includes('merde')) {
+        generateAdviceRef.current?.("J'ai raté mon coup. Sois mon mentor et analyse l'erreur possible.");
+      } else if (transcript.includes('score') || transcript.includes('combien')) {
+        generateAdviceRef.current?.("Fais un point sur mon score actuel et donne-moi ton ressenti de mentor.");
+      } else {
+        // Enregistrement rapide du score via mot-clé
+        const scoreKeywords: Record<string, number> = {
+          'albatros': -3, 'eagle': -2, 'birdie': -1, 'par': 0, 'bogey': 1, 'double': 2, 'triple': 3, 'quadruple': 4
+        };
+        
+        let foundScore = null;
+        for (const [kw, offset] of Object.entries(scoreKeywords)) {
+          if (transcript.includes(kw)) {
+            const holePar = selectedCourse.holes[currentHole - 1]?.par || 4;
+            foundScore = holePar + offset;
+            break;
+          }
+        }
+
+        // Détection de score numérique type "score de 5" ou "5 coups"
+        if (foundScore === null) {
+          const scoreMatch = transcript.match(/(?:score de|noter|marque|fait)\s*(\d+)/i) || transcript.match(/(\d+)\s*(?:coups|frappes)/i);
+          if (scoreMatch) {
+            foundScore = parseInt(scoreMatch[1]);
+          }
+        }
+        
+        if (foundScore !== null && onUpdateScore) {
+          onUpdateScore(currentHole, foundScore, 2); // 2 putts d'office comme demandé
+          if (currentHole === 9) {
+            generateAdviceRef.current?.("J'ai fini le trou 9. Fais-moi mon briefing de mi-parcours automatique maintenant avec ton analyse mentor.");
+          } else {
+            generateAdviceRef.current?.(`Entendu. Score enregistré sur le ${currentHole}. 2 putts d'office. On passe au suivant.`);
+          }
+        } else if (transcript.length > 5) {
+          // AI Chat if no command match and long enough
+          generateAdviceRef.current?.(transcript);
+        }
+      }
+      
+      stopListening();
+      isProcessingRef.current = false;
+    };
+
+    if (isFinal) {
+      if (text.trim().length > 3) {
+        processCommand(text);
+      }
+    } else if (text.trim().length > 3) {
+      silenceTimerRef.current = setTimeout(() => {
+        processCommand(text);
+      }, 3500); 
+    }
+  });
 
   const generateAdvice = useCallback(async (textOverride?: string) => {
     if (isSpeaking) return;
@@ -289,104 +377,49 @@ export default function Dashboard({
       }
       
       const isMutedLocal = localStorage.getItem('onyx_voice') === 'false';
+      
+      const finishSpeech = () => {
+        setIsSpeaking(false);
+        
+        // Auto-switch to scorecard if it's a mid-round or final summary
+        const lowerAdvice = message.toLowerCase();
+        if ((lowerAdvice.includes('bilan') || lowerAdvice.includes('score')) && (currentHole === 9 || currentHole === 18)) {
+          if (setActiveTab) setActiveTab('scorecard');
+        }
+
+        // Automatically restart mic after advice finishes if in voice mode
+        setTimeout(() => {
+          if (!isSpeaking && !isListening) {
+             startListening(false, 30000);
+          }
+        }, 800); // Slightly longer delay to ensure audio subsystem is ready
+      };
+
       if (!isMutedLocal) {
         const result = await generateSpeech(message, activeCaddie);
         setLastSpeechData(result);
         if (typeof result === 'object' && result.fallback) {
-          speakWithBrowser(result.text, () => setIsSpeaking(false));
+          speakWithBrowser(result.text, finishSpeech);
         } else if (typeof result === 'string') {
           const source = await playRawPcm(result);
           if (source) {
-            source.onended = () => setIsSpeaking(false);
+            source.onended = finishSpeech;
           } else {
-            setIsSpeaking(false);
+            finishSpeech();
           }
         } else {
-          setIsSpeaking(false);
+          finishSpeech();
         }
       } else {
-        setIsSpeaking(false);
+        finishSpeech();
       }
     } catch (err) {
       console.error(err);
       setIsSpeaking(false);
     }
-  }, [isSpeaking, playWind, currentHole, selectedCourse, distance, wind, arsenal, playerForm, handicap, activeCaddie, setAdvice, tacticalHistory, selectedMode, scorecard, user]);
+  }, [isSpeaking, isListening, startListening, playWind, currentHole, selectedCourse, distance, wind, arsenal, playerForm, handicap, activeCaddie, setAdvice, tacticalHistory, selectedMode, scorecard, user]);
 
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Voice Command Handler
-  const { isListening, startListening, stopListening, error: voiceError } = useVoiceInput((text, isFinal) => {
-    setLastTranscript(text);
-
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-
-    const processCommand = (finalText: string) => {
-      const transcript = finalText.toLowerCase();
-      console.log("[ONYX] Commande vocale traitée:", transcript);
-      
-      if (transcript.includes('suivant') || transcript.includes('prochain')) {
-        if (currentHole < 18) {
-          navigateHole('next');
-          generateAdvice("Passage au trou suivant. Analyse la ligne de jeu immédiatement.");
-        }
-      } else if (transcript.includes('paysage') || transcript.includes('alentour') || transcript.includes('regarde')) {
-        generateAdvice("Décris-moi le paysage, la lumière et les dangers avec ton œil de pro complicit.");
-      } else if (transcript.includes('anecdote') || transcript.includes('histoire') || transcript.includes('raconte')) {
-        generateAdvice("Raconte-moi une anecdote historique sur le golf ou ce parcours pour détendre l'atmosphère.");
-      } else if (transcript.includes('répète') || transcript.includes('encore') || transcript.includes('quoi')) {
-        repeatLastAdvice();
-      } else if (transcript.includes('parfait') || transcript.includes('génial') || transcript.includes('top')) {
-        generateAdvice("Le dernier coup était parfait ! Rebondis sur ma réussite.");
-      } else if (transcript.includes('raté') || transcript.includes('nul') || transcript.includes('merde')) {
-        generateAdvice("J'ai raté mon coup. Sois mon mentor et analyse l'erreur possible.");
-      } else if (transcript.includes('score') || transcript.includes('combien')) {
-        generateAdvice("Fais un point sur mon score actuel et donne-moi ton ressenti de mentor.");
-      } else {
-        // Enregistrement rapide du score via mot-clé
-        const words = transcript.split(' ');
-        const scoreKeywords: Record<string, number> = {
-          'albatros': -3, 'eagle': -2, 'birdie': -1, 'par': 0, 'bogey': 1, 'double': 2, 'triple': 3, 'quadruple': 4
-        };
-        
-        let foundScore = null;
-        for (const [kw, offset] of Object.entries(scoreKeywords)) {
-          if (transcript.includes(kw)) {
-            const holePar = selectedCourse.holes[currentHole - 1]?.par || 4;
-            foundScore = holePar + offset;
-            break;
-          }
-        }
-
-        // Détection de score numérique type "score de 5" ou "5 coups"
-        if (foundScore === null) {
-          const scoreMatch = transcript.match(/(?:score de|noter|marque|fait)\s*(\d+)/i) || transcript.match(/(\d+)\s*(?:coups|frappes)/i);
-          if (scoreMatch) {
-            foundScore = parseInt(scoreMatch[1]);
-          }
-        }
-        
-        if (foundScore !== null && onUpdateScore) {
-          onUpdateScore(currentHole, foundScore, 2); // 2 putts d'office comme demandé
-          if (currentHole === 9) {
-            generateAdvice("J'ai fini le trou 9. Fais-moi mon briefing de mi-parcours automatique maintenant avec ton analyse mentor.");
-          } else {
-            generateAdvice(`Entendu. Score enregistré sur le ${currentHole}. 2 putts d'office. On passe au suivant.`);
-          }
-        } else if (transcript.trim().length > 3) {
-          generateAdvice(transcript);
-        }
-      }
-      
-      stopListening();
-    };
-
-    if (text.trim().length > 3) {
-      silenceTimerRef.current = setTimeout(() => {
-        processCommand(text);
-      }, 2500); 
-    }
-  });
+  generateAdviceRef.current = generateAdvice;
 
   const [lastTranscript, setLastTranscript] = useState("");
   useEffect(() => {
@@ -397,15 +430,13 @@ export default function Dashboard({
 
   const handleMicTrigger = () => {
     if (isSpeaking) {
-      // If Adam is talking, we can't listen or we stop him?
-      // For now, ignore if speaking to avoid feedback loops
       return;
     }
     
     if (isListening) {
       stopListening();
     } else {
-      if (playPing) playPing(1200, 'sine', 0.05);
+      setLastTranscript("");
       // Increased sensitivity/timeout for golf context
       startListening(false, 45000); 
     }
@@ -418,7 +449,7 @@ export default function Dashboard({
       const inPosition = Math.abs(e.beta || 0) > 75 && Math.abs(e.gamma || 0) < 35;
       
       if (inPosition && !isEarPosition && !isSpeaking && !isListening) {
-        if (window.navigator.vibrate) window.navigator.vibrate([40, 20, 40]);
+        if (window.navigator?.vibrate) window.navigator.vibrate([40, 20, 40]);
         handleMicTrigger();
       }
       setIsEarPosition(inPosition);
@@ -435,29 +466,18 @@ export default function Dashboard({
       }
     };
 
-    const requestPermission = async () => {
-      // @ts-ignore - iOS specific permission request
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          // @ts-ignore
-          const response = await DeviceOrientationEvent.requestPermission();
-          if (response === 'granted') {
-            window.addEventListener('deviceorientation', handleOrientation);
-          }
-        } catch (e) {
-          console.error("Orientation permission denied:", e);
-        }
-      } else {
-        window.addEventListener('deviceorientation', handleOrientation);
-      }
-    };
-
-    requestPermission();
+    window.addEventListener('deviceorientation', handleOrientation);
     window.addEventListener('keydown', handleKeyDown);
+
+    const handleShowScorecard = () => {
+      if (setActiveTab) setActiveTab('scorecard');
+    };
+    window.addEventListener('onyx_show_scorecard', handleShowScorecard);
 
     return () => {
       window.removeEventListener('deviceorientation', handleOrientation);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('onyx_show_scorecard', handleShowScorecard);
     };
   }, [isSpeaking, isEarPosition, generateAdvice]);
 
@@ -474,6 +494,20 @@ export default function Dashboard({
       if (AudioContextClass) {
         const ctx = new AudioContextClass();
         ctx.resume();
+      }
+
+      // iOS Device Orientation Permission (Must be triggered by user interaction)
+      // @ts-ignore
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          // @ts-ignore
+          const response = await DeviceOrientationEvent.requestPermission();
+          if (response === 'granted') {
+            console.log("[ONYX] Orientation permission granted via interaction");
+          }
+        } catch (e) {
+          console.error("[ONYX] Orientation permission denied:", e);
+        }
       }
 
       // Voice confirmation of connection
