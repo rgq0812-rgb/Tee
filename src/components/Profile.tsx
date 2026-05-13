@@ -104,7 +104,9 @@ export default function Profile({
   useEffect(() => {
     const handleStorage = () => setUnits(localStorage.getItem('onyx_units') || 'meters');
     window.addEventListener('storage', handleStorage);
-    const interval = setInterval(handleStorage, 2000);
+    const interval = setInterval(() => {
+      setUnits(localStorage.getItem('onyx_units') || 'meters');
+    }, 2000);
     return () => {
       window.removeEventListener('storage', handleStorage);
       clearInterval(interval);

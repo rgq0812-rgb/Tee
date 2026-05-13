@@ -89,8 +89,8 @@ export default function Dashboard({
     const interval = setInterval(() => {
        const savedUnits = localStorage.getItem('onyx_units') || 'meters';
        const savedMuted = localStorage.getItem('onyx_voice') === 'false';
-       if (savedUnits !== units) setUnits(savedUnits);
-       if (savedMuted !== isMuted) setIsMuted(savedMuted);
+       setUnits(savedUnits);
+       setIsMuted(savedMuted);
     }, 2000);
     return () => {
       window.removeEventListener('storage', handleStorage);
