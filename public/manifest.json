@@ -5,21 +5,21 @@
   "categories": ["productivity", "games", "utilities"],
   "icons": [
     {
-      "src": "https://tee-rcgw.vercel.app/icon-192.png",
-      "type": "image/jpeg",
-      "sizes": "1024x1024",
+      "src": "https://www.pwabuilder.com/assets/icons/icon_192.png",
+      "type": "image/png",
+      "sizes": "192x192",
       "purpose": "any"
     },
     {
-      "src": "https://tee-rcgw.vercel.app/icon-512.png",
-      "type": "image/jpeg",
-      "sizes": "1024x1024",
+      "src": "https://www.pwabuilder.com/assets/icons/icon_512.png",
+      "type": "image/png",
+      "sizes": "512x512",
       "purpose": "any"
     },
     {
-      "src": "https://tee-rcgw.vercel.app/icon-512.png",
-      "type": "image/jpeg",
-      "sizes": "1024x1024",
+      "src": "https://www.pwabuilder.com/assets/icons/icon_512.png",
+      "type": "image/png",
+      "sizes": "512x512",
       "purpose": "maskable"
     }
   ],
@@ -27,14 +27,14 @@
     {
       "src": "https://tee-rcgw.vercel.app/screenshot-mobile.png",
       "sizes": "1080x1920",
-      "type": "image/jpeg",
+      "type": "image/png",
       "form_factor": "narrow",
       "label": "Tactical Mobile Interface"
     },
     {
       "src": "https://tee-rcgw.vercel.app/screenshot-desktop.png",
       "sizes": "1920x1080",
-      "type": "image/jpeg",
+      "type": "image/png",
       "form_factor": "wide",
       "label": "Tactical Desktop Dashboard"
     }
