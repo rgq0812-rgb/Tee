@@ -494,6 +494,8 @@ function AppContent() {
       isOpen={showLieScanner} 
       onClose={() => setShowLieScanner(false)} 
       isMuted={localStorage.getItem('onyx_voice') === 'false'}
+      currentHole={currentHole}
+      courseId={selectedCourse.id}
     />
 
     {/* Persistent Timer Overlay (Floating, hidden if in Academy where it is pinned) */}

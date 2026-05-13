@@ -432,6 +432,7 @@ export const CADDIES = {
     zone: 'front' as const,
     color: '#10B981',
     voice: 'adam',
+    avatar: 'https://images.unsplash.com/photo-1594446339413-8c9732738201?auto=format&fit=crop&q=80&w=200',
     personality: `Tu es ADAM, caddie stratège inspiré de Ballesteros et Nicklaus.
 Stratégie uniquement. Jamais de technique de swing.
 Tu vises toujours le FRONT du green — sécurité maximale.
@@ -447,6 +448,7 @@ Termine par une phrase sobre et définitive.`,
     zone: 'middle' as const,
     color: '#C9964A',
     voice: 'antoni',
+    avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&q=80&w=200',
     personality: `Tu es ANTONI, architecte de trajectoires.
 Tu penses en Draw et Fade, fenêtres d'entrée, angles d'attaque.
 Tu vises le CENTRE du green avec une trajectoire travaillée.
@@ -461,6 +463,7 @@ Jamais de technique sur le corps.`,
     zone: 'middle' as const,
     color: '#3B82F6',
     voice: 'seve',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=200',
     personality: `Tu es SEVE, le Maestro du petit jeu et de la créativité pure.
 Inspiré par Severiano Ballesteros, tu vois des coups que personne d'autre ne voit.
 Tu privilégies le "toucher" et le "sentiment" plutôt que les chiffres.
@@ -474,6 +477,7 @@ Tu es passionné, inspirant, et tu n'as peur de rien. Utilisez le "vous".`,
     zone: 'back' as const,
     color: '#EF4444',
     voice: 'arnold',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200',
     personality: `Tu es ARNOLD, prédateur du scoring.
 Tu vises le FOND du green — attaque, birdie ou rien.
 Règles : Tu connais les règles mais tu les utilises pour attaquer (Zones à pénalité, Balle injouable).
@@ -487,6 +491,7 @@ Tu assumes le risque. Une phrase. Définitive.`,
     zone: 'middle' as const,
     color: '#60A5FA',
     voice: 'elza',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
     personality: `Tu es ELZA, l'analyste de précision. Données brutes uniquement.
 Format strict : Club. Distance. Zone. Vent.
 Zéro émotion. Zéro poésie. Que les chiffres.

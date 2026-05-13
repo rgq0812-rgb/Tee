@@ -1429,9 +1429,10 @@ export default function Academy({
               ))}
             </div>
 
-            <AnimatePresence>
+            <AnimatePresence mode="wait">
               {selectedTeacher && (
                 <motion.div
+                  key={`teacher-panel-${selectedTeacher}`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
@@ -1505,7 +1506,7 @@ export default function Academy({
 
                         <div className="flex flex-col gap-4 max-h-[400px] overflow-y-auto no-scrollbar pb-4">
                           {teacherChat.map((msg, idx) => (
-                            <div key={`teacher-msg-${idx}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div key={`teacher-msg-v2-${selectedTeacher}-${idx}-${msg.role}-${msg.content.substring(0, 10)}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                               <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
                                 msg.role === 'user' 
                                   ? (isSolar ? 'bg-black text-white shadow-xl' : 'bg-[#c9964a] text-black font-bold shadow-lg shadow-[#c9964a]/20') 
@@ -1516,12 +1517,12 @@ export default function Academy({
                             </div>
                           ))}
                           {isTeacherLoading && (
-                            <div className="flex justify-start">
+                            <div key={`teacher-loading-indicator-${selectedTeacher}`} className="flex justify-start">
                               <div className="bg-white/5 p-4 rounded-2xl flex items-center gap-4">
                                 <div className="flex gap-1">
                                   {[1, 2, 3, 4].map(i => (
                                     <motion.div
-                                      key={`teacher-loader-bar-${i}`}
+                                      key={`teacher-loader-bar-${selectedTeacher}-${i}`}
                                       animate={{ height: [8, 16, 8] }}
                                       transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
                                       className="w-1 bg-[#c9964a] rounded-full"
@@ -1564,7 +1565,7 @@ export default function Academy({
                                   <div className="flex items-end gap-0.5 h-3">
                                     {[1, 2, 3, 2, 1].map((h, i) => (
                                       <motion.div
-                                        key={`voice-bar-${i}`}
+                                        key={`voice-bar-${selectedTeacher}-${i}-${h}`}
                                         animate={{ height: [4, 12, 4] }}
                                         transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.1 }}
                                         className="w-0.5 bg-black rounded-full"
@@ -1605,7 +1606,7 @@ export default function Academy({
                                 { title: "Focus Visualisation", time: 300 },
                                 { title: "Drill de Connexion", time: 600 }
                               ].map((d, i) => (
-                                <div key={`teacher-drill-mini-${i}`} className="flex items-center justify-between p-3 rounded-xl bg-black/20 border border-white/5">
+                                <div key={`teacher-drill-mini-v2-${selectedTeacher}-${i}-${d.title.substring(0, 5)}`} className="flex items-center justify-between p-3 rounded-xl bg-black/20 border border-white/5">
                                   <div className="flex flex-col">
                                     <span className="text-[9px] font-black uppercase tracking-widest text-[#c9964a]">EXERCICE 0{i + 1}</span>
                                     <span className="text-[11px] font-bold">{d.title}</span>

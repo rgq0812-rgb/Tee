@@ -1,5 +1,5 @@
 {
-  "name": "THE CHOSE (ONYX V2)",
-  "description": "Tactical Performance Matrix for elite golfers. AI Caddie Mentorship, Swing Analysis, and Course Strategy by Onyx Squadron.",
+  "name": "THE CHOSE",
+  "description": "Tactical Intelligence & Strategy Hub - ONYX V2. A premium platform for strategic analysis, tactical dominance, and luxury technical intelligence.",
   "requestFramePermissions": ["geolocation", "microphone", "camera"]
 }

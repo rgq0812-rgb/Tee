@@ -39,7 +39,7 @@
       "label": "Tactical Desktop Dashboard"
     }
   ],
-  "start_url": "https://tee-rcgw.vercel.app/",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#c9964a",

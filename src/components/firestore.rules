@@ -113,10 +113,11 @@ service cloud.firestore {
                data.userId == request.auth.uid &&
                isValidId(data.courseId) &&
                data.holeNumber >= 1 && data.holeNumber <= 18 &&
-               data.imageData is string && data.imageData.size() <= 1048576 && // 1MB limit for Base64 (roughly)
-               data.updatedAt is string;
+               data.imageData is string && data.imageData.size() <= 1048576 && 
+               (data.updatedAt is string || data.updatedAt == request.time);
       }
       allow read: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create, update: if isVerified() && isValidId(assetId) && isValidHoleAsset(incoming());
       allow delete: if isOwner(resource.data.userId);
     }

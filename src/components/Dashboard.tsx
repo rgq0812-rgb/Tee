@@ -60,11 +60,15 @@ export default function Dashboard({
 
   const customHoleImages = useMemo(() => {
     const images: Record<string, string> = {};
-    assets.filter(a => a.id.startsWith(selectedCourse.id) || (a as any).userId === user?.uid).forEach(a => {
-      images[a.id] = a.imageData;
+    // assets is already filtered by userId and sorted newest-first in assetService
+    assets.forEach(a => {
+      const key = `${a.courseId}_${a.holeNumber}`;
+      if (!images[key]) {
+        images[key] = a.imageData;
+      }
     });
     return images;
-  }, [assets, selectedCourse.id, user?.uid]);
+  }, [assets]);
 
   const [wind, setWind] = useState({ speed: Math.floor(Math.random() * 25) + 5, direction: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.floor(Math.random() * 8)] });
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
@@ -524,6 +528,16 @@ export default function Dashboard({
       <div className={`relative z-20 p-6 pt-12 flex flex-col gap-4 border-b ${isSolar ? 'border-red-600 bg-white' : 'border-red-600 bg-black/90 backdrop-blur-xl'} transition-all`}>
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
+            {user && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setActiveTab('profile')}
+                className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${isSolar ? 'bg-zinc-50 border-zinc-950/10' : 'bg-white/5 border-white/10'}`}
+                title="Vault Tactique"
+              >
+                <ImageIcon size={22} className={isSolar ? 'text-zinc-950' : 'text-[#c9964a]'} />
+              </motion.button>
+            )}
             {!user ? (
               <motion.button
                 whileTap={{ scale: 0.95 }}
@@ -740,7 +754,7 @@ export default function Dashboard({
         {advice && (
           <div className="fixed bottom-32 left-6 right-6 z-[60]">
             <motion.div 
-              key={`advice-box-v3-${advice.length}-${advice.substring(0, 20)}`}
+              key={`advice-box-v4-${advice.length}-${advice.substring(0, 30)}-${Date.now()}`}
               initial={{ opacity: 0, y: 20, scale: 0.95 }} 
               animate={{ opacity: 1, y: 0, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.9, y: 10 }}
@@ -829,24 +843,33 @@ export default function Dashboard({
             </div>
 
             <div className="flex-1 px-6 space-y-8 overflow-y-auto pb-32">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <button 
                   onClick={() => { setShowCaddieSelector(false); setShowArsenalMenu(true); }}
-                  className={`border p-6 rounded-3xl flex flex-col gap-3 items-center hover:opacity-80 transition-all active:scale-95 group ${isSolar ? 'bg-zinc-100 border-zinc-200' : 'bg-white/5 border-white/10'}`}
+                  className={`border p-4 rounded-3xl flex flex-col gap-2 items-center hover:opacity-80 transition-all active:scale-95 group ${isSolar ? 'bg-zinc-100 border-zinc-200' : 'bg-white/5 border-white/10'}`}
                 >
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isSolar ? 'bg-black text-white border border-black shadow-md' : 'bg-orange-500/10 border border-orange-500/20 text-orange-500 group-hover:bg-orange-500 group-hover:text-black'}`}>
-                    <Zap size={24} />
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${isSolar ? 'bg-black text-white border border-black shadow-md' : 'bg-orange-500/10 border border-orange-500/20 text-orange-500 group-hover:bg-orange-500 group-hover:text-black'}`}>
+                    <Zap size={20} />
                   </div>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-white/60'}`}>ARSENAL</span>
+                  <span className={`text-[8px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-white/60'}`}>ARSENAL</span>
                 </button>
                 <button 
                   onClick={() => { setShowCaddieSelector(false); setShowModeSelector(true); }}
-                  className={`border p-6 rounded-3xl flex flex-col gap-3 items-center hover:opacity-80 transition-all active:scale-95 group ${isSolar ? 'bg-zinc-100 border-zinc-200' : 'bg-white/5 border-white/10'}`}
+                  className={`border p-4 rounded-3xl flex flex-col gap-2 items-center hover:opacity-80 transition-all active:scale-95 group ${isSolar ? 'bg-zinc-100 border-zinc-200' : 'bg-white/5 border-white/10'}`}
                 >
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isSolar ? 'bg-black text-white border border-black shadow-md' : 'bg-sky-500/10 border border-sky-500/20 text-sky-400 group-hover:bg-sky-500 group-hover:text-black'}`}>
-                    <Navigation size={24} />
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${isSolar ? 'bg-black text-white border border-black shadow-md' : 'bg-sky-500/10 border border-sky-500/20 text-sky-400 group-hover:bg-sky-500 group-hover:text-black'}`}>
+                    <Navigation size={20} />
                   </div>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-white/60'}`}>MODE JEU</span>
+                  <span className={`text-[8px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-white/60'}`}>MODE JEU</span>
+                </button>
+                <button 
+                  onClick={() => { setShowCaddieSelector(false); setActiveTab('profile'); }}
+                  className={`border p-4 rounded-3xl flex flex-col gap-2 items-center hover:opacity-80 transition-all active:scale-95 group ${isSolar ? 'bg-zinc-100 border-zinc-200' : 'bg-white/5 border-white/10'}`}
+                >
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${isSolar ? 'bg-black text-white border border-black shadow-md' : 'bg-[#c9964a]/10 border border-[#c9964a]/20 text-[#c9964a] group-hover:bg-[#c9964a] group-hover:text-black'}`}>
+                    <ImageIcon size={20} />
+                  </div>
+                  <span className={`text-[8px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-white/60'}`}>VAULT</span>
                 </button>
               </div>
 
@@ -864,8 +887,8 @@ export default function Dashboard({
                       activeCaddie.id === c.id ? (isSolar ? 'bg-white border-black border-2 shadow-xl' : 'bg-[#c9964a]/10 border-[#c9964a]') : (isSolar ? 'bg-zinc-50 border-zinc-200' : 'bg-white/5 border-white/10 grayscale opacity-40')
                     }`}
                   >
-                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${activeCaddie.id === c.id ? (isSolar ? 'bg-black text-white shadow-lg' : 'bg-[#c9964a] text-black shadow-[0_0_15px_rgba(201,150,74,0.4)]') : 'bg-white/5 text-white/20'}`}>
-                      <Brain size={24} />
+                     <div className={`w-14 h-14 rounded-2xl overflow-hidden border-2 transition-all shadow-xl ${activeCaddie.id === c.id ? (isSolar ? 'border-black' : 'border-[#c9964a]') : 'border-white/10 opacity-40'}`}>
+                        <img src={c.avatar} alt={c.name} className="w-full h-full object-cover" />
                      </div>
                      <div className="flex-1">
                         <h4 className={`text-lg font-black italic tracking-tighter uppercase leading-none mb-1 ${isSolar ? 'text-black' : 'text-white'}`}>{c.name} {activeCaddie.id === c.id && <span className="text-[10px] text-emerald-500 ml-1">●</span>}</h4>

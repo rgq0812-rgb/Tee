@@ -1,13 +1,14 @@
-import { collection, onSnapshot, query, FirestoreError, deleteDoc, doc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, FirestoreError, deleteDoc, doc, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './firebase';
 
 export interface HoleAsset {
   id: string;
   holeNumber: number;
   imageData: string;
-  updatedAt: string;
+  updatedAt: any;
   courseId: string;
   userId: string;
+  type?: 'lie' | 'green' | 'draw' | 'scan';
 }
 
 type AssetCallback = (assets: HoleAsset[]) => void;
@@ -36,16 +37,21 @@ class AssetService {
 
     if (!this.unsubscribe && !this.isInitializing && !this.quotaExceeded) {
        // Wait for auth before init
-       if (auth.currentUser) {
-         this.init();
-       } else {
-         const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-           if (user && !this.unsubscribe && !this.isInitializing) {
+       const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+         if (user) {
+           if (!this.unsubscribe && !this.isInitializing) {
              this.init();
-             unsubscribeAuth();
            }
-         });
-       }
+         } else {
+           // User logged out, clean up
+           if (this.unsubscribe) {
+             this.unsubscribe();
+             this.unsubscribe = null;
+             this.assets = [];
+             this.listeners.forEach(cb => cb([]));
+           }
+         }
+       });
     }
 
     return () => {
@@ -59,22 +65,32 @@ class AssetService {
     this.isInitializing = true;
     
     // CRITICAL: Filter by userId to save quota and respect privacy
+    // Order by updatedAt to ensure latest assets are prioritized
     const q = query(
       collection(db, 'hole_assets'), 
       where('userId', '==', auth.currentUser.uid)
     );
     
     this.unsubscribe = onSnapshot(q, (snapshot) => {
-      this.assets = snapshot.docs.map(doc => ({
+      // ... same processing ...
+      const rawAssets = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as HoleAsset[];
+
+      this.assets = rawAssets.sort((a, b) => {
+        const timeA = a.updatedAt?.seconds || (typeof a.updatedAt === 'string' ? new Date(a.updatedAt).getTime() / 1000 : 0);
+        const timeB = b.updatedAt?.seconds || (typeof b.updatedAt === 'string' ? new Date(b.updatedAt).getTime() / 1000 : 0);
+        return timeB - timeA;
+      });
       
       this.listeners.forEach(cb => cb(this.assets));
       this.isInitializing = false;
       this.quotaExceeded = false;
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'hole_assets');
+      if (auth.currentUser) {
+        handleFirestoreError(error, OperationType.LIST, 'hole_assets');
+      }
       if (error.message?.includes('quota') || (error as any).code === 'resource-exhausted') {
         this.quotaExceeded = true;
       }
@@ -86,6 +102,22 @@ class AssetService {
         this.unsubscribe = null;
       }
     });
+  }
+
+  async saveAsset(asset: Omit<HoleAsset, 'id' | 'updatedAt' | 'userId'>) {
+    if (!auth.currentUser) throw new Error("Authentication required");
+    
+    try {
+      const docRef = await addDoc(collection(db, 'hole_assets'), {
+        ...asset,
+        userId: auth.currentUser.uid,
+        updatedAt: serverTimestamp()
+      });
+      return docRef.id;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'hole_assets');
+      throw error;
+    }
   }
 
   async deleteAsset(assetId: string) {

@@ -10,11 +10,13 @@ interface LieScannerProps {
   isOpen: boolean;
   onClose: () => void;
   isMuted: boolean;
+  currentHole?: number;
+  courseId?: string;
 }
 
 type ScanMode = 'LIE' | 'GREEN';
 
-export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps) {
+export default function LieScanner({ isOpen, onClose, isMuted, currentHole = 1, courseId = 'default' }: LieScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -23,6 +25,8 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [scanMode, setScanMode] = useState<ScanMode>('LIE');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingProgress, setRecordingProgress] = useState(0);
@@ -137,6 +141,7 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
     setAnalyzing(true);
     setResult(null);
     setError(null);
+    setIsSaved(false);
     try {
       let data;
       let textToSpeak = "";
@@ -167,11 +172,32 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
     }
   };
 
+  const handleSaveToVault = async () => {
+    if (!capturedImage || isSaving || isSaved) return;
+    setIsSaving(true);
+    try {
+      const { assetService } = await import('../services/assetService');
+      await assetService.saveAsset({
+        holeNumber: currentHole,
+        courseId: courseId,
+        imageData: capturedImage,
+        type: 'scan'
+      });
+      setIsSaved(true);
+    } catch (err) {
+      console.error("Save error:", err);
+      setError("Erreur lors de la sauvegarde.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const reset = () => {
     setCapturedImage(null);
     setResult(null);
     setError(null);
     setIsRecording(false);
+    setIsSaved(false);
     setRecordingProgress(0);
     startCamera();
   };
@@ -489,12 +515,26 @@ export default function LieScanner({ isOpen, onClose, isMuted }: LieScannerProps
                     )}
 
                     <div className="flex flex-col gap-3 mt-4">
-                       <button 
-                        onClick={onClose}
-                        className="w-full py-5 bg-white text-black font-black uppercase text-xs rounded-2xl hover:bg-[#c9964a] transition-all flex items-center justify-center gap-2 group shadow-[0_10px_30px_rgba(255,255,255,0.1)]"
-                       >
-                         Calculer l'Alignement <CheckCircle2 size={16} />
-                       </button>
+                       <div className="flex gap-2">
+                        <button 
+                          onClick={onClose}
+                          className="flex-1 py-5 bg-white text-black font-black uppercase text-[10px] rounded-2xl hover:bg-[#c9964a] transition-all flex items-center justify-center gap-2 group shadow-[0_10px_30px_rgba(255,255,255,0.1)]"
+                        >
+                          Terminer <CheckCircle2 size={16} />
+                        </button>
+                        <button 
+                          onClick={handleSaveToVault}
+                          disabled={isSaving || isSaved}
+                          className={`flex-1 py-5 font-black uppercase text-[10px] rounded-2xl transition-all flex items-center justify-center gap-2 ${
+                            isSaved 
+                              ? 'bg-emerald-600 text-white' 
+                              : 'bg-[#c9964a]/20 border border-[#c9964a]/40 text-[#c9964a] hover:bg-[#c9964a] hover:text-black'
+                          } disabled:opacity-70`}
+                        >
+                          {isSaving ? <Loader2 size={16} className="animate-spin" /> : isSaved ? <Shield size={16} /> : <Sparkles size={16} />}
+                          {isSaved ? 'Dans le Vault' : 'Sauver Vault'}
+                        </button>
+                       </div>
                        <button 
                         onClick={reset}
                         className="w-full py-4 bg-white/5 hover:bg-white/10 text-white/60 font-black uppercase text-[10px] rounded-2xl transition-all border border-white/10 flex items-center justify-center gap-2"

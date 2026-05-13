@@ -130,7 +130,7 @@ export default function Profile({
     const reader = new FileReader();
     reader.onload = async (event) => {
       const base64 = event.target?.result as string;
-      const assetId = `${selectedCourse.id}_${holeToUpload}`;
+      const assetId = `${user.uid}_${selectedCourse.id}_${holeToUpload}`;
       
       try {
         await setDoc(doc(db, 'hole_assets', assetId), {
@@ -192,7 +192,7 @@ export default function Profile({
   const [showArsenalMenu, setShowArsenalMenu] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     profiles: true,
-    vault: false,
+    vault: true,
     history: false,
     rounds: false,
     academy: false,
@@ -446,8 +446,8 @@ export default function Profile({
                               >
                                 <p className={`text-[10px] font-black uppercase tracking-widest ${isSolar ? 'text-zinc-400' : 'text-white/20'}`}>Conseils par Trou (Mémoire)</p>
                                 <div className="grid grid-cols-1 gap-2">
-                                  {Object.entries(p.holeAdvice || {}).map(([hole, advice]) => (
-                                    <div key={`hole-advice-v2-${p.id}-${hole}`} className={`flex gap-3 p-3 rounded-xl border ${isSolar ? 'bg-white border-zinc-100' : 'bg-white/5 border-white/5'}`}>
+                                  {Object.entries(p.holeAdvice || {}).map(([hole, advice], hidx) => (
+                                    <div key={`hole-advice-v3-${p.id}-${hole}-${hidx}`} className={`flex gap-3 p-3 rounded-xl border ${isSolar ? 'bg-white border-zinc-100' : 'bg-white/5 border-white/5'}`}>
                                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 font-black italic border ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black border-black shadow-sm'}`}>
                                         T{hole}
                                       </div>
@@ -522,7 +522,7 @@ export default function Profile({
                          onClick={() => setSelectedAsset(asset)}
                          className={`relative aspect-square rounded-xl overflow-hidden border group ${isSolar ? 'border-zinc-200' : 'border-white/5'}`}
                        >
-                         <img src={asset.imageData} alt="Tactical plan" className={`w-full h-full object-cover transition-opacity ${isSolar ? 'opacity-90' : 'opacity-60 group-hover:opacity-100'}`} />
+                         <img src={asset.imageData} alt="Tactical plan" className={`w-full h-full object-cover transition-opacity ${isSolar ? 'opacity-90' : 'opacity-85 group-hover:opacity-100'}`} />
                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                          <div className="absolute bottom-2 left-2 text-[10px] font-black italic text-white leading-none">
                            T{asset.holeNumber}
@@ -567,7 +567,7 @@ export default function Profile({
                      <div className="p-6 flex justify-center"><Loader2 className="animate-spin text-white/20" /></div>
                   ) : advices.length > 0 ? (
                     advices.map((adv, idx) => (
-                      <div key={`profile-advice-v2-${adv.id}-${idx}`} className="p-4 space-y-2 group">
+                      <div key={`profile-advice-v3-${adv.id}-${idx}-${adv.createdAt?.seconds || idx}`} className="p-4 space-y-2 group">
                         <div className="flex items-center justify-between">
                           <div className="flex flex-col">
                             <span className={`text-[8px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>{adv.caddieName} — TROU {adv.holeNumber}</span>
@@ -682,7 +682,7 @@ export default function Profile({
                >
                   {savedRounds.length > 0 ? (
                     savedRounds.map((round, sidx) => (
-                      <div key={`profile-saved-round-v4-${round.id}-${sidx}`} className={`border rounded-2xl p-5 space-y-4 relative overflow-hidden group shadow-sm ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
+                      <div key={`profile-saved-round-v5-${round.id}-${sidx}-${round.date}`} className={`border rounded-2xl p-5 space-y-4 relative overflow-hidden group shadow-sm ${isSolar ? 'bg-white border-zinc-200' : 'bg-white/5 border-white/10'}`}>
                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
                           <ShieldCheck size={40} className={isSolar ? 'text-zinc-200' : 'text-[#c9964a]'} />
                         </div>
