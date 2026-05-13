@@ -1508,7 +1508,7 @@ export default function Academy({
                           {teacherChat.map((msg, idx) => {
                             const text = msg.parts && msg.parts[0] ? msg.parts[0].text : '';
                             return (
-                              <div key={`aca-msg-v7-${idx}-${selectedTeacher}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              <div key={`aca-msg-v12-${idx}-${selectedTeacher}-${text.substring(0, 10)}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
                                   msg.role === 'user' 
                                     ? (isSolar ? 'bg-black text-white shadow-xl' : 'bg-[#c9964a] text-black font-bold shadow-lg shadow-[#c9964a]/20') 
@@ -1716,7 +1716,7 @@ export default function Academy({
               <h4 className="text-[10px] font-black uppercase tracking-[0.3em] px-2 opacity-60">PLAN D'ENTRAÎNEMENT REQUIS</h4>
               {program.drills.map((drill, idx) => (
                 <motion.div
-                  key={`program-drill-${drill.id || idx}-${idx}`}
+                  key={`aca-prog-v12-${drill.id || 'noid'}-${idx}-${drill.title.substring(0, 5)}`}
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.1 }}
@@ -1846,7 +1846,7 @@ export default function Academy({
         <div className="grid grid-cols-1 gap-6">
           {filteredDrills.map((drill, idx) => (
                 <motion.div
-                  key={`catalog-drill-${drill.id}-${idx}`}
+                  key={`aca-catalog-v12-${drill.id || 'noid'}-${idx}-${drill.category}-${drill.title.substring(0, 5)}`}
                   layout
                   className={`rounded-[2.5rem] border-2 shadow-sm transition-all overflow-hidden ${
                     activeSession?.id === drill.id

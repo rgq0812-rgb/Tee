@@ -3,7 +3,7 @@ import { GoogleGenAI, Modality, Type } from "@google/genai";
 
 // Initialize AI client 
 // In AI Studio, process.env.GEMINI_API_KEY is injected into the Vite environment
-const GEMINI_API_KEY = (import.meta.env?.VITE_GEMINI_API_KEY) || (process.env.GEMINI_API_KEY) || '';
+const GEMINI_API_KEY = (import.meta.env?.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '') || '';
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // Helper to parse JSON from AI responses that might be wrapped in markdown

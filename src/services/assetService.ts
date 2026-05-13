@@ -1,4 +1,4 @@
-import { collection, onSnapshot, query, FirestoreError, deleteDoc, doc, where, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, FirestoreError, deleteDoc, doc, where, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './firebase';
 
 export interface HoleAsset {
@@ -75,7 +75,8 @@ class AssetService {
     // Order by updatedAt to ensure latest assets are prioritized
     const q = query(
       collection(db, 'hole_assets'), 
-      where('userId', '==', auth.currentUser.uid)
+      where('userId', '==', auth.currentUser.uid),
+      limit(50)
     );
     
     this.unsubscribe = onSnapshot(q, (snapshot) => {

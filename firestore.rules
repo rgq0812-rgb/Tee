@@ -58,7 +58,7 @@ service cloud.firestore {
     function isValidHoleAsset(data) {
       return data.keys().hasAll(['userId', 'courseId', 'holeNumber', 'imageData', 'updatedAt']) &&
              data.userId == request.auth.uid &&
-             data.imageData is string && data.imageData.size() <= 900000;
+             data.imageData is string && data.imageData.size() <= 1048576;
     }
 
     function isValidTacticalAdvice(data) {

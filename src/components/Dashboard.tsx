@@ -826,7 +826,7 @@ export default function Dashboard({
           <motion.div key="course-selector" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className={`fixed inset-0 z-[500] ${isSolar ? 'bg-white' : 'bg-black'} p-6 pt-16`}>
             <button onClick={() => setShowCourseSelector(false)} className={`${isSolar ? 'text-black border-black shadow-md' : 'text-white/40 border-white/10'} uppercase text-[10px] border px-4 py-2 rounded-full mb-8 font-black`}>Fermer</button>
             <div className="grid gap-4">
-                {COURSES.map((c, cidx) => <button key={`dash-course-sel-v2-${c.id}-${cidx}`} onClick={() => { setSelectedCourse(c); setShowCourseSelector(false); }} className={`p-6 text-left rounded-3xl border font-black uppercase transition-all ${isSolar ? 'bg-zinc-100 border-zinc-200 text-black shadow-sm active:bg-zinc-200' : 'bg-white/5 border-white/10 text-white active:bg-white/10'}`}>{c.name}</button>)}
+                {COURSES.map((c, cidx) => <button key={`dash-course-sel-v12-${c.id}-${cidx}-${c.name.substring(0, 5)}`} onClick={() => { setSelectedCourse(c); setShowCourseSelector(false); }} className={`p-6 text-left rounded-3xl border font-black uppercase transition-all ${isSolar ? 'bg-zinc-100 border-zinc-200 text-black shadow-sm active:bg-zinc-200' : 'bg-white/5 border-white/10 text-white active:bg-white/10'}`}>{c.name}</button>)}
             </div>
           </motion.div>
         )}

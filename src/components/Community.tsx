@@ -244,7 +244,7 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
               className="space-y-6"
             >
               {posts.map((post, pidx) => (
-                <div key={`community-post-item-v2-${post.id}-${pidx}`} className={`border rounded-[2.5rem] p-6 space-y-4 shadow-sm relative overflow-hidden group ${isSolar ? 'bg-white border-zinc-100' : 'bg-zinc-900/50 border-white/5'}`}>
+                <div key={`community-post-v12-${post.id}-${pidx}-${post.time}`} className={`border rounded-[2.5rem] p-6 space-y-4 shadow-sm relative overflow-hidden group ${isSolar ? 'bg-white border-zinc-100' : 'bg-zinc-900/50 border-white/5'}`}>
                   {post.type === 'exploit' && (
                     <div className="absolute top-0 left-0 w-1 h-full bg-[#c9964a]" />
                   )}
@@ -328,7 +328,7 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
               </div>
 
               {challenges.map((ch, cidx) => (
-                <div key={`community-challenge-v2-${ch.id}-${cidx}`} className={`border rounded-[2.5rem] p-6 space-y-4 relative overflow-hidden group shadow-sm transition-all ${isSolar ? 'bg-white border-zinc-100 hover:border-black' : 'bg-zinc-900 border-white/5 hover:border-[#c9964a]/30'}`}>
+                <div key={`community-challenge-v12-${ch.id}-${cidx}-${ch.type}`} className={`border rounded-[2.5rem] p-6 space-y-4 relative overflow-hidden group shadow-sm transition-all ${isSolar ? 'bg-white border-zinc-100 hover:border-black' : 'bg-zinc-900 border-white/5 hover:border-[#c9964a]/30'}`}>
                   <div className={`absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-10 transition-opacity ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>
                     {ch.type === 'precision' ? <Target size={80} /> : ch.type === 'power' ? <Zap size={80} /> : <Brain size={80} />}
                   </div>
@@ -390,7 +390,7 @@ export default function Community({ displayMode }: { displayMode?: 'tactical' | 
 
                 <div className="space-y-4 max-h-[300px] overflow-y-auto px-1 mb-6 no-scrollbar">
                   {messages.slice(-5).map((msg, idx) => (
-                    <div key={`hub-chat-${idx}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div key={`hub-chat-v12-${idx}-${msg.role}-${msg.parts.map(p => 'text' in p ? (p.text as string).substring(0, 5) : '').join('')}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                       <div className={`p-3 rounded-2xl text-[10px] max-w-[80%] ${
                         msg.role === 'user' 
                           ? (isSolar ? 'bg-black text-white' : 'bg-white/10 text-white') 

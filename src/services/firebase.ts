@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -10,10 +10,9 @@ if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('INSERT')) {
   console.error("CRITICAL: Firebase API Key is missing or invalid. Please check firebase-applet-config.json");
 }
 
-// Initialiser Firestore avec Long Polling pour une meilleure stabilité dans les environnements restreints
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+// Initialiser Firestore standard (WebSocket) pour de meilleures performances (latence)
+// Sauf si l'utilisateur est dans un environnement très restrictif
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
@@ -122,9 +121,10 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   // If it's a quota error, we don't want to throw and crash the entire app
   // but we should still inform the user in the console or via a non-blocking UI
   if (isQuotaExceeded) {
-    console.warn("Firestore Quota Exceeded. The application may have limited functionality (e.g. historical data or custom photos may be missing).");
-    return; // Don't throw for quota errors
+    console.warn("Firestore Quota Exceeded. The application may have limited functionality.");
+    return;
   }
 
-  throw new Error(JSON.stringify(errInfo));
+  // We log but don't throw to avoid white screen of death in critical loops
+  console.warn("Recoverable Firestore Error occurred. Application continues.");
 }

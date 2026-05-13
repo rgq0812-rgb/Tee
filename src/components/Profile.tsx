@@ -570,7 +570,7 @@ export default function Profile({
                      <div className="p-6 flex justify-center"><Loader2 className="animate-spin text-white/20" /></div>
                   ) : advices.length > 0 ? (
                     advices.map((adv, idx) => (
-                      <div key={`profile-advice-v3-${adv.id}-${idx}-${adv.createdAt?.seconds || idx}`} className="p-4 space-y-2 group">
+                      <div key={`profile-advice-v12-${adv.id || 'noid'}-${idx}-${adv.createdAt?.seconds || 'notime'}-${adv.holeNumber}`} className="p-4 space-y-2 group">
                         <div className="flex items-center justify-between">
                           <div className="flex flex-col">
                             <span className={`text-[8px] font-black uppercase tracking-widest ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>{adv.caddieName} — TROU {adv.holeNumber}</span>
