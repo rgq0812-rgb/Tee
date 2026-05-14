@@ -5,7 +5,22 @@ import { GoogleGenAI, Modality, Type } from "@google/genai";
 // In AI Studio, process.env.GEMINI_API_KEY is injected into the Vite environment
 // @ts-ignore
 const GEMINI_API_KEY = (import.meta.env?.VITE_GEMINI_API_KEY) || (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) || '';
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+let ai: any;
+try {
+  ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+} catch (e) {
+  console.error("Gemini AI initialization failed:", e);
+  // Fallback to a mock object that throws on use but doesn't crash on load
+  ai = {
+    models: {
+      generateContent: () => { throw new Error("AI client not initialized"); }
+    },
+    chats: {
+      create: () => { throw new Error("AI client not initialized"); }
+    }
+  };
+}
 
 // Helper to parse JSON from AI responses that might be wrapped in markdown
 function parseAIJson(text: string) {

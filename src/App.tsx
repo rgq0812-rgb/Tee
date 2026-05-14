@@ -620,21 +620,64 @@ function AppContent() {
 );
 }
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("[ONYX] App Crash:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-black flex items-center justify-center p-6 text-center">
+          <div className="max-w-md space-y-6">
+            <div className="w-20 h-20 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mx-auto">
+              <Sparkles className="text-red-500 w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-xl font-black uppercase tracking-widest text-[#c9964a]">Erreur de Liaison Tactique</h1>
+              <p className="text-zinc-500 text-sm italic font-medium">L'interface ONYX a rencontré une anomalie critique. Adam tente de stabiliser le flux.</p>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-8 py-3 bg-[#c9964a] text-black font-black uppercase tracking-widest text-xs rounded-full hover:scale-105 transition-transform"
+            >
+              Relancer la Mission
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <AuthProvider>
-      <ChatProvider>
-        <APIProvider 
-          apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''} 
-          libraries={['places']}
-          onLoad={() => console.log("[ONYX] Google Maps API Loaded")}
-          onError={(err) => {
-            console.error("[ONYX] Google Maps Load Error:", err);
-          }}
-        >
-          <AppContent />
-        </APIProvider>
-      </ChatProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <ChatProvider>
+          <APIProvider 
+            apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''} 
+            libraries={['places']}
+            onLoad={() => console.log("[ONYX] Google Maps API Loaded")}
+            onError={(err) => {
+              console.error("[ONYX] Google Maps Load Error:", err);
+            }}
+          >
+            <AppContent />
+          </APIProvider>
+        </ChatProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

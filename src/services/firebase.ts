@@ -3,18 +3,33 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailA
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch (e) {
+  console.error("Firebase initialization failed:", e);
+  // Create a dummy app object to prevent app.settings errors, or handle later
+  app = { name: '[DEFAULT]', options: {}, automaticDataCollectionEnabled: false };
+}
 
 // Valider la config pour éviter les erreurs silencieuses sur les remixes
 if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('INSERT')) {
   console.error("CRITICAL: Firebase API Key is missing or invalid. Please check firebase-applet-config.json");
 }
 
-// Initialiser Firestore standard (WebSocket) pour de meilleures performances (latence)
-// Sauf si l'utilisateur est dans un environnement très restrictif
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+let db: any;
+let auth: any;
 
-export const auth = getAuth(app);
+try {
+  // Initialiser Firestore standard (WebSocket) pour de meilleures performances (latence)
+  // Sauf si l'utilisateur est dans un environnement très restrictif
+  db = getFirestore(app as any, firebaseConfig.firestoreDatabaseId);
+  auth = getAuth(app as any);
+} catch (e) {
+  console.error("Firebase services initialization failed:", e);
+}
+
+export { db, auth };
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account'
