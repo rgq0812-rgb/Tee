@@ -1,41 +1,47 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>THE CHOSE - ONYX V2</title>
-    <link rel="icon" type="image/png" href="/icon-192.png" />
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#c9964a" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="THE CHOSE" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(err => {
-            console.log('SW registration failed: ', err);
-          });
-        });
-      }
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>ONYX TACTICAL</title>
+    <!-- No Service Worker for now to avoid stale cache issues -->
+    <style>
+      body, html { margin: 0; padding: 0; background: #000; color: #fff; height: 100%; overflow: hidden; }
+      #debug-overlay { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); color: lime; font-family: monospace; font-size: 8px; z-index: 9999; padding: 5px; pointer-events: none; max-height: 100px; overflow-y: auto; }
+    </style>
   </head>
   <body>
-    <div id="root" style="background:#000;color:#c9964a;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;font-weight:bold;letter-spacing:0.2em;">
-      IA ONYX EN COURS...
+    <div id="root" style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;">
+      <div style="color:#c9964a;font-family:sans-serif;letter-spacing:0.3em;font-weight:bold;">
+        <div style="font-size:1.5rem;margin-bottom:10px;">IA ONYX</div>
+        <div style="font-size:0.8rem;opacity:0.5;">INITIALISATION...</div>
+      </div>
     </div>
-    <script type="module" src="/src/main.tsx"></script>
+    
+    <div id="debug-overlay">BOOT SEQUENCE STARTED...</div>
+
     <script>
+      const log = (msg) => {
+        const div = document.getElementById('debug-overlay');
+        if (div) div.innerHTML += '<br/>[' + new Date().toLocaleTimeString() + '] ' + msg;
+        console.log('[DEBUG]', msg);
+      };
+      
+      window.log = log;
+      log('HTML Ready');
+
       setTimeout(() => {
         const root = document.getElementById('root');
-        if (root && root.innerHTML.includes('IA ONYX EN COURS...')) {
-           root.style.background = 'red';
-           root.style.color = 'white';
-           root.innerHTML = '<div style="padding:20px;text-align:center;"><h1>ERREUR CHARGEMENT MODULE</h1><p>Le script d\'initialisation ONYX n\'a pas répondu. Vérifiez la console.</p></div>';
+        if (root && root.innerText.includes('INITIALISATION')) {
+          log('TIMEOUT: App did not take over root');
+          root.innerHTML = '<div style="color:red;padding:20px;">ERREUR CHARGEMENT<br/>Vérifiez la console ou désactivez le cache</div>';
         }
-      }, 10000);
+      }, 15000);
     </script>
+    <script type="module">
+      window.log('Loading Main Script...');
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
 

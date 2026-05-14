@@ -857,10 +857,39 @@ export default function Dashboard({
         )}
 
         {showCourseSelector && (
-          <motion.div key="course-selector" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className={`fixed inset-0 z-[500] ${isSolar ? 'bg-white' : 'bg-black'} p-6 pt-16`}>
-            <button onClick={() => setShowCourseSelector(false)} className={`${isSolar ? 'text-black border-black shadow-md' : 'text-white/40 border-white/10'} uppercase text-[10px] border px-4 py-2 rounded-full mb-8 font-black`}>Fermer</button>
-            <div className="grid gap-4">
-                {COURSES.map((c, cidx) => <button key={`dash-course-sel-v12-${c.id}-${cidx}-${c.name.substring(0, 5)}`} onClick={() => { setSelectedCourse(c); setShowCourseSelector(false); }} className={`p-6 text-left rounded-3xl border font-black uppercase transition-all ${isSolar ? 'bg-zinc-100 border-zinc-200 text-black shadow-sm active:bg-zinc-200' : 'bg-white/5 border-white/10 text-white active:bg-white/10'}`}>{c.name}</button>)}
+          <motion.div key="course-selector" initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className={`fixed inset-0 z-[500] ${isSolar ? 'bg-white' : 'bg-black'} p-6 pt-16 flex flex-col`}>
+            <div className="flex justify-between items-center mb-8">
+              <button onClick={() => setShowCourseSelector(false)} className={`${isSolar ? 'text-black border-black shadow-md' : 'text-white/40 border-white/10'} uppercase text-[10px] border px-4 py-2 rounded-full font-black`}>Annuler</button>
+              <h3 className={`font-black uppercase tracking-[0.3em] text-[10px] ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>SÉLECTION PARCOURS</h3>
+            </div>
+            
+            <div className="grid gap-4 flex-1 overflow-y-auto pb-40">
+                {COURSES.map((c, cidx) => (
+                  <button 
+                    key={`dash-course-sel-v12-${c.id}-${cidx}-${c.name.substring(0, 5)}`} 
+                    onClick={() => { 
+                      setSelectedCourse(c); 
+                    }} 
+                    className={`p-6 text-left rounded-3xl border font-black uppercase transition-all flex items-center justify-between ${
+                      selectedCourse.id === c.id 
+                      ? (isSolar ? 'bg-black border-black text-white shadow-xl translate-x-2' : 'bg-[#c9964a] border-[#c9964a] text-black translate-x-2 scale-[1.02]') 
+                      : (isSolar ? 'bg-zinc-100 border-zinc-200 text-black shadow-sm active:bg-zinc-200' : 'bg-white/5 border-white/10 text-white active:bg-white/10 opacity-40')
+                    }`}
+                  >
+                    <span>{c.name}</span>
+                    {selectedCourse.id === c.id && <Check size={20} />}
+                  </button>
+                ))}
+            </div>
+
+            <div className="fixed bottom-10 left-6 right-6">
+               <motion.button
+                 whileTap={{ scale: 0.95 }}
+                 onClick={() => setShowCourseSelector(false)}
+                 className={`w-full h-16 rounded-[2rem] flex items-center justify-center gap-3 font-black text-xs tracking-[0.4em] uppercase shadow-2xl ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black shadow-[#c9964a]/20'}`}
+               >
+                 VALIDER LE PARCOURS
+               </motion.button>
             </div>
           </motion.div>
         )}

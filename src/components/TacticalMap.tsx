@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { Crosshair, Navigation, Target, Shield, Brain, Zap, Info, ChevronRight, Map as MapIcon, X, Search } from 'lucide-react';
+import { Crosshair, Navigation, Target, Shield, Brain, Zap, Info, ChevronRight, Map as MapIcon, X, Search, AlertCircle } from 'lucide-react';
 import { analyzeTarget } from '../services/geminiService';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -212,14 +212,41 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
 
   const hole = selectedCourse.holes.find((h: any) => h.number === currentHole) || selectedCourse.holes[0];
   const [mire, setMire] = useState<any>({ 
-    lat: (hole.teeBox.lat + hole.green.middle.lat) / 2, 
-    lng: (hole.teeBox.lng + hole.green.middle.lng) / 2 
+    lat: hole.teeBox?.lat || 0,
+    lng: hole.teeBox?.lng || 0 
   });
   const [commentary, setCommentary] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const map = useMap();
 
-  const distAB = calculateDistance(hole.teeBox.lat, hole.teeBox.lng, mire.lat, mire.lng);
-  const distBC = calculateDistance(mire.lat, mire.lng, hole.green.middle.lat, hole.green.middle.lng);
+  // Reset Mire to midpoint and fit bounds on hole change
+  useEffect(() => {
+    if (!hole || !hole.teeBox || !hole.green?.middle) return;
+
+    const midpoint = {
+      lat: (hole.teeBox.lat + hole.green.middle.lat) / 2,
+      lng: (hole.teeBox.lng + hole.green.middle.lng) / 2
+    };
+
+    setMire(midpoint);
+
+    if (map) {
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(hole.teeBox);
+      bounds.extend(hole.green.middle);
+      map.fitBounds(bounds, { top: 100, bottom: 200, left: 50, right: 50 });
+      
+      // Smooth animation to center
+      setTimeout(() => {
+        map.panTo(midpoint);
+      }, 500);
+    }
+  }, [currentHole, hole.number, map]);
+
+  const hasGps = hole.teeBox?.lat && hole.green?.middle?.lat;
+  
+  const distAB = hasGps ? calculateDistance(hole.teeBox.lat, hole.teeBox.lng, mire.lat, mire.lng) : 0;
+  const distBC = hasGps ? calculateDistance(mire.lat, mire.lng, hole.green.middle.lat, hole.green.middle.lng) : 0;
 
   const performAnalysis = async () => {
     setIsAnalyzing(true);
@@ -244,45 +271,60 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
     <div className={`h-[calc(100vh-8rem)] w-full rounded-[2.5rem] overflow-hidden border relative shadow-2xl ${isSolar ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-white/10'}`}>
         <Map
           mapId="DEMO_MAP_ID"
-          defaultCenter={mire}
-          defaultZoom={17}
+          center={mire}
+          zoom={17}
           mapTypeId={isSolar ? "terrain" : "satellite"}
           disableDefaultUI={true}
           gestureHandling={'greedy'}
           internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
           style={{ width: '100%', height: '100%' }}
         >
+          {!hasGps && (
+             <div className="absolute inset-0 flex items-center justify-center z-[200] bg-black/60 backdrop-blur-sm">
+                <div className="bg-red-600/20 border border-red-600/50 p-6 rounded-3xl text-center max-w-xs">
+                   <AlertCircle className="text-red-500 mx-auto mb-3" size={32} />
+                   <div className="text-red-500 font-black uppercase text-xs tracking-widest mb-1">Satellite Perdu</div>
+                   <p className="text-white/60 text-[10px] uppercase font-bold tracking-tight">Coordonnées GPS manquantes pour ce trou. Mode tactique dégradé.</p>
+                </div>
+             </div>
+          )}
           {/* Points A, B, C */}
-          <AdvancedMarker 
-            key={`tee-marker-${hole.number}`}
-            position={hole.teeBox} 
-            title="Tee Box (A)"
-          >
-            <div className={`border-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${isSolar ? 'bg-black border-black text-white' : 'bg-black border-white text-white'}`}>A</div>
-          </AdvancedMarker>
+          {hasGps && (
+            <>
+              <AdvancedMarker 
+                key={`tee-marker-${hole.number}`}
+                position={hole.teeBox} 
+                title="Tee Box (A)"
+              >
+                <div className={`border-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${isSolar ? 'bg-black border-black text-white' : 'bg-black border-white text-white'}`}>A</div>
+              </AdvancedMarker>
 
-          <AdvancedMarker 
-            key={`mire-marker-${hole.number}`}
-            position={mire} 
-            draggable={true}
-            onDragEnd={(e: any) => {
-              if (e.latLng) setMire({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-            }}
-          >
-            <div className={`w-8 h-8 rounded-full border-2 backdrop-blur-md flex items-center justify-center ${isSolar ? 'bg-white/80 border-black text-black shadow-lg' : 'bg-black/60 border-[#c9964a] text-[#c9964a]'}`}>
-              <Target size={16} />
-            </div>
-          </AdvancedMarker>
+              <AdvancedMarker 
+                key={`mire-marker-${hole.number}`}
+                position={mire} 
+                draggable={true}
+                onDragEnd={(e: any) => {
+                  if (e.latLng) setMire({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+                }}
+              >
+                <motion.div 
+                  layoutId="pivot-c"
+                  className={`w-8 h-8 rounded-full border-2 backdrop-blur-md flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-grab active:cursor-grabbing ${isSolar ? 'bg-white/80 border-black text-black shadow-lg' : 'bg-black/60 border-[#c9964a] text-[#c9964a]'}`}>
+                  <Target size={16} />
+                </motion.div>
+              </AdvancedMarker>
 
-          <AdvancedMarker 
-            key={`green-marker-${hole.number}`}
-            position={hole.green.middle}
-            title="Green (C)"
-          >
-            <div className={`border-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${isSolar ? 'bg-black border-black text-white' : 'bg-[#c9964a] border-black text-black'}`}>C</div>
-          </AdvancedMarker>
- 
-          <LineOverlay points={[hole.teeBox, mire, hole.green.middle]} isSolar={isSolar} />
+              <AdvancedMarker 
+                key={`green-marker-${hole.number}`}
+                position={hole.green.middle}
+                title="Green (C)"
+              >
+                <div className={`border-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${isSolar ? 'bg-black border-black text-white' : 'bg-[#c9964a] border-black text-black'}`}>C</div>
+              </AdvancedMarker>
+     
+              <LineOverlay points={[hole.teeBox, mire, hole.green.middle]} isSolar={isSolar} />
+            </>
+          )}
         </Map>
         
         {/* Places Search Overlay */}
