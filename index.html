@@ -22,8 +22,20 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" style="background:#000;color:#c9964a;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;font-weight:bold;letter-spacing:0.2em;">
+      IA ONYX EN COURS...
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      setTimeout(() => {
+        const root = document.getElementById('root');
+        if (root && root.innerHTML.includes('IA ONYX EN COURS...')) {
+           root.style.background = 'red';
+           root.style.color = 'white';
+           root.innerHTML = '<div style="padding:20px;text-align:center;"><h1>ERREUR CHARGEMENT MODULE</h1><p>Le script d\'initialisation ONYX n\'a pas répondu. Vérifiez la console.</p></div>';
+        }
+      }, 10000);
+    </script>
   </body>
 </html>
 

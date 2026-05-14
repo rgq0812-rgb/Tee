@@ -29,7 +29,7 @@ class AssetService {
   }
 
   private setupAuth() {
-    if (this.authUnsubscribe) return;
+    if (this.authUnsubscribe || !auth) return;
     
     this.authUnsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
@@ -48,6 +48,11 @@ class AssetService {
   }
 
   subscribe(callback: AssetCallback, onError?: ErrorCallback) {
+    if (!auth || !db) {
+      console.warn("[ONYX] Asset service: Firebase not ready");
+      callback([]);
+      return () => {};
+    }
     this.setupAuth();
     this.listeners.add(callback);
     if (onError) this.errorListeners.add(onError);
