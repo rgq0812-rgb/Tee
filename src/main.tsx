@@ -35,39 +35,21 @@ console.log("[ONYX] Main entry point hit");
 
 async function init() {
     const rootElement = document.getElementById('root');
-    if (!rootElement) {
-        console.error("[ONYX] Root element not found");
-        return;
-    }
+    if (!rootElement) return;
 
     try {
-        if ((window as any).log) (window as any).log("Initialization function started");
-        console.log("[ONYX] Loading App component...");
-        if ((window as any).log) (window as any).log("Dynamically importing App.tsx...");
-        // Use dynamic import to catch top-level errors in App.tsx and its sub-modules
         const { default: App } = await import('./App.tsx');
-        if ((window as any).log) (window as any).log("App component imported successfully");
-        
-        console.log("[ONYX] Initializing React root");
-        if ((window as any).log) (window as any).log("Creating React root...");
         const root = createRoot(rootElement);
-        
-        if ((window as any).log) (window as any).log("Rendering App...");
         root.render(
             <StrictMode>
                 <App />
             </StrictMode>
         );
-        console.log("[ONYX] Render called successfully");
-        if ((window as any).log) (window as any).log("Render call completed");
     } catch (e: any) {
         console.error("[ONYX] Initialization failed:", e);
-        const root = document.getElementById('root');
-        if (root) {
-            root.style.background = 'darkblue';
-            root.style.color = 'white';
-            root.innerHTML = `<div style="padding:40px;"><h1>ONYX BOOT FAILURE</h1><p>${e.message}</p><pre>${e.stack}</pre></div>`;
-        }
+        rootElement.style.background = '#000';
+        rootElement.style.color = '#c9964a';
+        rootElement.innerHTML = `<div style="padding:40px;text-align:center;font-family:sans-serif;"><h1>ONYX BOOT FAILURE</h1><p>${e.message}</p></div>`;
     }
 }
 

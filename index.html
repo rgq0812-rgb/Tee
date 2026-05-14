@@ -11,36 +11,7 @@
     </style>
   </head>
   <body>
-    <div id="root" style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;">
-      <div style="color:#c9964a;font-family:sans-serif;letter-spacing:0.3em;font-weight:bold;">
-        <div style="font-size:1.5rem;margin-bottom:10px;">IA ONYX</div>
-        <div style="font-size:0.8rem;opacity:0.5;">INITIALISATION...</div>
-      </div>
-    </div>
-    
-    <div id="debug-overlay">BOOT SEQUENCE STARTED...</div>
-
-    <script>
-      const log = (msg) => {
-        const div = document.getElementById('debug-overlay');
-        if (div) div.innerHTML += '<br/>[' + new Date().toLocaleTimeString() + '] ' + msg;
-        console.log('[DEBUG]', msg);
-      };
-      
-      window.log = log;
-      log('HTML Ready');
-
-      setTimeout(() => {
-        const root = document.getElementById('root');
-        if (root && root.innerText.includes('INITIALISATION')) {
-          log('TIMEOUT: App did not take over root');
-          root.innerHTML = '<div style="color:red;padding:20px;">ERREUR CHARGEMENT<br/>Vérifiez la console ou désactivez le cache</div>';
-        }
-      }, 15000);
-    </script>
-    <script type="module">
-      window.log('Loading Main Script...');
-    </script>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
