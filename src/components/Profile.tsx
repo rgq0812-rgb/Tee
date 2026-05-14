@@ -21,13 +21,13 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 
 
 export default function Profile({ 
   selectedCourse, arsenal, setArsenal, playerForm, setPlayerForm, 
-  handicap, setHandicap, setTourSeen, setActiveTab, 
+  handicap, setHandicap, setActiveTab, 
   setShowMentorModal, setMentorInitialMessage,
   setMissionStarted, setAppPath,
   displayMode
 }: { 
   selectedCourse: any, arsenal: any[], setArsenal: any, playerForm: string, setPlayerForm: any, 
-  handicap: number, setHandicap: any, setTourSeen: (val: boolean) => void, setActiveTab: (tab: string) => void, 
+  handicap: number, setHandicap: any, setActiveTab: (tab: string) => void, 
   setShowMentorModal: (val: boolean) => void, setMentorInitialMessage: (val: string) => void,
   setMissionStarted: (val: boolean) => void, setAppPath: (val: any) => void,
   displayMode?: 'tactical' | 'solar'
@@ -766,7 +766,6 @@ export default function Profile({
             { label: 'Conditions & Confidentialité', icon: Shield, color: 'text-zinc-500', bg: isSolar ? 'bg-zinc-100' : 'bg-white/5', action: () => setShowLegal(true) },
             { label: 'Ouvrir les Paramètres', icon: Settings, color: isSolar ? 'text-black' : 'text-white', bg: isSolar ? 'bg-zinc-100' : 'bg-white/10', action: () => setShowSettingsModal(true) },
             { label: 'Règles du Golf', icon: BookOpen, color: 'text-blue-600', bg: isSolar ? 'bg-blue-50' : 'bg-blue-500/10', action: () => setShowRulesModal(true) },
-            { label: 'Relancer le Tutoriel', icon: Zap, color: 'text-emerald-600', bg: isSolar ? 'bg-emerald-50' : 'bg-emerald-500/10', action: () => { localStorage.removeItem('tourSeen'); setTourSeen(false); } },
           ].map((item, idx) => (
             <button
               key={`profile-action-central-v2-${idx}-${item.label}`}

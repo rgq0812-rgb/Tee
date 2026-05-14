@@ -38,9 +38,9 @@ function AppContent() {
     setIsGuest(true);
     sessionStorage.setItem('guestMode', 'true');
   };
-  // --- Global State from Bible ---
-  const [splashSeen, setSplashSeen] = useState(true);
-  const [tourSeen, setTourSeen] = useState(true);
+  // --- Global State ---
+  const [splashSeen] = useState(true);
+  const [tourSeen] = useState(true);
   const [appPath, setAppPath] = useState<AppPath | null>('player');
   const [missionStarted, setMissionStarted] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -320,12 +320,10 @@ function AppContent() {
   }, [appPath, scorecard, currentHole, selectedCourse, eliteXP, arsenal, playerForm, handicap, activeCaddie, selectedMode, displayMode, selectedTee]);
 
   const handleSplashComplete = useCallback(() => {
-    setSplashSeen(true);
     sessionStorage.setItem('splashSeen', 'true');
   }, []);
 
   const handleTourComplete = useCallback(() => {
-    setTourSeen(true);
     localStorage.setItem('tourSeen', 'true');
   }, []);
 
@@ -494,7 +492,6 @@ function AppContent() {
             setPlayerForm={setPlayerForm}
             handicap={handicap}
             setHandicap={setHandicap}
-            setTourSeen={setTourSeen}
             setActiveTab={setActiveTab}
             setShowMentorModal={setShowMentorModal}
             setMentorInitialMessage={setMentorInitialMessage}

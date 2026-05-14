@@ -14,14 +14,11 @@ googleProvider.setCustomParameters({
 });
 
 export const signInWithGoogle = async () => {
-  console.log("Starting Google Sign-In with popup...");
   try {
     auth.languageCode = 'fr';
     const result = await signInWithPopup(auth, googleProvider);
-    console.log("Sign-In successful:", result.user.email);
     return result;
   } catch (error: any) {
-    console.error("Firebase Sign-In Error:", error.code, error.message);
     if (error.code === 'auth/popup-blocked') {
       throw new Error("POPUP_BLOCKED");
     }
@@ -83,9 +80,8 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
 
-  console.error('[ONYX FIRESTORE ERROR]', JSON.stringify(errInfo));
-  
   if (isQuotaExceeded) {
-    console.warn("Firestore Quota Exceeded. The application may have limited functionality.");
+    // Keep a very small warning for quota as it affects UX
+    console.warn("Firestore Quota Exceeded.");
   }
 }

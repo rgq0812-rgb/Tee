@@ -144,11 +144,11 @@ export default function Dashboard({
                   holeNumber: parseInt(assetId.split('_')[1])
               });
             } catch (err) {
-              handleFirestoreError(err, OperationType.WRITE, path);
+              // Silently handle
             }
          }
          setShowSyncMenu(false);
-       } catch (err) { console.error(err); }
+       } catch (err) { /* ignore */ }
     };
     reader.readAsText(file);
   };
@@ -728,7 +728,7 @@ export default function Dashboard({
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
             <button onClick={() => navigateHole('prev')} disabled={currentHole === 1} className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border active:scale-95 disabled:opacity-20 shadow-md ${isSolar ? 'bg-white border-zinc-300 text-black' : 'bg-white/15 border border-white/30 text-white'}`}><ChevronLeft size={20} /></button>
             
-            <div className="flex gap-1.5 px-1">
+            <div className="flex gap-1.5 px-1 relative z-30">
               {Array.from({ length: 18 }, (_, i) => i + 1).map(h => (
                 <button
                   key={`hole-nav-${h}`}

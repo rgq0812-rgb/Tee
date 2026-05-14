@@ -22,10 +22,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
       return;
     }
-    return onAuthStateChanged(auth, async (firebaseUser) => {
+
+    // Safety fallback to ensure UI is never blocked indefinitely
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(safetyTimer);
       setUser(firebaseUser);
       
       if (firebaseUser) {
+        setLoading(false); // Set loading false immediately when user is found
+        
         // Check for success param first (optimistic/refresh)
         const urlParams = new URLSearchParams(window.location.search);
         const status = urlParams.get('payment_status');
@@ -33,15 +42,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const userDocRef = db ? doc(db, 'users', firebaseUser.uid) : null;
         
         if (status === 'success') {
-          // Note: In production, the Webhook handles the database update.
-          // We set local state to true for immediate UX, then refresh.
           setHasPaid(true);
         } else if (userDocRef) {
           // Normal check with safety timeout
           try {
             const docPromise = getDoc(userDocRef);
             const timeoutPromise = new Promise((_, reject) => 
-               setTimeout(() => reject(new Error("TIMEOUT")), 8000)
+               setTimeout(() => reject(new Error("TIMEOUT")), 5000)
             );
             
             const userDoc = await Promise.race([docPromise, timeoutPromise]) as any;
@@ -49,7 +56,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (userDoc.exists()) {
               setHasPaid(userDoc.data().subscriptionStatus === 'active');
             } else {
-              // Try client-side initialization first (now allowed by rules)
               try {
                 await setDoc(userDocRef, {
                   displayName: firebaseUser.displayName || 'ONYX Cadet',
@@ -60,21 +66,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   subscriptionStatus: 'none'
                 });
               } catch (clientErr) {
-                console.error("Client-side init failed:", clientErr);
+                // Silently fail in production
               }
               setHasPaid(false);
             }
           } catch (error) {
-            console.error("Auth sync check error or timeout:", error);
             setHasPaid(false);
           }
         }
       } else {
         setHasPaid(false);
+        setLoading(false); // Also false if no user (Guest mode)
       }
-      
-      setLoading(false);
     });
+
+    return () => {
+      clearTimeout(safetyTimer);
+      unsubscribe();
+    };
   }, []);
 
   return (
