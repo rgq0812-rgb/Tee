@@ -61,7 +61,7 @@ export default function Layout({ children, activeTab, setActiveTab, displayMode,
         </div>
       </header>
 
-      <main className="pt-16 pb-32 max-w-md mx-auto relative z-10 min-h-screen">
+      <main className="pt-16 pb-32 max-w-md mx-auto relative min-h-screen">
         <motion.div
           key={`tab-container-${activeTab}-${displayMode}`}
           initial={{ opacity: 0, scale: 0.98 }}

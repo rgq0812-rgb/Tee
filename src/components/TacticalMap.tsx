@@ -242,17 +242,6 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
 
   return (
     <div className={`h-[calc(100vh-8rem)] w-full rounded-[2.5rem] overflow-hidden border relative shadow-2xl ${isSolar ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-white/10'}`}>
-      <APIProvider 
-        apiKey={API_KEY} 
-        version="weekly" 
-        libraries={['places', 'marker']}
-        language="fr"
-        onLoad={() => console.log("Maps API Loaded Successfully")}
-        onError={(err) => {
-          console.error("Maps API Load Error:", err);
-          setMapError("ERREUR DE CHARGEMENT : Impossible de contacter les satellites Google.");
-        }}
-      >
         <Map
           mapId="DEMO_MAP_ID"
           defaultCenter={mire}
@@ -300,7 +289,6 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
         <div className="absolute top-24 left-6 right-6 z-[100] pointer-events-none">
            <MapSearch isSolar={isSolar} onPlaceSelect={(pos) => setMire(pos)} />
         </div>
-      </APIProvider>
  
       {/* HUD OVERLAY */}
       <div className="absolute top-6 left-6 right-6 pointer-events-none flex flex-col gap-3">

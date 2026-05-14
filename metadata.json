@@ -1,5 +1,5 @@
 {
-  "name": "THE CHOSE",
-  "description": "Tactical Intelligence & Strategy Hub - ONYX V2. A premium platform for strategic analysis, tactical dominance, and luxury technical intelligence.",
+  "name": "THE CHOSE (ONYX V2)",
+  "description": "Tactical Golf Intelligence & Mentorship – Featuring ADAM Master Caddy and the Academy Elite Teachers. Advanced strategic analysis, technical drills, and satellite sync for elite performance.",
   "requestFramePermissions": ["geolocation", "microphone", "camera"]
 }

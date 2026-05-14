@@ -23,6 +23,7 @@ import { BookOpen, Sparkles, Brain, X, Clock } from 'lucide-react';
 import { AcademyDrill } from './data/academyDrills';
 import { speakWithBrowser, generateSpeech, getCoachingIntervention } from './services/geminiService';
 import { playWhistle, playSoftBell, playRawPcm } from './lib/audioUtils';
+import { APIProvider } from '@vis.gl/react-google-maps';
 
 import { AppPath, HoleScore, Club } from './types';
 import { INITIAL_CLUBS, COURSES, CHALLENGES, CADDIES } from './constants';
@@ -623,7 +624,12 @@ export default function App() {
   return (
     <AuthProvider>
       <ChatProvider>
-        <AppContent />
+        <APIProvider 
+          apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''} 
+          libraries={['places', 'marker']}
+        >
+          <AppContent />
+        </APIProvider>
       </ChatProvider>
     </AuthProvider>
   );

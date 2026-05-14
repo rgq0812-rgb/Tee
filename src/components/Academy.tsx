@@ -977,8 +977,8 @@ export default function Academy({
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-lg h-[75vh] rounded-[3.5rem] border-2 z-[100] overflow-hidden flex flex-col backdrop-blur-3xl shadow-2xl transition-all duration-500 ${
-              isSolar ? 'bg-white/40 border-black/20 shadow-black/10 text-black' : 'bg-black/40 border-[#c9964a]/20 shadow-[#c9964a]/10 text-white'
+            className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-lg h-[75vh] rounded-[3.5rem] border-2 z-[500] overflow-hidden flex flex-col backdrop-blur-3xl shadow-2xl transition-all duration-500 ${
+              isSolar ? 'bg-white/80 border-black/20 shadow-black/10 text-black' : 'bg-black/80 border-[#c9964a]/20 shadow-[#c9964a]/10 text-white'
             }`}
           >
              {/* Mini Chat Header */}
@@ -1026,9 +1026,12 @@ export default function Academy({
                        e.stopPropagation();
                        setShowTeacherChat(false);
                      }} 
-                     className="w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center ml-2 hover:bg-white/5 transition-colors"
+                     className={`w-12 h-12 rounded-xl border flex items-center justify-center ml-2 transition-all shadow-xl hover:scale-110 active:scale-90 ${
+                       isSolar ? 'bg-black text-white border-black' : 'bg-[#c9964a] text-black border-[#c9964a]'
+                     }`}
+                     title="Fermer le chat"
                    >
-                      <X size={14} />
+                      <X size={24} />
                    </button>
                 </div>
              </div>
@@ -1501,12 +1504,12 @@ export default function Academy({
                         e.stopPropagation();
                         setSelectedTeacher(null);
                       }}
-                      className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all relative z-[200] shadow-xl hover:scale-110 active:scale-95 ${
-                        isSolar ? 'border-zinc-200 hover:bg-zinc-100 bg-white text-black' : 'border-white/20 hover:bg-white/10 bg-zinc-800 text-white shadow-black'
+                      className={`w-14 h-14 rounded-full flex items-center justify-center border-4 transition-all relative z-[200] shadow-2xl hover:scale-110 active:scale-95 ${
+                        isSolar ? 'border-zinc-200 hover:bg-zinc-100 bg-white text-black' : 'border-[#c9964a]/30 hover:border-[#c9964a] bg-zinc-900 text-[#c9964a] shadow-black'
                       }`}
                       title="Fermer l'analyse"
                     >
-                      <X size={24} />
+                      <X size={28} />
                     </button>
                   </div>
 
@@ -1714,9 +1717,7 @@ export default function Academy({
             </div>
 
             <div className={`h-[400px] w-full rounded-[2.5rem] overflow-hidden border relative shadow-2xl ${isSolar ? 'bg-zinc-50 border-zinc-200 shadow-zinc-200/50' : 'bg-black border-[#c9964a]/30 shadow-[#c9964a]/10'}`}>
-              <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''} libraries={['places']}>
-                <AcademyArenaMap isSolar={isSolar} />
-              </APIProvider>
+              <AcademyArenaMap isSolar={isSolar} />
             </div>
           </div>
         </div>
