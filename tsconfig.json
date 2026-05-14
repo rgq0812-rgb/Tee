@@ -21,9 +21,7 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "resolveJsonModule": true,
-    "esModuleInterop": true
+    "noEmit": true
   },
   "include": ["src", "api"]
 }

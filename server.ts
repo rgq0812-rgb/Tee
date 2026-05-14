@@ -3,6 +3,16 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
+import { fileURLToPath } from 'url';
+
+// Fix for __filename and __dirname
+let __filename = '';
+let __dirname = '';
+
+if (typeof import.meta !== 'undefined' && import.meta.url) {
+  __filename = fileURLToPath(import.meta.url);
+  __dirname = path.dirname(__filename);
+}
 
 // Static imports for API handlers to ensure they are bundled by esbuild
 // Note: These imports will be resolved by esbuild during the build step
@@ -14,12 +24,14 @@ import spotifyCallbackHandler from './api/auth/spotify/callback';
 import youtubeUrlHandler from './api/auth/youtube/url';
 import youtubeCallbackHandler from './api/auth/youtube/callback';
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+export const app = express();
+const PORT = 3000;
 
-  // Resolve dist path
-  const distPath = path.join(process.cwd(), 'dist');
+async function startServer() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  // In production, the file is in dist/server.cjs, so assets are in the same folder (.)
+  // In development, the file is in the root, so assets are in dist/
+  const distPath = isProduction ? __dirname : path.join(process.cwd(), 'dist');
 
   // Health check for deployment monitoring
   app.get('/api/health', (req, res) => {
@@ -27,7 +39,9 @@ async function startServer() {
       status: 'ok', 
       mode: process.env.NODE_ENV,
       port: PORT,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isProduction,
+      distPath
     });
   });
 
@@ -80,23 +94,60 @@ async function startServer() {
         middlewareMode: true,
         hmr: false 
       },
-      appType: 'spa',
+      appType: 'custom', // Use 'custom' when we handle the HTML themselves
     });
     app.use(vite.middlewares);
+
+    // Serve index.html for non-API requests
+    app.get('*', async (req, res, next) => {
+      // Exclude API routes and files with extensions (assets) from being served as index.html
+      // This prevents syntax errors when assets fall through Vite middleware
+      if (req.url.startsWith('/api') || req.url.includes('.')) {
+        return next();
+      }
+
+      try {
+        const url = req.originalUrl;
+        const indexPath = path.resolve(process.cwd(), 'index.html');
+        if (!fs.existsSync(indexPath)) {
+          return res.status(404).send('index.html not found');
+        }
+        let template = fs.readFileSync(indexPath, 'utf-8');
+        template = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
   } else {
-    // Production mode serving static assets from dist/
+    // Production mode serving static assets from the current directory
+    // as the bundled server.cjs is located inside dist/
     const distPath = path.join(process.cwd(), 'dist');
+    if (!fs.existsSync(distPath)) {
+      console.warn(`Warning: distPath ${distPath} does not exist. Serving from CWD.`);
+    }
     app.use(express.static(distPath));
     // SPA fallback: send index.html for any unknown routes
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('Not Found');
+      }
     });
   }
 
   // Bind to 0.0.0.0 for container accessibility
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-  });
+  // In Vercel, the app is exported, but here we need to listen.
+  const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL;
+  
+  if (!isVercel) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running at http://localhost:${PORT} [${process.env.NODE_ENV || 'development'}]`);
+    });
+  }
 }
 
 // Global error handling for unhandled rejections

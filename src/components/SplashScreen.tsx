@@ -4,39 +4,53 @@ import { useEffect } from 'react';
 
 export default function SplashScreen({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
-    const timer = setTimeout(onComplete, 1200);
+    const timer = setTimeout(onComplete, 3500);
     return () => clearTimeout(timer);
   }, [onComplete]);
 
   return (
-    <div 
-      className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden cursor-pointer"
-      onClick={onComplete}
-    >
+    <div className="min-h-screen bg-brg-bg flex items-center justify-center p-6 relative overflow-hidden brg-gradient">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.8 }}
+        transition={{ duration: 1.5, ease: [0.87, 0, 0.13, 1] }}
         className="flex flex-col items-center"
       >
         <motion.div
-          animate={{ scale: [1, 1.05, 1], rotate: [0, 5, -5, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="w-20 h-20 bg-[#c9964a] rounded-full flex items-center justify-center text-black mb-6 shadow-[0_0_30px_rgba(201,150,74,0.3)]"
+          animate={{ 
+            rotateY: [0, 180, 360],
+            opacity: [0, 1, 1]
+          }}
+          transition={{ duration: 2, times: [0, 0.5, 1] }}
+          className="w-24 h-24 bg-brg-primary rounded-full flex items-center justify-center text-white mb-8 shadow-2xl shadow-emerald-500/10"
         >
-          <Trophy size={40} />
+          <Trophy size={48} />
         </motion.div>
         
-        <h1 className="text-white text-3xl font-black italic tracking-[0.3em] uppercase mb-2">THE CHOSE</h1>
-        <p className="text-[#c9964a] text-[8px] font-mono uppercase tracking-[0.5em] opacity-40">ONYX v2.0</p>
-
-        <button 
-          onClick={(e) => { e.stopPropagation(); onComplete(); }}
-          className="mt-12 px-6 py-2 border border-[#c9964a]/20 rounded-full text-[8px] text-white/40 uppercase tracking-[0.2em] hover:bg-white/5 transition-all"
+        <motion.h1 
+          initial={{ opacity: 0, letterSpacing: '0.5em' }}
+          animate={{ opacity: 1, letterSpacing: '0.22em' }}
+          transition={{ duration: 2, delay: 0.5 }}
+          className="font-cinzel text-5xl font-bold tracking-tighter mb-2"
         >
-          Skip Mission Intro
-        </button>
+          THE CHOSE
+        </motion.h1>
+        
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: 40 }}
+          transition={{ duration: 1, delay: 2 }}
+          className="h-[1px] bg-brg-gold mb-4"
+        />
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.5 }}
+          transition={{ duration: 1, delay: 2.5 }}
+          className="font-mono text-[10px] uppercase tracking-[0.3em] font-light"
+        >
+          Instrument de Précision
+        </motion.p>
       </motion.div>
     </div>
   );

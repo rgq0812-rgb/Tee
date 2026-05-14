@@ -22,19 +22,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
       return;
     }
-
-    // Safety fallback to ensure UI is never blocked indefinitely
-    const safetyTimer = setTimeout(() => {
-      setLoading(false);
-    }, 4000);
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      clearTimeout(safetyTimer);
+    return onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       
       if (firebaseUser) {
-        setLoading(false); // Set loading false immediately when user is found
-        
         // Check for success param first (optimistic/refresh)
         const urlParams = new URLSearchParams(window.location.search);
         const status = urlParams.get('payment_status');
@@ -42,20 +33,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const userDocRef = db ? doc(db, 'users', firebaseUser.uid) : null;
         
         if (status === 'success') {
+          // Note: In production, the Webhook handles the database update.
+          // We set local state to true for immediate UX, then refresh.
           setHasPaid(true);
         } else if (userDocRef) {
-          // Normal check with safety timeout
+          // Normal check
           try {
-            const docPromise = getDoc(userDocRef);
-            const timeoutPromise = new Promise((_, reject) => 
-               setTimeout(() => reject(new Error("TIMEOUT")), 5000)
-            );
-            
-            const userDoc = await Promise.race([docPromise, timeoutPromise]) as any;
+            const userDoc = await getDoc(userDocRef);
             
             if (userDoc.exists()) {
               setHasPaid(userDoc.data().subscriptionStatus === 'active');
             } else {
+              // Try client-side initialization first (now allowed by rules)
               try {
                 await setDoc(userDocRef, {
                   displayName: firebaseUser.displayName || 'ONYX Cadet',
@@ -66,24 +55,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   subscriptionStatus: 'none'
                 });
               } catch (clientErr) {
-                // Silently fail in production
+                // If it's a permission denied we might want to know why
+                if (clientErr instanceof Error && clientErr.message.includes('permission-denied')) {
+                   handleFirestoreError(clientErr, OperationType.CREATE, `users/${firebaseUser.uid}`);
+                }
+                
+                console.error("Client-side init failed, falling back to server:", clientErr);
+                // Fallback to server sync
+                fetch('/api/auth/sync', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    displayName: firebaseUser.displayName
+                  })
+                }).catch(err => console.error("Sync trigger failed:", err));
               }
+              
               setHasPaid(false);
             }
           } catch (error) {
+            console.error("Auth sync check error:", error);
+            // If getDoc fails (permission denied during sync), we can still fallback.
+            // We set paid to false for now and let the user in (if rules allow).
             setHasPaid(false);
           }
         }
       } else {
         setHasPaid(false);
-        setLoading(false); // Also false if no user (Guest mode)
       }
+      
+      setLoading(false);
     });
-
-    return () => {
-      clearTimeout(safetyTimer);
-      unsubscribe();
-    };
   }, []);
 
   return (

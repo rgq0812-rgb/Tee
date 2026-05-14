@@ -257,7 +257,7 @@ export default function ScorecardPage({
   };
 
   return (
-    <div className={`relative -mx-6 -mt-6 min-h-[calc(100vh-140px)] p-6 font-sans overflow-x-hidden transition-colors duration-300 ${isSolar ? 'bg-white text-zinc-950 font-black' : 'bg-black text-white'}`}>
+    <div className={`relative min-h-[calc(100vh-140px)] p-6 font-sans overflow-x-hidden transition-colors duration-300 ${isSolar ? 'bg-white text-zinc-950 font-black' : 'bg-black text-white'}`}>
       {/* Background Dots */}
       <div className={`absolute inset-0 z-0 pointer-events-none opacity-5 ${isSolar ? 'bg-[radial-gradient(circle_at_center,_#000_1px,_transparent_1px)]' : 'bg-[radial-gradient(circle_at_center,_#c9964a_1px,_transparent_1px)]'}`} style={{ backgroundSize: '30px 30px' }} />
 

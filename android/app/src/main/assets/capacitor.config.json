@@ -1,6 +1,0 @@
-{
-	"appId": "io.tee.app",
-	"appName": "Tee",
-	"webDir": "dist",
-	"bundledWebRuntime": false
-}

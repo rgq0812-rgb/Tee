@@ -13,7 +13,7 @@ export const PowerManager: React.FC<PowerManagerProps> = ({ children }) => {
   const [isEcoMode, setIsEcoMode] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
 
-  const DIM_TIMEOUT = 30000; // 30 seconds
+  const DIM_TIMEOUT = 120000; // 2 minutes
 
   const wakeUp = useCallback(() => {
     setIsDimmed(false);
@@ -76,9 +76,9 @@ export const PowerManager: React.FC<PowerManagerProps> = ({ children }) => {
   }, [wakeUp]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
+    <div className="relative min-h-screen">
       {/* Main Content */}
-      <div className={`w-full h-full transition-all duration-1000 ${isDimmed ? 'opacity-20 scale-[0.98] blur-sm' : 'opacity-100 scale-100 blur-0'}`}>
+      <div className={`min-h-screen transition-all duration-1000 ${isDimmed ? 'opacity-40' : 'opacity-100'}`}>
         {children}
       </div>
 
@@ -90,7 +90,7 @@ export const PowerManager: React.FC<PowerManagerProps> = ({ children }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={wakeUp}
-            className="absolute inset-0 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center cursor-pointer z-[9999]"
+            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center cursor-pointer z-[9999]"
           >
             <div className="flex flex-col items-center gap-6">
               <motion.div
@@ -106,7 +106,7 @@ export const PowerManager: React.FC<PowerManagerProps> = ({ children }) => {
               
               <div className="text-center space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.5em] text-[#c9964a]">Mode Énergie Optimisé</p>
-                <p className="text-white/40 text-[9px] font-bold italic">Dites "Hey Tee" ou touchez pour réveiller</p>
+                <p className="text-white text-[9px] font-black italic">TOUCHEZ POUR RÉACTIVER L'INTERFACE</p>
               </div>
 
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">

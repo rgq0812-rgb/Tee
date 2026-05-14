@@ -1,24 +1,53 @@
-import { initializeApp, getApp, getApps } from 'firebase/app';
+import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-// Initialize Firebase once
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch (e) {
+  console.error("Firebase initialization failed:", e);
+  // Create a dummy app object to prevent app.settings errors, or handle later
+  app = { name: '[DEFAULT]', options: {}, automaticDataCollectionEnabled: false };
+}
 
+// Valider la config pour éviter les erreurs silencieuses sur les remixes
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('INSERT')) {
+  console.error("CRITICAL: Firebase API Key is missing or invalid. Please check firebase-applet-config.json");
+}
+
+let db: any = null;
+let auth: any = null;
+
+try {
+  if (app && app.options && Object.keys(app.options).length > 0) {
+    // Initialiser Firestore standard (WebSocket) pour de meilleures performances (latence)
+    // Sauf si l'utilisateur est dans un environnement très restrictif
+    db = getFirestore(app as any, firebaseConfig.firestoreDatabaseId);
+    auth = getAuth(app as any);
+  }
+} catch (e) {
+  console.error("Firebase services initialization failed:", e);
+}
+
+export { db, auth };
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
 export const signInWithGoogle = async () => {
+  console.log("Starting Google Sign-In with popup...");
+  if (!auth) throw new Error("FIREBASE_AUTH_NOT_READY");
   try {
+    // Explicitly set language
     auth.languageCode = 'fr';
     const result = await signInWithPopup(auth, googleProvider);
+    console.log("Sign-In successful:", result.user.email);
     return result;
   } catch (error: any) {
+    console.error("Firebase Sign-In Error:", error.code, error.message);
     if (error.code === 'auth/popup-blocked') {
       throw new Error("POPUP_BLOCKED");
     }
@@ -42,7 +71,36 @@ export const registerWithEmail = async (email: string, pass: string, name: strin
   return result;
 };
 
-export const logout = () => signOut(auth);
+export const logout = () => auth ? signOut(auth) : Promise.resolve();
+
+async function testConnection(retries = 3) {
+  if (!db) {
+    console.error("[Firebase] Firestore DB not initialized, skipping connection test.");
+    return;
+  }
+  for (let i = 0; i < retries; i++) {
+    try {
+      console.log(`[Firebase] Testing connection to Firestore (Attempt ${i + 1}/${retries})...`);
+      // Use the specially allowed test path with a timeout
+      const connectionTest = getDocFromServer(doc(db, 'test', 'connection'));
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 5000));
+      
+      await Promise.race([connectionTest, timeout]);
+      console.log("[Firebase] Firestore connection healthy.");
+      return; // Success
+    } catch (error: any) {
+      console.warn(`[Firebase] Connection attempt ${i + 1} failed:`, error.message);
+      if (i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait before retry
+      } else {
+        console.error("Firebase connection failed after multiple attempts. The database might still be initializing or the project needs re-provisioning.");
+      }
+    }
+  }
+}
+
+// Lancer le test après un court délai pour laisser le temps aux services de s'initialiser
+setTimeout(() => testConnection(), 2000);
 
 export enum OperationType {
   CREATE = 'create',
@@ -80,8 +138,15 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
 
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  // If it's a quota error, we don't want to throw and crash the entire app
+  // but we should still inform the user in the console or via a non-blocking UI
   if (isQuotaExceeded) {
-    // Keep a very small warning for quota as it affects UX
-    console.warn("Firestore Quota Exceeded.");
+    console.warn("Firestore Quota Exceeded. The application may have limited functionality.");
+    return;
   }
+
+  // We log but don't throw to avoid white screen of death in critical loops
+  console.warn("Recoverable Firestore Error occurred. Application continues.");
 }

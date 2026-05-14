@@ -144,11 +144,11 @@ export default function Dashboard({
                   holeNumber: parseInt(assetId.split('_')[1])
               });
             } catch (err) {
-              // Silently handle
+              handleFirestoreError(err, OperationType.WRITE, path);
             }
          }
          setShowSyncMenu(false);
-       } catch (err) { /* ignore */ }
+       } catch (err) { console.error(err); }
     };
     reader.readAsText(file);
   };
@@ -545,7 +545,7 @@ export default function Dashboard({
   const currentCustomImage = useMemo(() => customHoleImages[`${selectedCourse.id}_${currentHole}`], [customHoleImages, selectedCourse.id, currentHole]);
 
   return (
-    <div className={`relative -mx-6 -mt-6 min-h-[calc(100vh-140px)] flex flex-col overflow-hidden ${isSolar ? 'bg-white text-zinc-950 font-black' : 'bg-black text-white'} font-sans transition-colors duration-500`}>
+    <div className={`relative flex-1 flex flex-col ${isSolar ? 'bg-white text-zinc-950 font-black' : 'bg-black text-white'} font-sans transition-colors duration-500 overflow-visible`}>
       {/* Background */}
       <div className="absolute inset-0 z-0">
         <img 
@@ -728,7 +728,7 @@ export default function Dashboard({
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
             <button onClick={() => navigateHole('prev')} disabled={currentHole === 1} className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border active:scale-95 disabled:opacity-20 shadow-md ${isSolar ? 'bg-white border-zinc-300 text-black' : 'bg-white/15 border border-white/30 text-white'}`}><ChevronLeft size={20} /></button>
             
-            <div className="flex gap-1.5 px-1 relative z-30">
+            <div className="flex gap-1.5 px-1">
               {Array.from({ length: 18 }, (_, i) => i + 1).map(h => (
                 <button
                   key={`hole-nav-${h}`}
@@ -791,7 +791,7 @@ export default function Dashboard({
 
       <AnimatePresence>
         {advice && (
-          <div className="fixed bottom-32 left-6 right-6 z-[80]">
+          <div className="fixed bottom-32 left-6 right-6 z-[60]">
             <motion.div 
               key={`advice-box-v5-${advice.substring(0, 50)}`}
               initial={{ opacity: 0, y: 20, scale: 0.95 }} 

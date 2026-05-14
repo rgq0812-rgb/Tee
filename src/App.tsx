@@ -38,11 +38,16 @@ function AppContent() {
     setIsGuest(true);
     sessionStorage.setItem('guestMode', 'true');
   };
-  // --- Global State ---
-  const [splashSeen] = useState(true);
-  const [tourSeen] = useState(true);
-  const [appPath, setAppPath] = useState<AppPath | null>('player');
-  const [missionStarted, setMissionStarted] = useState(true);
+  // --- Global State from Bible ---
+  const [splashSeen, setSplashSeen] = useState(() => sessionStorage.getItem('splashSeen') === 'true');
+  const [tourSeen, setTourSeen] = useState(() => localStorage.getItem('tourSeen') === 'true');
+  const [appPath, setAppPath] = useState<AppPath | null>(() => localStorage.getItem('app_path') as AppPath);
+  const [missionStarted, setMissionStarted] = useState(() => {
+    // If there's already a scorecard, consider mission started
+    const saved = localStorage.getItem('the-chose-scorecard');
+    if (saved && saved !== '{}') return true;
+    return localStorage.getItem('onyx_mission_active') === 'true';
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [pseudo, setPseudo] = useState(() => localStorage.getItem('onyx_pseudo') || 'OPÉRATEUR');
 
@@ -164,7 +169,10 @@ function AppContent() {
     }
   });
 
-  const [selectedCourse, setSelectedCourse] = useState(() => COURSES[0]);
+  const [selectedCourse, setSelectedCourse] = useState(() => {
+    const saved = localStorage.getItem('the-chose-selected-course');
+    return COURSES.find(c => c.id === saved) || COURSES[0];
+  });
 
   const [arsenal, setArsenal] = useState<Club[]>(() => {
     try {
@@ -272,16 +280,12 @@ function AppContent() {
     const holeData = selectedCourse.holes.find(h => h.number === holeNum);
     const existingHole = scorecard[holeNum];
     
-    // STRICT RULE: Default to 2 putts if not specified (even if 0 is passed, if strokes > 0 we want default 2 if not explicitly set)
-    // Actually, if the AI says 0 putts, it's possible (chip in), but usually the user wants "2 by default"
-    // User said: "il faut 2 putt d office tu comprends" -> "d'office" means "automatically/mandatory default"
-    let finalPutts = 0;
+    // STRICT RULE: Default to 2 putts if not specified
+    let finalPutts = 2;
     if (putts !== undefined && putts !== null) {
       finalPutts = putts;
-    } else if (existingHole && existingHole.putts > 0) {
+    } else if (existingHole && existingHole.putts !== undefined) {
       finalPutts = existingHole.putts;
-    } else if (strokes > 0) {
-      finalPutts = 2; // The requested default
     }
 
     setScorecard(prev => ({
@@ -319,18 +323,6 @@ function AppContent() {
     localStorage.setItem('the-chose-selected-tee', selectedTee);
   }, [appPath, scorecard, currentHole, selectedCourse, eliteXP, arsenal, playerForm, handicap, activeCaddie, selectedMode, displayMode, selectedTee]);
 
-  const handleSplashComplete = useCallback(() => {
-    sessionStorage.setItem('splashSeen', 'true');
-  }, []);
-
-  const handleTourComplete = useCallback(() => {
-    localStorage.setItem('tourSeen', 'true');
-  }, []);
-
-  const handlePathSelect = useCallback((path: AppPath) => {
-    setAppPath(path);
-  }, []);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -349,15 +341,21 @@ function AppContent() {
   }
 
   if (!splashSeen) {
-    return <SplashScreen onComplete={handleSplashComplete} />;
+    return <SplashScreen onComplete={() => {
+      setSplashSeen(true);
+      sessionStorage.setItem('splashSeen', 'true');
+    }} />;
   }
 
   if (!tourSeen) {
-    return <WelcomeTour onComplete={handleTourComplete} />;
+    return <WelcomeTour onComplete={() => {
+      setTourSeen(true);
+      localStorage.setItem('tourSeen', 'true');
+    }} />;
   }
 
   if (!appPath) {
-    return <PathSelector onSelect={handlePathSelect} />;
+    return <PathSelector onSelect={(path) => setAppPath(path)} />;
   }
 
   if (appPath === 'player' && !missionStarted) {
@@ -392,113 +390,162 @@ function AppContent() {
       >
       <AnimatePresence mode="wait">
         {activeTab === 'dashboard' && (
-          <Dashboard 
-            key="dashboard"
-            scorecard={scorecard}
-            setScorecard={setScorecard}
-            currentHole={currentHole}
-            setCurrentHole={setCurrentHole}
-            selectedCourse={selectedCourse}
-            setSelectedCourse={setSelectedCourse}
-            advice={advice}
-            setAdvice={setAdvice}
-            eliteXP={eliteXP}
-            setEliteXP={setEliteXP}
-            arsenal={arsenal}
-            setArsenal={setArsenal}
-            selectedMode={selectedMode}
-            setSelectedMode={setSelectedMode}
-            playerForm={playerForm}
-            setPlayerForm={setPlayerForm}
-            handicap={handicap}
-            onUpdateScore={updateScore}
-            setActiveTab={setActiveTab}
-            setShowLieScanner={setShowLieScanner}
-            activeCaddie={activeCaddie}
-            setActiveCaddie={setActiveCaddie}
-            setMissionStarted={setMissionStarted}
-            setAppPath={setAppPath}
-            displayMode={displayMode}
-            selectedTee={selectedTee}
-          />
+          <motion.div
+            key="dashboard-wrapper"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Dashboard 
+              key="dashboard"
+              scorecard={scorecard}
+              setScorecard={setScorecard}
+              currentHole={currentHole}
+              setCurrentHole={setCurrentHole}
+              selectedCourse={selectedCourse}
+              setSelectedCourse={setSelectedCourse}
+              advice={advice}
+              setAdvice={setAdvice}
+              eliteXP={eliteXP}
+              setEliteXP={setEliteXP}
+              arsenal={arsenal}
+              setArsenal={setArsenal}
+              selectedMode={selectedMode}
+              setSelectedMode={setSelectedMode}
+              playerForm={playerForm}
+              setPlayerForm={setPlayerForm}
+              handicap={handicap}
+              onUpdateScore={updateScore}
+              setActiveTab={setActiveTab}
+              setShowLieScanner={setShowLieScanner}
+              activeCaddie={activeCaddie}
+              setActiveCaddie={setActiveCaddie}
+              setMissionStarted={setMissionStarted}
+              setAppPath={setAppPath}
+              displayMode={displayMode}
+              selectedTee={selectedTee}
+            />
+          </motion.div>
         )}
         {activeTab === 'community' && (
-          <Community 
-            key="community"
-            displayMode={displayMode}
-          />
+          <motion.div
+            key="community-wrapper"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Community 
+              key="community"
+              displayMode={displayMode}
+            />
+          </motion.div>
         )}
         {activeTab === 'tactical' && (
-          <TacticalMap 
-            key="tactical"
-            selectedCourse={selectedCourse}
-            currentHole={currentHole}
-            activeCaddie={activeCaddie}
-            displayMode={displayMode}
-            selectedTee={selectedTee}
-          />
+          <motion.div
+            key="tactical-wrapper"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.3 }}
+          >
+            <TacticalMap 
+              key="tactical"
+              selectedCourse={selectedCourse}
+              currentHole={currentHole}
+              activeCaddie={activeCaddie}
+              displayMode={displayMode}
+              selectedTee={selectedTee}
+            />
+          </motion.div>
         )}
         {activeTab === 'scorecard' && (
-          <ScorecardPage 
-            key="scorecard" 
-            user={user}
-            scorecard={scorecard} 
-            setScorecard={setScorecard}
-            selectedCourse={selectedCourse}
-            setSelectedCourse={setSelectedCourse}
-            currentHole={currentHole}
-            setCurrentHole={setCurrentHole}
-            activeCaddie={activeCaddie}
-            setActiveCaddie={setActiveCaddie}
-            selectedMode={selectedMode}
-            setSelectedMode={setSelectedMode}
-            handicap={handicap}
-            setHandicap={setHandicap}
-            arsenal={arsenal}
-            setArsenal={setArsenal}
-            setShowMentorModal={setShowMentorModal}
-            setMentorInitialMessage={setMentorInitialMessage}
-            setMissionStarted={setMissionStarted}
-            setAppPath={setAppPath}
-            displayMode={displayMode}
-            setActiveTab={setActiveTab}
-            selectedTee={selectedTee}
-          />
+          <motion.div
+            key="scorecard-wrapper"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.3 }}
+          >
+            <ScorecardPage 
+              key="scorecard" 
+              user={user}
+              scorecard={scorecard} 
+              setScorecard={setScorecard}
+              selectedCourse={selectedCourse}
+              setSelectedCourse={setSelectedCourse}
+              currentHole={currentHole}
+              setCurrentHole={setCurrentHole}
+              activeCaddie={activeCaddie}
+              setActiveCaddie={setActiveCaddie}
+              selectedMode={selectedMode}
+              setSelectedMode={setSelectedMode}
+              handicap={handicap}
+              setHandicap={setHandicap}
+              arsenal={arsenal}
+              setArsenal={setArsenal}
+              setShowMentorModal={setShowMentorModal}
+              setMentorInitialMessage={setMentorInitialMessage}
+              setMissionStarted={setMissionStarted}
+              setAppPath={setAppPath}
+              displayMode={displayMode}
+              setActiveTab={setActiveTab}
+              selectedTee={selectedTee}
+            />
+          </motion.div>
         )}
         {activeTab === 'academy' && (
-          <Academy 
-            key="academy"
-            displayMode={displayMode}
-            scorecard={scorecard}
-            pseudo={pseudo}
-            setPseudo={setPseudo}
-            arsenal={arsenal}
-            index={handicap}
-            currentHole={currentHole}
-            activeSession={activeSession}
-            sessionTimeLeft={sessionTimeLeft}
-            isSessionRunning={isSessionRunning}
-            startDrillSession={startDrillSession}
-            stopDrillSession={stopDrillSession}
-          />
+          <motion.div
+            key="academy-wrapper"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Academy 
+              key="academy"
+              displayMode={displayMode}
+              scorecard={scorecard}
+              pseudo={pseudo}
+              setPseudo={setPseudo}
+              arsenal={arsenal}
+              index={handicap}
+              currentHole={currentHole}
+              activeSession={activeSession}
+              sessionTimeLeft={sessionTimeLeft}
+              isSessionRunning={isSessionRunning}
+              startDrillSession={startDrillSession}
+              stopDrillSession={stopDrillSession}
+            />
+          </motion.div>
         )}
         {activeTab === 'profile' && (
-          <Profile 
-            key="profile" 
-            selectedCourse={selectedCourse} 
-            arsenal={arsenal}
-            setArsenal={setArsenal}
-            playerForm={playerForm}
-            setPlayerForm={setPlayerForm}
-            handicap={handicap}
-            setHandicap={setHandicap}
-            setActiveTab={setActiveTab}
-            setShowMentorModal={setShowMentorModal}
-            setMentorInitialMessage={setMentorInitialMessage}
-            setMissionStarted={setMissionStarted}
-            setAppPath={setAppPath}
-            displayMode={displayMode}
-          />
+          <motion.div
+            key="profile-wrapper"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Profile 
+              key="profile" 
+              selectedCourse={selectedCourse} 
+              arsenal={arsenal}
+              setArsenal={setArsenal}
+              playerForm={playerForm}
+              setPlayerForm={setPlayerForm}
+              handicap={handicap}
+              setHandicap={setHandicap}
+              setTourSeen={setTourSeen}
+              setActiveTab={setActiveTab}
+              setShowMentorModal={setShowMentorModal}
+              setMentorInitialMessage={setMentorInitialMessage}
+              setMissionStarted={setMissionStarted}
+              setAppPath={setAppPath}
+              displayMode={displayMode}
+            />
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -659,12 +706,16 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 }
 
 export default function App() {
+  const API_KEY = 
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 
+    '';
+
   return (
     <ErrorBoundary>
       <AuthProvider>
         <ChatProvider>
           <APIProvider 
-            apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''} 
+            apiKey={API_KEY} 
             libraries={['places', 'marker']}
             onLoad={() => console.log("[ONYX] Google Maps API Loaded")}
             onError={(err) => {

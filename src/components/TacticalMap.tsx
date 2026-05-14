@@ -4,7 +4,9 @@ import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-m
 import { Crosshair, Navigation, Target, Shield, Brain, Zap, Info, ChevronRight, Map as MapIcon, X, Search, AlertCircle } from 'lucide-react';
 import { analyzeTarget } from '../services/geminiService';
 
-const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const API_KEY = 
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 
+  '';
 const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY' && API_KEY.length > 5;
 
 interface TacticalMapProps {
@@ -39,27 +41,20 @@ const MapPin = ({ size, className }: { size?: number, className?: string }) => (
 );
 
 const AIScreen = ({ isSolar }: { isSolar?: boolean }) => (
-  <div className={`flex flex-col items-center justify-center h-full p-8 text-center ${isSolar ? 'bg-zinc-50 text-black' : 'bg-black text-white'}`}>
-    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 animate-pulse ${isSolar ? 'bg-black/5 border-black/10' : 'bg-[#c9964a]/20 border-[#c9964a]/40'}`}>
-      <MapPin size={32} className={isSolar ? 'text-black' : 'text-[#c9964a]'} />
+  <div className={`flex flex-col items-center justify-center h-full p-8 text-center ${isSolar ? 'bg-zinc-50 text-black' : 'bg-zinc-950 text-white'}`}>
+    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 animate-pulse border ${isSolar ? 'bg-black/5 border-black/10' : 'bg-orange-500/10 border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)]'}`}>
+      <AlertCircle size={32} className={isSolar ? 'text-black' : 'text-orange-500'} />
     </div>
-    <h2 className={`text-xl font-black uppercase tracking-[0.3em] mb-4 ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>GPS Non Configuré</h2>
-    <p className={`text-sm leading-relaxed max-w-xs mb-8 ${isSolar ? 'text-zinc-500 font-bold' : 'text-white/40'}`}>
-      Le protocole satellite nécessite une clé d'accès Google Maps Platform pour le rendu tactique.
+    <h2 className={`text-xl font-black uppercase tracking-[0.3em] mb-4 ${isSolar ? 'text-black' : 'text-orange-500'}`}>ONYX : ACCÈS RESTREINT</h2>
+    <p className={`text-[10px] uppercase font-bold tracking-widest leading-relaxed max-w-xs mb-8 ${isSolar ? 'text-zinc-500' : 'text-white/40'}`}>
+      L'unité tactile nécessite une clé d'activation Google Maps Platform valide.
     </p>
-    <div className={`border p-6 rounded-3xl text-left w-full space-y-4 ${isSolar ? 'bg-white border-zinc-200 shadow-sm' : 'bg-white/5 border-white/10'}`}>
+    <div className={`border p-6 rounded-3xl text-left w-full space-y-4 ${isSolar ? 'bg-white border-zinc-200 shadow-sm' : 'bg-black/40 border-white/10'}`}>
       <div className="flex gap-4">
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-sans shrink-0 ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black'}`}>1</div>
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-sans shrink-0 ${isSolar ? 'bg-black text-white' : 'bg-orange-500 text-black'}`}>1</div>
         <div className="flex flex-col">
-          <p className={`text-[10px] uppercase tracking-widest leading-tight mb-1 font-bold ${isSolar ? 'text-black' : 'text-white/80'}`}>Activer <span className={`${isSolar ? 'text-black font-black underline decoration-2' : 'text-[#c9964a] underline'}`}>Maps JavaScript API</span></p>
-          <p className={`text-[9px] leading-normal italic text-xs ${isSolar ? 'text-zinc-500' : 'text-white/40'}`}>C'est différent du 'SDK Android'. Activez 'Maps JavaScript API' dans la console Google Cloud.</p>
-        </div>
-      </div>
-      <div className="flex gap-4">
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isSolar ? 'bg-zinc-100 text-zinc-400' : 'bg-white/10'}`}>2</div>
-        <div className="flex flex-col">
-          <p className={`text-[10px] uppercase tracking-widest leading-tight mb-1 font-bold ${isSolar ? 'text-zinc-400' : 'text-white/60'}`}>VÉRIFIER LE DOMAINE (Referrer)</p>
-          <p className={`text-[9px] leading-normal italic text-xs ${isSolar ? 'text-zinc-500' : 'text-white/40'}`}>Assurez-vous que l'URL de l'application est autorisée dans les restrictions de clés.</p>
+          <p className={`text-[10px] uppercase tracking-widest leading-tight mb-1 font-bold ${isSolar ? 'text-black' : 'text-white/80'}`}>Protocol : <span className={`${isSolar ? 'text-black font-black underline decoration-2' : 'text-orange-500 underline'}`}>Maps JavaScript API</span></p>
+          <p className={`text-[9px] leading-normal italic ${isSolar ? 'text-zinc-500' : 'text-white/40'}`}>Activation requise dans la console Cloud.</p>
         </div>
       </div>
     </div>
@@ -219,6 +214,8 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const map = useMap();
 
+  const [mapReady, setMapReady] = useState(false);
+
   // Reset Mire to midpoint and fit bounds on hole change
   useEffect(() => {
     if (!hole || !hole.teeBox || !hole.green?.middle) return;
@@ -231,15 +228,10 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
     setMire(midpoint);
 
     if (map) {
-      const bounds = new window.google.maps.LatLngBounds();
-      bounds.extend(hole.teeBox);
-      bounds.extend(hole.green.middle);
-      map.fitBounds(bounds, { top: 100, bottom: 200, left: 50, right: 50 });
-      
-      // Smooth animation to center
-      setTimeout(() => {
-        map.panTo(midpoint);
-      }, 500);
+      setMapReady(true);
+      // Revert to stable zoom and center
+      map.setCenter(midpoint);
+      map.setZoom(17);
     }
   }, [currentHole, hole.number, map]);
 
@@ -289,29 +281,38 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
              </div>
           )}
           {/* Points A, B, C */}
-          {hasGps && (
+          {hasGps && mapReady && (
             <>
               <AdvancedMarker 
                 key={`tee-marker-${hole.number}`}
                 position={hole.teeBox} 
                 title="Tee Box (A)"
               >
-                <div className={`border-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${isSolar ? 'bg-black border-black text-white' : 'bg-black border-white text-white'}`}>A</div>
+                <div className={`border-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg ${isSolar ? 'bg-black border-black text-white' : 'bg-black border-white text-white'}`}>A</div>
               </AdvancedMarker>
 
               <AdvancedMarker 
                 key={`mire-marker-${hole.number}`}
                 position={mire} 
                 draggable={true}
-                onDragEnd={(e: any) => {
-                  if (e.latLng) setMire({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+                onDrag={(e: any) => {
+                  if (e.latLng) {
+                    setMire({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+                  }
                 }}
+                onDragEnd={(e: any) => {
+                  if (e.latLng) {
+                    setMire({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+                  }
+                }}
+                zIndex={100}
               >
-                <motion.div 
-                  layoutId="pivot-c"
-                  className={`w-8 h-8 rounded-full border-2 backdrop-blur-md flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-grab active:cursor-grabbing ${isSolar ? 'bg-white/80 border-black text-black shadow-lg' : 'bg-black/60 border-[#c9964a] text-[#c9964a]'}`}>
-                  <Target size={16} />
-                </motion.div>
+                <div 
+                  style={{ pointerEvents: 'auto' }}
+                  className="w-14 h-14 rounded-full border-2 border-orange-500 bg-orange-500/20 backdrop-blur-md flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.8)] cursor-grab active:cursor-grabbing transition-transform hover:scale-110 active:scale-95">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse shadow-[0_0_10px_#f97316]" />
+                  <Target size={28} className="text-orange-500 absolute" strokeWidth={3} />
+                </div>
               </AdvancedMarker>
 
               <AdvancedMarker 
@@ -319,7 +320,7 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
                 position={hole.green.middle}
                 title="Green (C)"
               >
-                <div className={`border-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${isSolar ? 'bg-black border-black text-white' : 'bg-[#c9964a] border-black text-black'}`}>C</div>
+                <div className={`border-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg ${isSolar ? 'bg-black border-black text-white' : 'bg-[#c9964a] border-black text-black'}`}>C</div>
               </AdvancedMarker>
      
               <LineOverlay points={[hole.teeBox, mire, hole.green.middle]} isSolar={isSolar} />
@@ -387,25 +388,25 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
  
       <div className="absolute bottom-6 left-6 right-6 flex items-center gap-3">
          <motion.div 
-            animate={isAnalyzing ? { scale: [1, 1.05, 1], opacity: [0.5, 1, 0.5] } : {}}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className={`backdrop-blur-3xl border h-16 rounded-[1.8rem] flex items-center px-6 gap-4 shadow-lg ${isSolar ? 'bg-white/95 border-zinc-200' : 'bg-black/80 border-white/10'}`}
+            animate={isAnalyzing ? { scale: [1, 1.02, 1], opacity: [0.8, 1, 0.8] } : {}}
+            transition={{ duration: 1, repeat: Infinity }}
+            className={`backdrop-blur-3xl border h-16 rounded-2xl flex items-center px-6 gap-4 shadow-lg flex-1 ${isSolar ? 'bg-white/95 border-zinc-200' : 'bg-black/90 border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]'}`}
           >
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${isSolar ? 'bg-black shadow-inner border-black text-white' : 'bg-white/5 border-white/10 text-[#c9964a]'}`}>
-               <Shield size={18} />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border transition-colors ${isSolar ? 'bg-black text-white border-black' : 'bg-orange-500/10 border-orange-500/30 text-orange-500'}`}>
+               <Shield size={20} />
             </div>
             <div className="flex flex-col">
-               <span className={`text-[8px] font-black uppercase tracking-[0.2em] leading-none mb-1 ${isSolar ? 'text-zinc-400 font-bold' : 'text-white/30'}`}>ANALYSE BALISTIQUE</span>
-               <span className={`text-[10px] font-black italic uppercase tracking-widest ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>
-                 {isAnalyzing ? 'Calcul en cours...' : 'Prêt pour engagement'}
+               <span className={`text-[8px] font-black uppercase tracking-[0.2em] leading-none mb-1 ${isSolar ? 'text-zinc-400' : 'text-white/30'}`}>STATUT OPÉRATIONNEL</span>
+               <span className={`text-[10px] font-black italic uppercase tracking-widest ${isSolar ? 'text-black' : 'text-orange-500'}`}>
+                 {isAnalyzing ? 'Calcul balistique...' : 'Mode Chirurgical Actif'}
                </span>
             </div>
          </motion.div>
          <button 
            onClick={performAnalysis}
-           className={`w-16 h-16 rounded-[1.8rem] flex items-center justify-center shadow-xl active:scale-95 transition-all ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black shadow-[0_15px_40px_rgba(201,150,74,0.3)]'}`}
+           className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl active:scale-90 transition-all border ${isSolar ? 'bg-black text-white border-black' : 'bg-orange-500 text-black border-orange-400/50 shadow-orange-500/20'}`}
           >
-            <Navigation size={24} />
+            <Navigation size={24} strokeWidth={3} />
          </button>
       </div>
     </div>

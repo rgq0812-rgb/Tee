@@ -98,7 +98,7 @@ export default function TacticalHoleView({ hole, customImage, userLocation, sele
         <img 
           src={customImage || hole.customImage} 
           alt={`Hole ${hole.number} drawing`}
-          className="absolute inset-0 w-full h-full object-cover opacity-90 mix-blend-lighten z-0 scale-105"
+          className="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-screen z-0"
           onError={(e) => {
             (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1535131749006-b7f58c9903e7?q=80&w=2000&auto=format&fit=crop';
           }}

@@ -24,7 +24,7 @@ export default function Layout({ children, activeTab, setActiveTab, displayMode,
   const isSolar = displayMode === 'solar';
 
   return (
-    <div className={`min-h-screen ${isSolar ? 'bg-zinc-50 text-black' : 'bg-black text-white'} font-sans transition-colors duration-500 selection:bg-[#c9964a]/30 overflow-x-hidden`}>
+    <div className={`min-h-screen ${isSolar ? 'bg-zinc-50 text-black' : 'bg-black text-white'} font-sans transition-colors duration-500 selection:bg-[#c9964a]/30 overflow-x-hidden overflow-y-auto`}>
       <header className={`fixed top-0 left-0 right-0 z-[60] ${isSolar ? 'bg-white/90 border-zinc-200 shadow-sm' : 'bg-black/95 border-white/10'} backdrop-blur-xl border-b px-4 py-3 flex justify-between items-center h-16 transition-all`}>
         <div className="flex items-center gap-3">
           <div className="flex items-baseline gap-1">
@@ -61,7 +61,7 @@ export default function Layout({ children, activeTab, setActiveTab, displayMode,
         </div>
       </header>
 
-      <main className="pt-16 pb-32 max-w-md mx-auto relative min-h-screen">
+      <main className="pt-16 pb-32 max-w-md mx-auto relative">
         <motion.div
           key={`tab-container-${activeTab}-${displayMode}`}
           initial={{ opacity: 0, scale: 0.98 }}
@@ -73,7 +73,7 @@ export default function Layout({ children, activeTab, setActiveTab, displayMode,
         </motion.div>
       </main>
 
-      <nav className="fixed bottom-6 left-0 right-0 z-[70] px-6 pointer-events-none pb-safe">
+      <nav className="fixed bottom-6 left-0 right-0 z-[2000] px-6 pointer-events-none pb-safe">
         <div className={`max-w-md mx-auto flex justify-between items-center ${isSolar ? 'bg-white border-zinc-200 text-black shadow-xl' : 'bg-zinc-900/90 border-white/20 text-white'} backdrop-blur-3xl border p-1.5 rounded-[2.5rem] shadow-2xl pointer-events-auto transition-all`}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
