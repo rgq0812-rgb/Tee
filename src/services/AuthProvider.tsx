@@ -17,6 +17,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [hasPaid, setHasPaid] = useState(false);
 
   useEffect(() => {
+    if (!auth) {
+      console.warn("[ONYX] Auth service not available");
+      setLoading(false);
+      return;
+    }
     return onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       
@@ -25,13 +30,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const urlParams = new URLSearchParams(window.location.search);
         const status = urlParams.get('payment_status');
         
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocRef = db ? doc(db, 'users', firebaseUser.uid) : null;
         
         if (status === 'success') {
           // Note: In production, the Webhook handles the database update.
           // We set local state to true for immediate UX, then refresh.
           setHasPaid(true);
-        } else {
+        } else if (userDocRef) {
           // Normal check
           try {
             const userDoc = await getDoc(userDocRef);

@@ -17,14 +17,16 @@ if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('INSERT')) {
   console.error("CRITICAL: Firebase API Key is missing or invalid. Please check firebase-applet-config.json");
 }
 
-let db: any;
-let auth: any;
+let db: any = null;
+let auth: any = null;
 
 try {
-  // Initialiser Firestore standard (WebSocket) pour de meilleures performances (latence)
-  // Sauf si l'utilisateur est dans un environnement très restrictif
-  db = getFirestore(app as any, firebaseConfig.firestoreDatabaseId);
-  auth = getAuth(app as any);
+  if (app && app.options && Object.keys(app.options).length > 0) {
+    // Initialiser Firestore standard (WebSocket) pour de meilleures performances (latence)
+    // Sauf si l'utilisateur est dans un environnement très restrictif
+    db = getFirestore(app as any, firebaseConfig.firestoreDatabaseId);
+    auth = getAuth(app as any);
+  }
 } catch (e) {
   console.error("Firebase services initialization failed:", e);
 }
@@ -37,6 +39,7 @@ googleProvider.setCustomParameters({
 
 export const signInWithGoogle = async () => {
   console.log("Starting Google Sign-In with popup...");
+  if (!auth) throw new Error("FIREBASE_AUTH_NOT_READY");
   try {
     // Explicitly set language
     auth.languageCode = 'fr';
@@ -68,9 +71,13 @@ export const registerWithEmail = async (email: string, pass: string, name: strin
   return result;
 };
 
-export const logout = () => signOut(auth);
+export const logout = () => auth ? signOut(auth) : Promise.resolve();
 
 async function testConnection(retries = 3) {
+  if (!db) {
+    console.error("[Firebase] Firestore DB not initialized, skipping connection test.");
+    return;
+  }
   for (let i = 0; i < retries; i++) {
     try {
       console.log(`[Firebase] Testing connection to Firestore (Attempt ${i + 1}/${retries})...`);
@@ -122,10 +129,10 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
+      userId: auth?.currentUser?.uid,
+      email: auth?.currentUser?.email,
+      emailVerified: auth?.currentUser?.emailVerified,
+      isAnonymous: auth?.currentUser?.isAnonymous,
     },
     operationType,
     path
