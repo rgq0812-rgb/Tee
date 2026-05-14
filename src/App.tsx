@@ -626,7 +626,11 @@ export default function App() {
       <ChatProvider>
         <APIProvider 
           apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''} 
-          libraries={['places', 'marker']}
+          libraries={['places']}
+          onLoad={() => console.log("[ONYX] Google Maps API Loaded")}
+          onError={(err) => {
+            console.error("[ONYX] Google Maps Load Error:", err);
+          }}
         >
           <AppContent />
         </APIProvider>

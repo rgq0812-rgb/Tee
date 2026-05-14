@@ -16,6 +16,94 @@ interface TrainingProgram {
   drills: Drill[];
 }
 
+const AcademyArenaMap = ({ isSolar }: { isSolar: boolean }) => {
+  const map = useMap();
+  const [arenas, setArenas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (map && window.google) {
+      const loadArenas = async () => {
+        try {
+          // Find golf courses/academies nearby within 50km
+          const results = await searchPlaces("golf academy", { lat: 43.7065, lng: 5.2080 }); // Centered on Pont Royal
+          setArenas(results || []);
+        } catch (error) {
+          console.error("Arenas search failed:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      loadArenas();
+    }
+  }, [map]);
+
+  const getLatLng = (arena: any) => {
+    const loc = arena.geometry?.location;
+    if (!loc) return null;
+    if (typeof loc.lat === 'function') {
+      return { lat: loc.lat(), lng: loc.lng() };
+    }
+    return { lat: loc.lat, lng: loc.lng };
+  };
+
+  return (
+    <>
+      <Map
+        mapId="ACADEMY_ARENA_MAP"
+        defaultCenter={{ lat: 43.7065, lng: 5.2080 }}
+        defaultZoom={11}
+        mapTypeId={isSolar ? "terrain" : "satellite"}
+        disableDefaultUI={true}
+        gestureHandling={'greedy'}
+        style={{ width: '100%', height: '100%' }}
+      >
+        {arenas.map((arena, i) => {
+          const pos = getLatLng(arena);
+          if (!pos) return null;
+          return (
+            <AdvancedMarker
+              key={arena.place_id || i}
+              position={pos}
+              title={arena.name}
+            >
+              <div className={`flex flex-col items-center group cursor-pointer`}>
+                 <div className={`p-2 rounded-full border-2 transform group-hover:scale-110 transition-transform ${isSolar ? 'bg-white border-black text-black' : 'bg-black border-[#c9964a] text-[#c9964a]'}`}>
+                    <Target size={16} />
+                 </div>
+                 <div className={`absolute top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded whitespace-nowrap z-[200]`}>
+                    {arena.name}
+                 </div>
+              </div>
+            </AdvancedMarker>
+          );
+        })}
+      </Map>
+
+      {loading && (
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+             <Loader2 className="w-8 h-8 animate-spin text-[#c9964a]" />
+             <p className="text-[10px] font-black uppercase tracking-widest text-[#c9964a] animate-pulse">Scan Radar Arena en cours...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Overlay */}
+      <div className="absolute bottom-6 left-6 right-6 flex gap-4 pointer-events-none">
+        <div className={`p-4 rounded-2xl backdrop-blur-xl border-2 flex-1 ${isSolar ? 'bg-white/90 border-zinc-200 shadow-xl' : 'bg-black/60 border-[#c9964a]/30 shadow-2xl'}`}>
+           <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1">Arenas</p>
+           <p className="text-xl font-black italic font-mono">{arenas.length}</p>
+        </div>
+        <div className={`p-4 rounded-2xl backdrop-blur-xl border-2 flex-1 ${isSolar ? 'bg-white/90 border-zinc-200 shadow-xl' : 'bg-black/60 border-[#c9964a]/30 shadow-2xl'}`}>
+           <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1">Radar</p>
+           <p className="text-xl font-black italic font-mono">50KM</p>
+        </div>
+      </div>
+    </>
+  );
+};
+
 const AcademyBackground = React.memo(({ isSolar }: { isSolar: boolean }) => {
   const relics = useMemo(() => [
     { Icon: Target, size: 32 },
@@ -350,6 +438,7 @@ export default function Academy({
 
   const loadTeacherCoaching = async (teacherKey: 'marcus' | 'elena') => {
     setSelectedTeacher(teacherKey);
+    setShowTeacherChat(true); // Automatically open chat when teacher is selected
     setIsTeacherLoading(true);
     setTeacherAnalysis(null);
     setTeacherChat([]);
@@ -2044,81 +2133,3 @@ export default function Academy({
     </div>
   );
 }
-
-const AcademyArenaMap = ({ isSolar }: { isSolar: boolean }) => {
-  const map = useMap();
-  const [arenas, setArenas] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (map && window.google) {
-      const loadArenas = async () => {
-        try {
-          // Find golf courses/academies nearby within 50km
-          const results = await searchPlaces("golf academy", { lat: 48.8566, lng: 2.3522 }); // Default to Paris center if no geo
-          setArenas(results || []);
-        } catch (error) {
-          console.error("Arenas search failed:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      loadArenas();
-    }
-  }, [map]);
-
-  return (
-    <>
-      <Map
-        mapId="ACADEMY_ARENA_MAP"
-        defaultCenter={{ lat: 48.8566, lng: 2.3522 }}
-        defaultZoom={11}
-        mapTypeId={isSolar ? "terrain" : "satellite"}
-        disableDefaultUI={true}
-        gestureHandling={'greedy'}
-        style={{ width: '100%', height: '100%' }}
-      >
-        {arenas.map((arena, i) => (
-          <AdvancedMarker
-            key={arena.place_id || i}
-            position={{ 
-              lat: arena.geometry.location.lat(), 
-              lng: arena.geometry.location.lng() 
-            }}
-            title={arena.name}
-          >
-            <div className={`flex flex-col items-center group cursor-pointer`}>
-               <div className={`p-2 rounded-full border-2 transform group-hover:scale-110 transition-transform ${isSolar ? 'bg-white border-black text-black' : 'bg-black border-[#c9964a] text-[#c9964a]'}`}>
-                  <Target size={16} />
-               </div>
-               <div className={`absolute top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded whitespace-nowrap z-[200]`}>
-                  {arena.name}
-               </div>
-            </div>
-          </AdvancedMarker>
-        ))}
-      </Map>
-
-      {loading && (
-        <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-             <Loader2 className="w-8 h-8 animate-spin text-[#c9964a]" />
-             <p className="text-[10px] font-black uppercase tracking-widest text-[#c9964a] animate-pulse">Scan Radar Arena en cours...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Stats Overlay */}
-      <div className="absolute bottom-6 left-6 right-6 flex gap-4 pointer-events-none">
-        <div className={`p-4 rounded-2xl backdrop-blur-xl border-2 flex-1 ${isSolar ? 'bg-white/90 border-zinc-200 shadow-xl' : 'bg-black/60 border-[#c9964a]/30 shadow-2xl'}`}>
-           <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1">Arenas Détectées</p>
-           <p className="text-xl font-black italic font-mono">{arenas.length}</p>
-        </div>
-        <div className={`p-4 rounded-2xl backdrop-blur-xl border-2 flex-1 ${isSolar ? 'bg-white/90 border-zinc-200 shadow-xl' : 'bg-black/60 border-[#c9964a]/30 shadow-2xl'}`}>
-           <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1">Rayon Satellite</p>
-           <p className="text-xl font-black italic font-mono">50KM</p>
-        </div>
-      </div>
-    </>
-  );
-};
