@@ -245,7 +245,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
             className={`w-full h-full sm:max-w-xl sm:h-[90vh] ${isSolar ? 'bg-white' : 'bg-black'} border-t sm:border ${isSolar ? 'border-zinc-200 shadow-2xl' : 'border-white/10'} sm:rounded-[2.5rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] flex flex-col relative`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 ${isSolar ? 'opacity-100' : 'opacity-100'}`}>
+            <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 will-change-transform ${isSolar ? 'opacity-100' : 'opacity-100'}`}>
                <AudioVisualizer 
                  isActive={isLoading || isSpeaking || isListening} 
                  mode={isLoading ? 'thinking' : isSpeaking ? 'speaking' : isListening ? 'listening' : 'idle'}
@@ -478,10 +478,10 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
             </div>
 
             {/* SCROLLING CONVERSATION */}
-            <div ref={scrollRef} className={`relative z-20 flex-1 overflow-y-auto px-6 py-6 scrollbar-hide overflow-anchor-none ${isSolar ? 'bg-zinc-50/50' : 'bg-transparent'}`}>
+            <div ref={scrollRef} className={`relative z-20 flex-1 overflow-y-auto px-6 py-6 scroll-smooth scrollbar-hide overflow-anchor-none ${isSolar ? 'bg-zinc-50/50' : 'bg-transparent'}`}>
               <div className="flex flex-col min-h-full">
                 {messages.map((msg, idx) => (
-                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-6 relative`}>
+                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-6 relative will-change-transform`}>
                     <div className={`max-w-[85%] ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
                         <div className={`inline-block p-4 rounded-2xl text-[14px] font-medium leading-relaxed shadow-xl ${
                           msg.role === 'user' 

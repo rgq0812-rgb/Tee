@@ -98,14 +98,16 @@ function AppContent() {
         const message = await getCoachingIntervention(elapsedMinutes, activeSession.title, commMode, isWarmup);
         
         if (message) {
-          setMentorTacticalMode('ENTRAÎNEMENT');
-          setMentorInitialMessage(message);
-          setShowMentorModal(true);
-          
-          // Dispatch event for existing chat session if already open
-          window.dispatchEvent(new CustomEvent('onyx_inject_message', { 
-            detail: { text: message, speaker: 'ONYX' } 
+          // ALWAYS send to teacher chat if in a drill session, as requested by user
+          window.dispatchEvent(new CustomEvent('onyx_teacher_message', { 
+            detail: { text: message } 
           }));
+
+          // Optionally, if not in academy, we could show a small toast, 
+          // but user said "ONLY in the teacher's chat"
+          if (activeTab !== 'academy') {
+            console.log("[ONYX] Academy coaching suppressed in main chat:", message);
+          }
         }
       };
 
@@ -122,7 +124,6 @@ function AppContent() {
     } else if (sessionTimeLeft === 0 && isSessionRunning) {
       setIsSessionRunning(false);
       setShowTimeUp(true);
-      playSoftBell();
       setTimeout(() => setShowTimeUp(false), 5000);
     }
     return () => clearInterval(interval);

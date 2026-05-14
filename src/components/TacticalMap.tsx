@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
-import { Crosshair, Navigation, Target, Shield, Brain, Zap, Info, ChevronRight, Map as MapIcon, X } from 'lucide-react';
+import { Crosshair, Navigation, Target, Shield, Brain, Zap, Info, ChevronRight, Map as MapIcon, X, Search } from 'lucide-react';
 import { analyzeTarget } from '../services/geminiService';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -117,6 +117,84 @@ const LineOverlay = ({ points, isSolar }: { points: any[], isSolar?: boolean }) 
   return null;
 };
 
+const MapSearch = ({ isSolar, onPlaceSelect }: { isSolar: boolean, onPlaceSelect: (pos: { lat: number, lng: number }) => void }) => {
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const map = useMap();
+  const placesService = useRef<google.maps.places.AutocompleteService | null>(null);
+  const geocoder = useRef<google.maps.Geocoder | null>(null);
+
+  useEffect(() => {
+    if (window.google && window.google.maps && !placesService.current) {
+      placesService.current = new window.google.maps.places.AutocompleteService();
+      geocoder.current = new window.google.maps.Geocoder();
+    }
+  }, []);
+
+  const handleSearch = (val: string) => {
+    setQuery(val);
+    if (!val || val.length < 3 || !placesService.current) {
+      setSuggestions([]);
+      return;
+    }
+
+    placesService.current.getPlacePredictions(
+      { input: val, types: ['establishment'], componentRestrictions: { country: 'fr' } },
+      (predictions) => {
+        setSuggestions(predictions || []);
+      }
+    );
+  };
+
+  const selectPlace = (place: any) => {
+    if (!geocoder.current || !map) return;
+    
+    geocoder.current.geocode({ placeId: place.place_id }, (results, status) => {
+      if (status === 'OK' && results?.[0]?.geometry?.location) {
+        const pos = {
+          lat: results[0].geometry.location.lat(),
+          lng: results[0].geometry.location.lng()
+        };
+        onPlaceSelect(pos);
+        map.panTo(pos);
+        map.setZoom(16);
+        setQuery("");
+        setSuggestions([]);
+      }
+    });
+  };
+
+  return (
+    <div className="relative pointer-events-auto max-w-md mx-auto">
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border backdrop-blur-xl shadow-2xl transition-all ${isSolar ? 'bg-white/90 border-zinc-200 shadow-zinc-200/50' : 'bg-black/80 border-[#c9964a]/30 shadow-[#c9964a]/10'}`}>
+        <Search className={isSolar ? 'text-zinc-400' : 'text-[#c9964a]'} size={20} />
+        <input 
+          type="text"
+          value={query}
+          onChange={(e) => handleSearch(e.target.value)}
+          placeholder="Trouver un parcours..."
+          className="bg-transparent border-none outline-none flex-1 text-sm font-medium focus:ring-0 placeholder:text-zinc-500"
+        />
+      </div>
+
+      {suggestions.length > 0 && (
+        <div className={`absolute top-full left-0 right-0 mt-2 p-2 rounded-2xl border backdrop-blur-xl shadow-2xl max-h-64 overflow-y-auto ${isSolar ? 'bg-white/95 border-zinc-200 shadow-zinc-200/50' : 'bg-black/95 border-white/10 shadow-black'}`}>
+          {suggestions.map((s) => (
+            <button
+              key={s.place_id}
+              onClick={() => selectPlace(s)}
+              className={`w-full text-left px-4 py-3 rounded-xl text-xs transition-colors mb-1 last:mb-0 ${isSolar ? 'hover:bg-zinc-100 text-zinc-800' : 'hover:bg-white/5 text-zinc-300'}`}
+            >
+              <div className="font-bold mb-0.5 line-clamp-1">{s.structured_formatting.main_text}</div>
+              <div className="opacity-50 line-clamp-1">{s.structured_formatting.secondary_text}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function TacticalMap({ selectedCourse, currentHole, activeCaddie, displayMode, selectedTee }: TacticalMapProps & { displayMode?: 'tactical' | 'solar' }) {
   const isSolar = displayMode === 'solar';
   const [mapError, setMapError] = useState<string | null>(null);
@@ -167,6 +245,7 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
       <APIProvider 
         apiKey={API_KEY} 
         version="weekly" 
+        libraries={['places', 'marker']}
         language="fr"
         onLoad={() => console.log("Maps API Loaded Successfully")}
         onError={(err) => {
@@ -216,6 +295,11 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
  
           <LineOverlay points={[hole.teeBox, mire, hole.green.middle]} isSolar={isSolar} />
         </Map>
+        
+        {/* Places Search Overlay */}
+        <div className="absolute top-24 left-6 right-6 z-[100] pointer-events-none">
+           <MapSearch isSolar={isSolar} onPlaceSelect={(pos) => setMire(pos)} />
+        </div>
       </APIProvider>
  
       {/* HUD OVERLAY */}

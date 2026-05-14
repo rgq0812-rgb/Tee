@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Target, Zap, Brain, Trophy, ChevronRight, Loader2, Star, User, Edit3, CheckCircle2, Play, Flame, Filter, Clock, X, Volume2, Activity, ShieldAlert, Timer as TimerIcon, PlayCircle, GraduationCap, BookOpen, Quote, Sparkles, MessageSquare, Mic, Lock, Circle, Flag, ShieldCheck } from 'lucide-react';
-import { getTrainingProgram, speakWithBrowser, getTeacherCoaching, generateSpeech, chatWithTeacher } from '../services/geminiService';
+import { Target, Zap, Brain, Trophy, ChevronRight, Loader2, Star, User, Edit3, CheckCircle2, Play, Flame, Filter, Clock, X, Volume2, Activity, ShieldAlert, Timer as TimerIcon, PlayCircle, GraduationCap, BookOpen, Quote, Sparkles, MessageSquare, Mic, Lock, Circle, Flag, ShieldCheck, Search, Navigation, Map as MapIcon } from 'lucide-react';
+import { getTrainingProgram, speakWithBrowser, getTeacherCoaching, generateSpeech, chatWithTeacher, searchPlaces } from '../services/geminiService';
+import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { useChat } from '../services/ChatContext';
 import { ACADEMY_CATALOG, AcademyDrill } from '../data/academyDrills';
 import { playWhistle, playRawPcm, playPing } from '../lib/audioUtils';
@@ -549,11 +550,17 @@ export default function Academy({
 
     rec.onerror = (event: any) => {
       const errorType = String(event.error || '').toLowerCase();
-      if (errorType === 'aborted') {
-        console.warn("[Academy Speech] Aborted gracefully.");
+      if (errorType === 'aborted' || errorType === 'no-speech') {
         return;
       }
+      
       console.error("[Academy Speech] Error:", errorType);
+      
+      if (errorType === 'not-allowed') {
+        const text = "Accès micro refusé. Veuillez autoriser le microphone dans les paramètres de votre navigateur pour utiliser le mode mains-libres.";
+        handleTeacherSpeak(text, 'strat');
+        setIsHandsFree(false); // Stop trying if not allowed
+      }
     };
 
     rec.onend = () => { if (isHandsFree) {
@@ -564,7 +571,7 @@ export default function Academy({
              rec.start();
            } catch (e) {}
          }
-       }, 200);
+       }, 500); // Slightly longer delay
     }};
     rec.onstart = () => console.log("[Academy Speech] Listening...");
     
@@ -1014,7 +1021,13 @@ export default function Academy({
                          <img src={TEACHERS.elena.avatar} className="w-full h-full object-cover" />
                       </button>
                    </div>
-                   <button onClick={() => setShowTeacherChat(false)} className="w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center ml-2 hover:bg-white/5 transition-colors">
+                   <button 
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       setShowTeacherChat(false);
+                     }} 
+                     className="w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center ml-2 hover:bg-white/5 transition-colors"
+                   >
                       <X size={14} />
                    </button>
                 </div>
@@ -1484,14 +1497,16 @@ export default function Academy({
                     </div>
                     <button 
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         setSelectedTeacher(null);
                       }}
-                      className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all relative z-50 ${
-                        isSolar ? 'border-zinc-200 hover:bg-zinc-100 bg-white' : 'border-white/10 hover:bg-white/5 bg-zinc-900'
+                      className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all relative z-[200] shadow-xl hover:scale-110 active:scale-95 ${
+                        isSolar ? 'border-zinc-200 hover:bg-zinc-100 bg-white text-black' : 'border-white/20 hover:bg-white/10 bg-zinc-800 text-white shadow-black'
                       }`}
+                      title="Fermer l'analyse"
                     >
-                      <X size={18} />
+                      <X size={24} />
                     </button>
                   </div>
 
@@ -1683,6 +1698,26 @@ export default function Academy({
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          {/* RÉSEAU ARENA MAP SECTION */}
+          <div className="space-y-6 pt-12 border-t border-white/5">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-2">
+                <MapIcon size={16} className={isSolar ? 'text-black' : 'text-[#c9964a]'} />
+                <h3 className="text-xs font-black uppercase tracking-[0.3em] italic">Réseau Arena : Localisation</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[8px] font-black uppercase tracking-widest opacity-40 italic">Services Google Places Activés</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+              </div>
+            </div>
+
+            <div className={`h-[400px] w-full rounded-[2.5rem] overflow-hidden border relative shadow-2xl ${isSolar ? 'bg-zinc-50 border-zinc-200 shadow-zinc-200/50' : 'bg-black border-[#c9964a]/30 shadow-[#c9964a]/10'}`}>
+              <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''} libraries={['places']}>
+                <AcademyArenaMap isSolar={isSolar} />
+              </APIProvider>
+            </div>
           </div>
         </div>
       )}
@@ -2008,3 +2043,81 @@ export default function Academy({
     </div>
   );
 }
+
+const AcademyArenaMap = ({ isSolar }: { isSolar: boolean }) => {
+  const map = useMap();
+  const [arenas, setArenas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (map && window.google) {
+      const loadArenas = async () => {
+        try {
+          // Find golf courses/academies nearby within 50km
+          const results = await searchPlaces("golf academy", { lat: 48.8566, lng: 2.3522 }); // Default to Paris center if no geo
+          setArenas(results || []);
+        } catch (error) {
+          console.error("Arenas search failed:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      loadArenas();
+    }
+  }, [map]);
+
+  return (
+    <>
+      <Map
+        mapId="ACADEMY_ARENA_MAP"
+        defaultCenter={{ lat: 48.8566, lng: 2.3522 }}
+        defaultZoom={11}
+        mapTypeId={isSolar ? "terrain" : "satellite"}
+        disableDefaultUI={true}
+        gestureHandling={'greedy'}
+        style={{ width: '100%', height: '100%' }}
+      >
+        {arenas.map((arena, i) => (
+          <AdvancedMarker
+            key={arena.place_id || i}
+            position={{ 
+              lat: arena.geometry.location.lat(), 
+              lng: arena.geometry.location.lng() 
+            }}
+            title={arena.name}
+          >
+            <div className={`flex flex-col items-center group cursor-pointer`}>
+               <div className={`p-2 rounded-full border-2 transform group-hover:scale-110 transition-transform ${isSolar ? 'bg-white border-black text-black' : 'bg-black border-[#c9964a] text-[#c9964a]'}`}>
+                  <Target size={16} />
+               </div>
+               <div className={`absolute top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded whitespace-nowrap z-[200]`}>
+                  {arena.name}
+               </div>
+            </div>
+          </AdvancedMarker>
+        ))}
+      </Map>
+
+      {loading && (
+        <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+             <Loader2 className="w-8 h-8 animate-spin text-[#c9964a]" />
+             <p className="text-[10px] font-black uppercase tracking-widest text-[#c9964a] animate-pulse">Scan Radar Arena en cours...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Overlay */}
+      <div className="absolute bottom-6 left-6 right-6 flex gap-4 pointer-events-none">
+        <div className={`p-4 rounded-2xl backdrop-blur-xl border-2 flex-1 ${isSolar ? 'bg-white/90 border-zinc-200 shadow-xl' : 'bg-black/60 border-[#c9964a]/30 shadow-2xl'}`}>
+           <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1">Arenas Détectées</p>
+           <p className="text-xl font-black italic font-mono">{arenas.length}</p>
+        </div>
+        <div className={`p-4 rounded-2xl backdrop-blur-xl border-2 flex-1 ${isSolar ? 'bg-white/90 border-zinc-200 shadow-xl' : 'bg-black/60 border-[#c9964a]/30 shadow-2xl'}`}>
+           <p className="text-[8px] font-black uppercase tracking-widest opacity-40 mb-1">Rayon Satellite</p>
+           <p className="text-xl font-black italic font-mono">50KM</p>
+        </div>
+      </div>
+    </>
+  );
+};

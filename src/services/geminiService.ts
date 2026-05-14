@@ -428,6 +428,55 @@ export async function getCoachingIntervention(minutes: number, drillTitle: strin
   }
 }
 
+/**
+ * GOOGLE MAPS HELPERS
+ * Utilizing the Places library and Geocoding API as requested.
+ */
+
+export async function geocodeAddress(address: string): Promise<{ lat: number, lng: number } | null> {
+  if (!window.google || !window.google.maps) return null;
+  const geocoder = new window.google.maps.Geocoder();
+  return new Promise((resolve) => {
+    geocoder.geocode({ address }, (results, status) => {
+      if (status === 'OK' && results?.[0]?.geometry?.location) {
+        resolve({
+          lat: results[0].geometry.location.lat(),
+          lng: results[0].geometry.location.lng()
+        });
+      } else {
+        console.error("Geocoding failed:", status);
+        resolve(null);
+      }
+    });
+  });
+}
+
+export async function searchPlaces(query: string, location?: { lat: number, lng: number }): Promise<any[]> {
+  if (!window.google || !window.google.maps) return [];
+  
+  // We need a dummy element for PlacesService if not used with a map
+  const dummyElement = document.createElement('div');
+  const service = new window.google.maps.places.PlacesService(dummyElement);
+  
+  const request: google.maps.places.TextSearchRequest = {
+    query,
+    location: location ? new window.google.maps.LatLng(location.lat, location.lng) : undefined,
+    radius: location ? 50000 : undefined,
+    type: 'establishment'
+  };
+
+  return new Promise((resolve) => {
+    service.textSearch(request, (results, status) => {
+      if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+        resolve(results);
+      } else {
+        console.error("Places search failed:", status);
+        resolve([]);
+      }
+    });
+  });
+}
+
 export async function chatWithAdam(history: { role: 'user' | 'model', parts: any[] }[], selectedCourse?: any, currentHole?: number, scorecard?: Record<number, any>, arsenal?: any[], handicap: number = 18, form: string = 'forme', selectedTee: string = 'white', mode: string = 'PARCOURS', tactic: string = 'SÉCURITÉ', context?: TacticalContext, communicationMode: 'pro' | 'casual' = 'pro') {
   try {
     // Enrich system instruction with tactical results
@@ -689,8 +738,8 @@ export async function chatWithTeacher(
 ) {
   try {
     const scorecardContext = activeDrillTitle 
-      ? `CONSIGNE : L'utilisateur est en train d'effectuer l'exercice "${activeDrillTitle}". Focalisez vos réponses EXCLUSIVEMENT sur cet entraînement et sur les progrès constatés lors des échanges précédents dans ce chat. Ne parlez pas du parcours sauf si le joueur le demande explicitement.`
-      : "Le joueur est au Salon VIP pour un bilan global.";
+      ? `CONSIGNE IMPÉRATIVE : L'enseignant doit se baser EXCLUSIVEMENT sur l'entraînement actuel ("${activeDrillTitle}") et sur les échanges précédents dans ce chat. Interdiction formelle de parler du parcours de golf ou de la carte de score sauf si l'utilisateur insiste. Concentre-toi sur la technique pure du drill.`
+      : "Le joueur est au Salon VIP pour un bilan global de ses entraînements récents.";
 
     const scorecardText = scorecard 
       ? Object.entries(scorecard).map(([h, data]: any) => `Trou ${h}: ${data.strokes} strokes, ${data.putts} putts`).join('\n')
@@ -767,8 +816,8 @@ export async function getTeacherCoaching(
 ) {
   try {
     const drillContext = activeDrillTitle 
-      ? `CONSIGNE : L'utilisateur commence ou continue l'exercice : "${activeDrillTitle}". Ta mission est de l'accompagner techniquement sur CE drill spécifiquement. Analyse sa situation par rapport à cet objectif.`
-      : "Le joueur souhaite un bilan global de son jeu.";
+      ? `CONSIGNE : L'utilisateur commence ou continue l'exercice : "${activeDrillTitle}". Ta mission est de l'accompagner techniquement sur CE drill spécifiquement. Base ton analyse UNIQUEMENT sur cet objectif et les données d'entraînement. Ignore le parcours.`
+      : "Le joueur souhaite un bilan global de son jeu technique.";
 
     const scorecardText = scorecard 
       ? Object.entries(scorecard).map(([h, data]: any) => `Trou ${h}: ${data.strokes} strokes, ${data.putts} putts`).join('\n')

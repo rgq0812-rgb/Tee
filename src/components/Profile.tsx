@@ -144,7 +144,6 @@ export default function Profile({
           updatedAt: new Date().toISOString()
         });
         
-        if (playPing) playPing(1200, 'sine', 0.1);
         setShowUploadModal(false);
       } catch (error: any) {
         handleFirestoreError(error, OperationType.WRITE, `hole_assets/${assetId}`);
@@ -204,13 +203,11 @@ export default function Profile({
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-    if (playPing) playPing(1000, 'sine', 0.05);
   };
 
   const [expandedProfiles, setExpandedProfiles] = useState<Record<string, boolean>>({});
   const toggleProfile = (id: string) => {
     setExpandedProfiles(prev => ({ ...prev, [id]: !prev[id] }));
-    if (playPing) playPing(800, 'sine', 0.05);
   };
 
   const [showLegal, setShowLegal] = useState(false);
