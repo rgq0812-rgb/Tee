@@ -4,12 +4,15 @@ import { useEffect } from 'react';
 
 export default function SplashScreen({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
-    const timer = setTimeout(onComplete, 3500);
+    const timer = setTimeout(onComplete, 2500);
     return () => clearTimeout(timer);
   }, [onComplete]);
 
   return (
-    <div className="min-h-screen bg-brg-bg flex items-center justify-center p-6 relative overflow-hidden brg-gradient">
+    <div 
+      className="min-h-screen bg-brg-bg flex items-center justify-center p-6 relative overflow-hidden brg-gradient cursor-pointer"
+      onClick={onComplete}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}

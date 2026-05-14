@@ -21,45 +21,50 @@ class AssetService {
   private unsubscribe: (() => void) | null = null;
   private isInitializing = false;
   private quotaExceeded = false;
-
   private authUnsubscribe: (() => void) | null = null;
 
   constructor() {
-    // We'll call setupAuth on first use or subscribe to ensure auth is ready
+    this.setupAuth();
   }
 
   private setupAuth() {
-    if (this.authUnsubscribe || !auth) return;
+    if (typeof window === 'undefined' || this.authUnsubscribe) return;
     
+    // Use onAuthStateChanged to trigger init when user is available
     this.authUnsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
         if (!this.unsubscribe && !this.isInitializing) {
           this.init();
         }
       } else {
-        if (this.unsubscribe) {
-          this.unsubscribe();
-          this.unsubscribe = null;
-          this.assets = [];
-          [...this.listeners].forEach(cb => cb([]));
-        }
+        this.cleanup();
       }
     });
+
+    // Forced check in case auth was already ready
+    setTimeout(() => {
+      if (auth.currentUser && !this.unsubscribe && !this.isInitializing) {
+        this.init();
+      }
+    }, 1000);
+  }
+
+  private cleanup() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+    this.assets = [];
+    this.isInitializing = false;
+    this.listeners.forEach(cb => cb([]));
   }
 
   subscribe(callback: AssetCallback, onError?: ErrorCallback) {
-    if (!auth || !db) {
-      console.warn("[ONYX] Asset service: Firebase not ready");
-      callback([]);
-      return () => {};
-    }
-    this.setupAuth();
     this.listeners.add(callback);
     if (onError) this.errorListeners.add(onError);
 
-    if (this.assets.length > 0) {
-      callback(this.assets);
-    }
+    // Provide current data immediate
+    callback(this.assets);
     
     if (this.quotaExceeded && onError) {
       const error = { message: 'quota exceeded' } as unknown as FirestoreError;
@@ -73,19 +78,18 @@ class AssetService {
   }
 
   private init() {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || this.isInitializing || !db) return;
     this.isInitializing = true;
     
-    // CRITICAL: Filter by userId to save quota and respect privacy
-    // Order by updatedAt to ensure latest assets are prioritized
+    console.log("[ONYX ASSETS] Initializing listener for user:", auth.currentUser.uid);
+
     const q = query(
       collection(db, 'hole_assets'), 
       where('userId', '==', auth.currentUser.uid),
-      limit(50)
+      limit(100)
     );
     
     this.unsubscribe = onSnapshot(q, (snapshot) => {
-      // ... same processing ...
       const rawAssets = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -101,9 +105,7 @@ class AssetService {
       this.isInitializing = false;
       this.quotaExceeded = false;
     }, (error) => {
-      if (auth.currentUser) {
-        handleFirestoreError(error, OperationType.LIST, 'hole_assets');
-      }
+      handleFirestoreError(error, OperationType.LIST, 'hole_assets');
       if (error.message?.includes('quota') || (error as any).code === 'resource-exhausted') {
         this.quotaExceeded = true;
       }
