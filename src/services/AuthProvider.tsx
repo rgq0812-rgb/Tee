@@ -37,9 +37,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // We set local state to true for immediate UX, then refresh.
           setHasPaid(true);
         } else if (userDocRef) {
-          // Normal check
+          // Normal check with safety timeout
           try {
-            const userDoc = await getDoc(userDocRef);
+            const docPromise = getDoc(userDocRef);
+            const timeoutPromise = new Promise((_, reject) => 
+               setTimeout(() => reject(new Error("TIMEOUT")), 8000)
+            );
+            
+            const userDoc = await Promise.race([docPromise, timeoutPromise]) as any;
             
             if (userDoc.exists()) {
               setHasPaid(userDoc.data().subscriptionStatus === 'active');
@@ -55,30 +60,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                   subscriptionStatus: 'none'
                 });
               } catch (clientErr) {
-                // If it's a permission denied we might want to know why
-                if (clientErr instanceof Error && clientErr.message.includes('permission-denied')) {
-                   handleFirestoreError(clientErr, OperationType.CREATE, `users/${firebaseUser.uid}`);
-                }
-                
-                console.error("Client-side init failed, falling back to server:", clientErr);
-                // Fallback to server sync
-                fetch('/api/auth/sync', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    uid: firebaseUser.uid,
-                    email: firebaseUser.email,
-                    displayName: firebaseUser.displayName
-                  })
-                }).catch(err => console.error("Sync trigger failed:", err));
+                console.error("Client-side init failed:", clientErr);
               }
-              
               setHasPaid(false);
             }
           } catch (error) {
-            console.error("Auth sync check error:", error);
-            // If getDoc fails (permission denied during sync), we can still fallback.
-            // We set paid to false for now and let the user in (if rules allow).
+            console.error("Auth sync check error or timeout:", error);
             setHasPaid(false);
           }
         }

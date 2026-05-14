@@ -327,6 +327,20 @@ function AppContent() {
     localStorage.setItem('the-chose-selected-tee', selectedTee);
   }, [appPath, scorecard, currentHole, selectedCourse, eliteXP, arsenal, playerForm, handicap, activeCaddie, selectedMode, displayMode, selectedTee]);
 
+  const handleSplashComplete = useCallback(() => {
+    setSplashSeen(true);
+    sessionStorage.setItem('splashSeen', 'true');
+  }, []);
+
+  const handleTourComplete = useCallback(() => {
+    setTourSeen(true);
+    localStorage.setItem('tourSeen', 'true');
+  }, []);
+
+  const handlePathSelect = useCallback((path: AppPath) => {
+    setAppPath(path);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -345,21 +359,15 @@ function AppContent() {
   }
 
   if (!splashSeen) {
-    return <SplashScreen onComplete={() => {
-      setSplashSeen(true);
-      sessionStorage.setItem('splashSeen', 'true');
-    }} />;
+    return <SplashScreen onComplete={handleSplashComplete} />;
   }
 
   if (!tourSeen) {
-    return <WelcomeTour onComplete={() => {
-      setTourSeen(true);
-      localStorage.setItem('tourSeen', 'true');
-    }} />;
+    return <WelcomeTour onComplete={handleTourComplete} />;
   }
 
   if (!appPath) {
-    return <PathSelector onSelect={(path) => setAppPath(path)} />;
+    return <PathSelector onSelect={handlePathSelect} />;
   }
 
   if (appPath === 'player' && !missionStarted) {
