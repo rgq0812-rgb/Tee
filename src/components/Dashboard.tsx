@@ -791,7 +791,7 @@ export default function Dashboard({
 
       <AnimatePresence>
         {advice && (
-          <div className="fixed bottom-32 left-6 right-6 z-[60]">
+          <div className="fixed bottom-32 left-6 right-6 z-[80]">
             <motion.div 
               key={`advice-box-v5-${advice.substring(0, 50)}`}
               initial={{ opacity: 0, y: 20, scale: 0.95 }} 

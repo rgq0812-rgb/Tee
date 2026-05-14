@@ -39,15 +39,10 @@ function AppContent() {
     sessionStorage.setItem('guestMode', 'true');
   };
   // --- Global State from Bible ---
-  const [splashSeen, setSplashSeen] = useState(() => sessionStorage.getItem('splashSeen') === 'true');
-  const [tourSeen, setTourSeen] = useState(() => localStorage.getItem('tourSeen') === 'true');
-  const [appPath, setAppPath] = useState<AppPath | null>(() => localStorage.getItem('app_path') as AppPath);
-  const [missionStarted, setMissionStarted] = useState(() => {
-    // If there's already a scorecard, consider mission started
-    const saved = localStorage.getItem('the-chose-scorecard');
-    if (saved && saved !== '{}') return true;
-    return localStorage.getItem('onyx_mission_active') === 'true';
-  });
+  const [splashSeen, setSplashSeen] = useState(true);
+  const [tourSeen, setTourSeen] = useState(true);
+  const [appPath, setAppPath] = useState<AppPath | null>('player');
+  const [missionStarted, setMissionStarted] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [pseudo, setPseudo] = useState(() => localStorage.getItem('onyx_pseudo') || 'OPÉRATEUR');
 
@@ -169,10 +164,7 @@ function AppContent() {
     }
   });
 
-  const [selectedCourse, setSelectedCourse] = useState(() => {
-    const saved = localStorage.getItem('the-chose-selected-course');
-    return COURSES.find(c => c.id === saved) || COURSES[0];
-  });
+  const [selectedCourse, setSelectedCourse] = useState(() => COURSES[0]);
 
   const [arsenal, setArsenal] = useState<Club[]>(() => {
     try {
