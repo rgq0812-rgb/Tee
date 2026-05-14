@@ -5,6 +5,7 @@ import { Crosshair, Navigation, Target, Shield, Brain, Zap, Info, ChevronRight, 
 import { analyzeTarget } from '../services/geminiService';
 
 const API_KEY = 
+  (process as any).env?.GOOGLE_MAPS_PLATFORM_KEY ||
   import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 
   '';
 const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY' && API_KEY.length > 5;
@@ -41,20 +42,20 @@ const MapPin = ({ size, className }: { size?: number, className?: string }) => (
 );
 
 const AIScreen = ({ isSolar }: { isSolar?: boolean }) => (
-  <div className={`flex flex-col items-center justify-center h-full p-8 text-center ${isSolar ? 'bg-zinc-50 text-black' : 'bg-zinc-950 text-white'}`}>
-    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 animate-pulse border ${isSolar ? 'bg-black/5 border-black/10' : 'bg-orange-500/10 border-orange-500/30 shadow-[0_0_20px_rgba(249,115,22,0.2)]'}`}>
-      <AlertCircle size={32} className={isSolar ? 'text-black' : 'text-orange-500'} />
+  <div className={`flex flex-col items-center justify-center h-full p-8 text-center ${isSolar ? 'bg-zinc-100 text-black' : 'bg-zinc-900 text-white'}`}>
+    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 animate-pulse border ${isSolar ? 'bg-black/5 border-black/20' : 'bg-red-500/10 border-red-500/30'}`}>
+      <AlertCircle size={32} className={isSolar ? 'text-black' : 'text-red-500'} />
     </div>
-    <h2 className={`text-xl font-black uppercase tracking-[0.3em] mb-4 ${isSolar ? 'text-black' : 'text-orange-500'}`}>ONYX : ACCÈS RESTREINT</h2>
+    <h2 className={`text-xl font-black uppercase tracking-[0.3em] mb-4 ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>ONYX : ACCÈS LIMITED</h2>
     <p className={`text-[10px] uppercase font-bold tracking-widest leading-relaxed max-w-xs mb-8 ${isSolar ? 'text-zinc-500' : 'text-white/40'}`}>
-      L'unité tactile nécessite une clé d'activation Google Maps Platform valide.
+      L'unité tactile nécessite une clé Google Maps Platform valide avec l'API "Maps JavaScript API" activée.
     </p>
-    <div className={`border p-6 rounded-3xl text-left w-full space-y-4 ${isSolar ? 'bg-white border-zinc-200 shadow-sm' : 'bg-black/40 border-white/10'}`}>
+    <div className={`border p-6 rounded-3xl text-left w-full max-w-sm space-y-4 ${isSolar ? 'bg-white border-zinc-200' : 'bg-black/40 border-white/10'}`}>
       <div className="flex gap-4">
-        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-sans shrink-0 ${isSolar ? 'bg-black text-white' : 'bg-orange-500 text-black'}`}>1</div>
-        <div className="flex flex-col">
-          <p className={`text-[10px] uppercase tracking-widest leading-tight mb-1 font-bold ${isSolar ? 'text-black' : 'text-white/80'}`}>Protocol : <span className={`${isSolar ? 'text-black font-black underline decoration-2' : 'text-orange-500 underline'}`}>Maps JavaScript API</span></p>
-          <p className={`text-[9px] leading-normal italic ${isSolar ? 'text-zinc-500' : 'text-white/40'}`}>Activation requise dans la console Cloud.</p>
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black'}`}>!</div>
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest mb-1">Status : Invalid Key</p>
+          <p className="text-[9px] opacity-60">Veuillez configurer votre clé API dans les paramètres (.env). Si vous l'avez fait, assurez-vous qu'elle dispose des droits nécessaires.</p>
         </div>
       </div>
     </div>
@@ -190,6 +191,76 @@ const MapSearch = ({ isSolar, onPlaceSelect }: { isSolar: boolean, onPlaceSelect
   );
 };
 
+const MapMarkers = ({ hole, mire, isSolar, setMire }: { hole: any, mire: { lat: number, lng: number }, isSolar: boolean, setMire: (pos: { lat: number, lng: number }) => void }) => {
+  const map = useMap();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!map) {
+      setReady(false);
+      return;
+    }
+    
+    // Defer marker rendering until map is completely ready to avoid 'getRootNode' errors
+    // 'tilesloaded' is a safe event to wait for
+    const listener = map.addListener('tilesloaded', () => {
+      setReady(true);
+    });
+
+    // Fallback in case tilesloaded already happened
+    const timeout = setTimeout(() => setReady(true), 2000);
+
+    return () => {
+      google.maps.event.removeListener(listener);
+      clearTimeout(timeout);
+    };
+  }, [map]);
+
+  if (!map || !ready) return null;
+
+  return (
+    <>
+      <AdvancedMarker 
+        key={`tee-marker-${hole.number}-${ready}`}
+        position={hole.teeBox} 
+        title="Tee Box (A)"
+      >
+        <div className={`border-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg ${isSolar ? 'bg-black border-black text-white' : 'bg-black border-white text-white'}`}>A</div>
+      </AdvancedMarker>
+
+      <AdvancedMarker 
+        key={`mire-marker-${hole.number}-${ready}`}
+        position={mire} 
+        draggable={true}
+        onDrag={(e: any) => {
+          if (e.latLng) setMire({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        }}
+        onDragEnd={(e: any) => {
+          if (e.latLng) setMire({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        }}
+        zIndex={100}
+      >
+        <div 
+          style={{ pointerEvents: 'auto' }}
+          className="w-14 h-14 rounded-full border-2 border-orange-500 bg-orange-500/20 backdrop-blur-md flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.8)] cursor-grab active:cursor-grabbing transition-transform hover:scale-110 active:scale-95">
+          <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse shadow-[0_0_10px_#f97316]" />
+          <Target size={28} className="text-orange-500 absolute" strokeWidth={3} />
+        </div>
+      </AdvancedMarker>
+
+      <AdvancedMarker 
+        key={`green-marker-${hole.number}-${ready}`}
+        position={hole.green.middle}
+        title="Green (C)"
+      >
+        <div className={`border-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg ${isSolar ? 'bg-black border-black text-white' : 'bg-[#c9964a] border-black text-black'}`}>C</div>
+      </AdvancedMarker>
+      
+      <LineOverlay points={[hole.teeBox, mire, hole.green.middle]} isSolar={isSolar} />
+    </>
+  );
+};
+
 export default function TacticalMap({ selectedCourse, currentHole, activeCaddie, displayMode, selectedTee }: TacticalMapProps & { displayMode?: 'tactical' | 'solar' }) {
   const isSolar = displayMode === 'solar';
   const [mapError, setMapError] = useState<string | null>(null);
@@ -214,8 +285,6 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const map = useMap();
 
-  const [mapReady, setMapReady] = useState(false);
-
   // Reset Mire to midpoint and fit bounds on hole change
   useEffect(() => {
     if (!hole || !hole.teeBox || !hole.green?.middle) return;
@@ -228,7 +297,6 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
     setMire(midpoint);
 
     if (map) {
-      setMapReady(true);
       // Revert to stable zoom and center
       map.setCenter(midpoint);
       map.setZoom(17);
@@ -281,50 +349,8 @@ export default function TacticalMap({ selectedCourse, currentHole, activeCaddie,
              </div>
           )}
           {/* Points A, B, C */}
-          {hasGps && mapReady && (
-            <>
-              <AdvancedMarker 
-                key={`tee-marker-${hole.number}`}
-                position={hole.teeBox} 
-                title="Tee Box (A)"
-              >
-                <div className={`border-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg ${isSolar ? 'bg-black border-black text-white' : 'bg-black border-white text-white'}`}>A</div>
-              </AdvancedMarker>
-
-              <AdvancedMarker 
-                key={`mire-marker-${hole.number}`}
-                position={mire} 
-                draggable={true}
-                onDrag={(e: any) => {
-                  if (e.latLng) {
-                    setMire({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-                  }
-                }}
-                onDragEnd={(e: any) => {
-                  if (e.latLng) {
-                    setMire({ lat: e.latLng.lat(), lng: e.latLng.lng() });
-                  }
-                }}
-                zIndex={100}
-              >
-                <div 
-                  style={{ pointerEvents: 'auto' }}
-                  className="w-14 h-14 rounded-full border-2 border-orange-500 bg-orange-500/20 backdrop-blur-md flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.8)] cursor-grab active:cursor-grabbing transition-transform hover:scale-110 active:scale-95">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse shadow-[0_0_10px_#f97316]" />
-                  <Target size={28} className="text-orange-500 absolute" strokeWidth={3} />
-                </div>
-              </AdvancedMarker>
-
-              <AdvancedMarker 
-                key={`green-marker-${hole.number}`}
-                position={hole.green.middle}
-                title="Green (C)"
-              >
-                <div className={`border-2 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shadow-lg ${isSolar ? 'bg-black border-black text-white' : 'bg-[#c9964a] border-black text-black'}`}>C</div>
-              </AdvancedMarker>
-     
-              <LineOverlay points={[hole.teeBox, mire, hole.green.middle]} isSolar={isSolar} />
-            </>
+          {hasGps && (
+            <MapMarkers hole={hole} mire={mire} isSolar={isSolar} setMire={setMire} />
           )}
         </Map>
         

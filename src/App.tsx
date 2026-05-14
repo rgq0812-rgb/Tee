@@ -707,6 +707,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 export default function App() {
   const API_KEY = 
+    (process as any).env?.GOOGLE_MAPS_PLATFORM_KEY ||
     import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 
     '';
 
