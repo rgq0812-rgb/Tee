@@ -12,10 +12,12 @@ export default defineConfig(({ mode }) => {
     ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+      'import.meta.env.VITE_GOOGLE_MAPS_API_KEY': JSON.stringify(env.VITE_GOOGLE_MAPS_API_KEY || env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''),
     },
     build: {
       outDir: 'dist',
       emptyOutDir: true,
+      sourcemap: true,
     },
     resolve: {
       alias: {
