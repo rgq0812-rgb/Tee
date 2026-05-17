@@ -323,14 +323,6 @@ function AppContent() {
     localStorage.setItem('the-chose-selected-tee', selectedTee);
   }, [appPath, scorecard, currentHole, selectedCourse, eliteXP, arsenal, playerForm, handicap, activeCaddie, selectedMode, displayMode, selectedTee]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   if (!user && !isGuest) {
     return <AuthScreen onGuest={handleGuestMode} />;
   }
