@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tee</string>
+    <string name="title_activity_main">Tee</string>
+    <string name="package_name">io.tee.app</string>
+    <string name="custom_url_scheme">io.tee.app</string>
+</resources>
