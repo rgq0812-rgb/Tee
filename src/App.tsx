@@ -24,6 +24,7 @@ import { AcademyDrill } from './data/academyDrills';
 import { speakWithBrowser, generateSpeech, getCoachingIntervention } from './services/geminiService';
 import { playWhistle, playSoftBell, playRawPcm } from './lib/audioUtils';
 import { APIProvider } from '@vis.gl/react-google-maps';
+import { HashRouter } from 'react-router-dom';
 
 import { AppPath, HoleScore, Club } from './types';
 import { INITIAL_CLUBS, COURSES, CHALLENGES, CADDIES } from './constants';
@@ -704,7 +705,8 @@ export default function App() {
     '';
 
   return (
-    <ErrorBoundary>
+    <HashRouter>
+      <ErrorBoundary>
       <AuthProvider>
         <ChatProvider>
           <APIProvider 
@@ -719,6 +721,7 @@ export default function App() {
           </APIProvider>
         </ChatProvider>
       </AuthProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </HashRouter>
   );
 }
