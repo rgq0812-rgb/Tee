@@ -441,10 +441,10 @@ export async function getCoachingIntervention(minutes: number, drillTitle: strin
  */
 
 export async function geocodeAddress(address: string): Promise<{ lat: number, lng: number } | null> {
-  if (!window.google || !window.google.maps) return null;
-  const geocoder = new window.google.maps.Geocoder();
+  if (!(window as any).google || !(window as any).google.maps) return null;
+  const geocoder = new (window as any).google.maps.Geocoder();
   return new Promise((resolve) => {
-    geocoder.geocode({ address }, (results, status) => {
+    geocoder.geocode({ address }, (results: any, status: any) => {
       if (status === 'OK' && results?.[0]?.geometry?.location) {
         resolve({
           lat: results[0].geometry.location.lat(),
@@ -459,22 +459,22 @@ export async function geocodeAddress(address: string): Promise<{ lat: number, ln
 }
 
 export async function searchPlaces(query: string, location?: { lat: number, lng: number }): Promise<any[]> {
-  if (!window.google || !window.google.maps) return [];
+  if (!(window as any).google || !(window as any).google.maps) return [];
   
   // We need a dummy element for PlacesService if not used with a map
   const dummyElement = document.createElement('div');
-  const service = new window.google.maps.places.PlacesService(dummyElement);
+  const service = new (window as any).google.maps.places.PlacesService(dummyElement);
   
-  const request: google.maps.places.TextSearchRequest = {
+  const request: any = {
     query,
-    location: location ? new window.google.maps.LatLng(location.lat, location.lng) : undefined,
+    location: location ? new (window as any).google.maps.LatLng(location.lat, location.lng) : undefined,
     radius: location ? 50000 : undefined,
     type: 'establishment'
   };
 
   return new Promise((resolve) => {
-    service.textSearch(request, (results, status) => {
-      if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+    service.textSearch(request, (results: any, status: any) => {
+      if (status === (window as any).google.maps.places.PlacesServiceStatus.OK && results) {
         resolve(results);
       } else {
         console.error("Places search failed:", status);
@@ -637,9 +637,9 @@ function getAdamSystemInstruction(selectedCourse?: any, currentHole?: number, sc
 
     VÉRIFICATION DU TROU :
     Si l'utilisateur annonce un score sans préciser le trou :
-    1. Vérifiez s'il vient de finir le trou actuel (${currentHole}). 
-    2. Si le score semble correspondre au trou précédent (${currentHole - 1 > 0 ? currentHole - 1 : 1}) et qu'il n'est pas rempli, proposez-le.
-    3. TOUJOURS confirmer le numéro du trou dans votre réponse : "Entendu. Birdie enregistré sur le ${currentHole}."
+    1. Vérifiez s'il vient de finir le trou actuel (${currentHole || 1}). 
+    2. Si le score semble correspondre au trou précédent (${(currentHole || 1) - 1 > 0 ? (currentHole || 1) - 1 : 1}) et qu'il n'est pas rempli, proposez-le.
+    3. TOUJOURS confirmer le numéro du trou dans votre réponse : "Entendu. Birdie enregistré sur le ${currentHole || 1}."
 
     COMMANDES VOCALES SPÉCIFIQUES :
     - "Suivant" : Proposez le conseil pour le coup suivant sur le trou actuel (lie, distance, club). N'appelez 'set_current_hole' que si le trou est explicitement terminé.
