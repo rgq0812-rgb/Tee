@@ -20,6 +20,8 @@ jobs:
 
       - name: Build Web App
         run: npm run build
+        env:
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
 
       - name: Add & Sync Android Platform
         run: |
