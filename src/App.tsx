@@ -657,14 +657,14 @@ function AppContent() {
 );
 }
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: any, errorInfo: any) {
@@ -682,6 +682,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
             <div className="space-y-2">
               <h1 className="text-xl font-black uppercase tracking-widest text-[#c9964a]">Erreur de Liaison Tactique</h1>
               <p className="text-zinc-500 text-sm italic font-medium">L'interface ONYX a rencontré une anomalie critique. Adam tente de stabiliser le flux.</p>
+              <p className="text-red-400 text-xs font-mono mt-2">{this.state.error?.message}</p>
             </div>
             <button 
               onClick={() => window.location.reload()}
