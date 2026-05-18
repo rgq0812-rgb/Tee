@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, ChevronLeft, Shield, Zap, Target, Award, Volume2, VolumeX, Brain, Share2 } from 'lucide-react';
+import { TextToSpeech } from '@capacitor-community/text-to-speech';
 
 const SLIDES = [
   {
@@ -60,50 +61,34 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
   const [isAuto, setIsAuto] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
-  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
-
-  const stopSpeech = useCallback(() => {
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+  const stopSpeech = useCallback(async () => {
+    try {
+      await TextToSpeech.stop();
+    } catch (e) {
+      console.error(e);
     }
   }, []);
 
-  const speak = useCallback((text: string, onEnd: () => void) => {
-    if (isMuted || !window.speechSynthesis) {
+  const speak = useCallback(async (text: string, onEnd: () => void) => {
+    if (isMuted) {
       if (isAuto) setTimeout(onEnd, 5000);
       return;
     }
-    stopSpeech();
+    await stopSpeech();
     
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'fr-FR';
-    utterance.rate = 0.9; 
-    utterance.pitch = 0.85; // Un peu plus grave pour plus d'élégance
-    
-    const voices = window.speechSynthesis.getVoices();
-    // Priorité absolue aux voix d'hommes françaises
-    const maleVoices = voices.filter(v => 
-      v.lang.startsWith('fr') && 
-      (v.name.toLowerCase().includes('thomas') || 
-       v.name.toLowerCase().includes('daniel') || 
-       v.name.toLowerCase().includes('google français') ||
-       v.name.toLowerCase().includes('male'))
-    );
-    
-    const anyFrench = voices.filter(v => v.lang.startsWith('fr'));
-    
-    if (maleVoices.length > 0) {
-      utterance.voice = maleVoices[0];
-    } else if (anyFrench.length > 0) {
-      utterance.voice = anyFrench[0];
-    }
-    
-    utterance.onend = () => {
+    try {
+      await TextToSpeech.speak({
+        text,
+        lang: 'fr-FR',
+        rate: 0.9,
+        pitch: 0.85,
+        volume: 1.0,
+      });
       if (isAuto) onEnd();
-    };
-
-    speechRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.error(e);
+      if (isAuto) setTimeout(onEnd, 5000);
+    }
   }, [isMuted, stopSpeech, isAuto]);
 
   const playSubtleSound = useCallback((freq: number, type: OscillatorType = 'sine') => {

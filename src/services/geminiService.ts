@@ -334,13 +334,11 @@ export async function analyzeTarget(selectedTee: string, distAB: number, distBC:
   }
 }
 
-export function speakWithBrowser(text: string, onEnd?: () => void) {
-  if (!window.speechSynthesis) return;
-  
-  const speak = () => {
-    window.speechSynthesis.cancel();
-    
-    // Strip markdown for browser TTS
+import { TextToSpeech } from '@capacitor-community/text-to-speech';
+
+export async function speakWithBrowser(text: string, onEnd?: () => void) {
+  try {
+    // Strip markdown for TTS
     let cleanText = text
       .replace(/\*\*/g, '')
       .replace(/\*/g, '')
@@ -353,24 +351,18 @@ export function speakWithBrowser(text: string, onEnd?: () => void) {
     // Phonetic correction for Driver in French
     cleanText = cleanText.replace(/\bDriver\b/gi, "Draïveur").replace(/\bdriver\b/gi, "draïveur");
     
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = 'fr-FR';
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    await TextToSpeech.speak({
+      text: cleanText,
+      lang: 'fr-FR',
+      rate: 1.0,
+      pitch: 1.0,
+      volume: 1.0,
+    });
     
-    const voices = window.speechSynthesis.getVoices();
-    const maleFrench = voices.find(v => v.lang.startsWith('fr') && (v.name.includes('Google') || v.name.includes('Premium') || v.name.includes('Microsoft'))) || 
-                       voices.find(v => v.lang.startsWith('fr') && (v.name.includes('Thomas') || v.name.includes('Daniel') || v.name.includes('Male')));
-    
-    if (maleFrench) utterance.voice = maleFrench;
-    if (onEnd) utterance.onend = onEnd;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  if (window.speechSynthesis.getVoices().length === 0) {
-    window.speechSynthesis.onvoiceschanged = speak;
-  } else {
-    speak();
+    if (onEnd) onEnd();
+  } catch (error) {
+    console.error("Capacitor TTS Error:", error);
+    if (onEnd) onEnd();
   }
 }
 
