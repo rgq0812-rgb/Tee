@@ -143,14 +143,6 @@ export default function WelcomeTour({ onComplete }: { onComplete: () => void }) 
     };
   }, [currentSlide, speak, next, stopSpeech, hasStarted]);
 
-  // Pré-chargement des voix
-  useEffect(() => {
-    window.speechSynthesis.getVoices();
-    const handler = () => window.speechSynthesis.getVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', handler);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', handler);
-  }, []);
-
   if (!hasStarted) {
     return (
       <div className="fixed inset-0 z-[110] bg-black flex items-center justify-center p-8 overflow-hidden">

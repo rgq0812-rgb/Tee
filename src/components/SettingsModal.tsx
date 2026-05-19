@@ -247,8 +247,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       Si la voix est métallique ou si le caddie ne répond plus, lancez une réinitialisation des services neuraux.
                     </p>
                     <button 
-                      onClick={() => {
-                        window.speechSynthesis.cancel();
+                      onClick={async () => {
+                        try {
+                          const { TextToSpeech } = await import('@capacitor-community/text-to-speech');
+                          await TextToSpeech.stop();
+                        } catch (e) {
+                          console.error('Failed to stop speech', e);
+                        }
                         localStorage.removeItem('onyx_voice_stuck');
                         // Reload the page to clear all memory states
                         window.location.reload();

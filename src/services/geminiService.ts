@@ -336,6 +336,24 @@ export async function analyzeTarget(selectedTee: string, distAB: number, distBC:
 
 import { TextToSpeech } from '@capacitor-community/text-to-speech';
 
+// Patch global speechSynthesis pour éviter les crashs sur mobile/PWA
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  const originalGetVoices = window.speechSynthesis.getVoices?.bind(window.speechSynthesis);
+  if (originalGetVoices) {
+    window.speechSynthesis.getVoices = function() {
+      try {
+        const voices = originalGetVoices();
+        return voices || [];
+      } catch (e) {
+        console.warn("SpeechSynthesis getVoices error:", e);
+        return [];
+      }
+    };
+  } else {
+    window.speechSynthesis.getVoices = function() { return []; };
+  }
+}
+
 export async function speakWithBrowser(text: string, onEnd?: () => void) {
   try {
     // Strip markdown for TTS
