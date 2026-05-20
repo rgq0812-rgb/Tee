@@ -8,6 +8,7 @@ import AudioVisualizer from './AudioVisualizer';
 import { useAmbientSound } from '../hooks/use-ambient-sound';
 import { playRawPcm } from '../lib/audioUtils';
 import { useLiveChat, type SafeMessage } from '../hooks/useLiveChat';
+import { useVoiceLive } from '../hooks/useVoiceLive';
 
 interface AdamMentorModalProps {
   isOpen: boolean;
@@ -44,6 +45,8 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
   const handsFreeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastScoreUpdateRef = useRef<{ hole: number, strokes: number, putts: number } | null>(null);
   const [lastScoreUpdate, setLastScoreUpdate] = useState<{ hole: number, strokes: number, putts: number } | null>(null);
+
+  const { connect: connectLive, stop: stopLive, isConnected: isLiveConnected, isSpeaking: isLiveSpeaking, latency: liveLatency } = useVoiceLive();
 
   const {
     messages, setMessages, input, setInput, attachedImage, setAttachedImage,
@@ -660,6 +663,15 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                    >
                      {isHandsFree ? <Brain size={22} /> : <Mic size={22} />}
                    </motion.button>
+
+                   {/* LIVE VOICE BUTTON */}
+                   <button 
+                     onClick={() => isLiveConnected ? stopLive() : connectLive()}
+                     title="Mode Live Audio Ultra-Rapide"
+                     className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shadow-xl border-2 ${isLiveConnected ? 'bg-indigo-600 border-indigo-400 text-white animate-pulse' : (isSolar ? 'bg-zinc-100 border-zinc-300 text-zinc-500' : 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400')}`}
+                   >
+                     <Zap size={22} />
+                   </button>
                    
                    <AnimatePresence>
                      {voiceError && (

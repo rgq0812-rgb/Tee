@@ -28,10 +28,11 @@ import spotifyUrlHandler from './api/auth/spotify/url';
 import spotifyCallbackHandler from './api/auth/spotify/callback';
 import youtubeUrlHandler from './api/auth/youtube/url';
 import youtubeCallbackHandler from './api/auth/youtube/callback';
+import { setupVoiceLiveProxy } from './api/voiceLiveProxy';
 
 async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
-  
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', production: isProduction });
@@ -90,9 +91,12 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running at http://localhost:${PORT}`);
   });
+
+  // Setup the Voice Live WebSocket Proxy on the same server
+  setupVoiceLiveProxy(server);
 }
 
 process.on('unhandledRejection', (reason) => {
