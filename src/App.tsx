@@ -701,8 +701,8 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 export default function App() {
   const API_KEY = 
-    (process as any).env?.GOOGLE_MAPS_PLATFORM_KEY ||
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 
+    (typeof process !== 'undefined' && process.env && process.env.GOOGLE_MAPS_PLATFORM_KEY) ||
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) || 
     '';
 
   return (
@@ -710,16 +710,33 @@ export default function App() {
       <ErrorBoundary>
       <AuthProvider>
         <ChatProvider>
-          <APIProvider 
-            apiKey={API_KEY} 
-            libraries={['places', 'marker']}
-            onLoad={() => console.log("[ONYX] Google Maps API Loaded")}
-            onError={(err) => {
-              console.error("[ONYX] Google Maps Load Error:", err);
-            }}
-          >
-            <AppContent />
-          </APIProvider>
+          {API_KEY && API_KEY.length > 5 ? (
+            <APIProvider 
+              apiKey={API_KEY} 
+              libraries={['places', 'marker']}
+              onLoad={() => console.log("[ONYX] Google Maps API Loaded")}
+              onError={(err) => {
+                console.error("[ONYX] Google Maps Load Error:", err);
+              }}
+            >
+              <AppContent />
+            </APIProvider>
+          ) : (
+            <div className="min-h-screen bg-black flex items-center justify-center text-white p-6 text-center">
+              <div className="space-y-4 max-w-sm">
+                <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
+                  <span className="font-black">!</span>
+                </div>
+                <h1 className="text-sm font-black tracking-widest text-[#c9964a]">ONYX SECURE BOOT</h1>
+                <p className="text-xs opacity-60">
+                  Impossible d'initialiser le module cartographique. Les clés d'API système sont manquantes ou en cours d'injection.
+                </p>
+                <p className="text-[10px] font-mono opacity-30 mt-4 break-all">
+                  API_KEY_LENGTH: {API_KEY ? API_KEY.length : 0}
+                </p>
+              </div>
+            </div>
+          )}
         </ChatProvider>
       </AuthProvider>
       </ErrorBoundary>
