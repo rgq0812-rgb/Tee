@@ -76,45 +76,67 @@ class AssetService {
     if (!auth.currentUser) return;
     this.isInitializing = true;
     
-    // CRITICAL: Filter by userId to save quota and respect privacy
-    // Order by updatedAt to ensure latest assets are prioritized
-    const q = query(
+    // Public courses collection query
+    const publicQuery = query(
+      collection(db, 'public_courses'),
+      limit(100)
+    );
+
+    // Private vault query
+    const privateQuery = query(
       collection(db, 'hole_assets'), 
       where('userId', '==', auth.currentUser.uid),
       limit(50)
     );
-    
-    this.unsubscribe = onSnapshot(q, (snapshot) => {
-      // ... same processing ...
-      const rawAssets = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as HoleAsset[];
 
-      this.assets = rawAssets.sort((a, b) => {
+    let publicAssets: HoleAsset[] = [];
+    let privateAssets: HoleAsset[] = [];
+
+    const updateCombinedAssets = () => {
+      const combined = [...publicAssets, ...privateAssets];
+      this.assets = combined.sort((a, b) => {
         const timeA = a.updatedAt?.seconds || (typeof a.updatedAt === 'string' ? new Date(a.updatedAt).getTime() / 1000 : 0);
         const timeB = b.updatedAt?.seconds || (typeof b.updatedAt === 'string' ? new Date(b.updatedAt).getTime() / 1000 : 0);
         return timeB - timeA;
       });
-      
       this.listeners.forEach(cb => cb(this.assets));
       this.isInitializing = false;
       this.quotaExceeded = false;
+    };
+    
+    // Subscribe to Private Vault
+    const unsubPrivate = onSnapshot(privateQuery, (snapshot) => {
+      privateAssets = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as HoleAsset[];
+      updateCombinedAssets();
     }, (error) => {
-      if (auth.currentUser) {
-        handleFirestoreError(error, OperationType.LIST, 'hole_assets');
-      }
-      if (error.message?.includes('quota') || (error as any).code === 'resource-exhausted') {
-        this.quotaExceeded = true;
-      }
+      if (auth.currentUser) handleFirestoreError(error, OperationType.LIST, 'hole_assets');
+      if (error.message?.includes('quota') || (error as any).code === 'resource-exhausted') this.quotaExceeded = true;
       this.errorListeners.forEach(cb => cb(error as FirestoreError));
-      this.isInitializing = false;
-      
       if (this.quotaExceeded && this.unsubscribe) {
         this.unsubscribe();
         this.unsubscribe = null;
       }
     });
+
+    // Subscribe to Public Course Photos
+    const unsubPublic = onSnapshot(publicQuery, (snapshot) => {
+      publicAssets = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        userId: 'PUBLIC' // Force mark as public to avoid modification
+      })) as HoleAsset[];
+      updateCombinedAssets();
+    }, (error) => {
+      console.warn("[ONYX] Could not load public_courses:", error);
+    });
+
+    this.unsubscribe = () => {
+      unsubPrivate();
+      unsubPublic();
+    };
   }
 
   async saveAsset(asset: Omit<HoleAsset, 'id' | 'updatedAt' | 'userId'>) {
