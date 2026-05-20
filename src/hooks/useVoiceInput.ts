@@ -39,11 +39,23 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
     updateIsListening(false);
   }, []);
 
-  const startListening = useCallback((continuousMode = false, timeoutMs?: number) => {
+  const startListening = useCallback(async (continuousMode = false, timeoutMs?: number) => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
       setError("La reconnaissance vocale n'est pas supportée sur ce navigateur.");
+      return;
+    }
+
+    // Force Android native permission prompt via getUserMedia before starting SpeechRecognition
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop()); // Immediately stop it
+      }
+    } catch (err) {
+      console.warn("[ONYX] Pre-flight mic permission denied:", err);
+      setError("Accès Micro Refusé. Autorisez le microphone dans les paramètres de l'application.");
       return;
     }
 
@@ -98,7 +110,7 @@ export const useVoiceInput = (onResult: (text: string, isFinal: boolean) => void
         console.error("[ONYX] Speech Recognition Error:", errorType);
         
         if (errorType === 'not-allowed') {
-          setError("Accès Micro Refusé - Cliquez ici ou autorisez dans la barre d'adresse");
+          setError("Accès Micro Refusé - Veuillez autoriser le microphone dans les paramètres");
           updateIsListening(false);
           isAutoRestarting.current = false;
         } else if (errorType === 'network') {
