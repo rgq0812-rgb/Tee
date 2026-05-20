@@ -5,7 +5,12 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 let app;
 try {
-  app = initializeApp(firebaseConfig);
+  const dynamicConfig = {
+    ...firebaseConfig,
+    apiKey: (import.meta.env && import.meta.env.VITE_FIREBASE_API_KEY) || firebaseConfig.apiKey,
+    authDomain: (import.meta.env && import.meta.env.VITE_FIREBASE_AUTH_DOMAIN) || firebaseConfig.authDomain,
+  };
+  app = initializeApp(dynamicConfig);
 } catch (e) {
   console.error("Firebase initialization failed:", e);
   // Create a dummy app object to prevent app.settings errors, or handle later
@@ -13,8 +18,9 @@ try {
 }
 
 // Valider la config pour éviter les erreurs silencieuses sur les remixes
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('INSERT')) {
-  console.error("CRITICAL: Firebase API Key is missing or invalid. Please check firebase-applet-config.json");
+const currentApiKey = app?.options?.apiKey || firebaseConfig.apiKey;
+if (!currentApiKey || currentApiKey.includes('INSERT')) {
+  console.error("CRITICAL: Firebase API Key is missing or invalid. Please check firebase-applet-config.json or VITE_FIREBASE_API_KEY");
 }
 
 let db: any = null;
