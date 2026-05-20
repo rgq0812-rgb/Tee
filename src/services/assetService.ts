@@ -31,7 +31,7 @@ class AssetService {
   private setupAuth() {
     if (this.authUnsubscribe || !auth) return;
     
-    this.authUnsubscribe = auth.onAuthStateChanged((user) => {
+    this.authUnsubscribe = auth.onAuthStateChanged((user: any) => {
       if (user) {
         if (!this.unsubscribe && !this.isInitializing) {
           this.init();
@@ -105,13 +105,13 @@ class AssetService {
     };
     
     // Subscribe to Private Vault
-    const unsubPrivate = onSnapshot(privateQuery, (snapshot) => {
-      privateAssets = snapshot.docs.map(doc => ({
+    const unsubPrivate = onSnapshot(privateQuery, (snapshot: any) => {
+      privateAssets = snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data()
       })) as HoleAsset[];
       updateCombinedAssets();
-    }, (error) => {
+    }, (error: any) => {
       if (auth.currentUser) handleFirestoreError(error, OperationType.LIST, 'hole_assets');
       if (error.message?.includes('quota') || (error as any).code === 'resource-exhausted') this.quotaExceeded = true;
       this.errorListeners.forEach(cb => cb(error as FirestoreError));
@@ -122,14 +122,14 @@ class AssetService {
     });
 
     // Subscribe to Public Course Photos
-    const unsubPublic = onSnapshot(publicQuery, (snapshot) => {
-      publicAssets = snapshot.docs.map(doc => ({
+    const unsubPublic = onSnapshot(publicQuery, (snapshot: any) => {
+      publicAssets = snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data(),
         userId: 'PUBLIC' // Force mark as public to avoid modification
       })) as HoleAsset[];
       updateCombinedAssets();
-    }, (error) => {
+    }, (error: any) => {
       console.warn("[ONYX] Could not load public_courses:", error);
     });
 

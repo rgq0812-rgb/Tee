@@ -247,7 +247,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
           <motion.div
             initial={{ scale: 0.95, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 30 }}
             className={`w-full h-full sm:max-w-xl sm:h-[90vh] ${isSolar ? 'bg-white' : 'bg-black'} border-t sm:border ${isSolar ? 'border-zinc-200 shadow-2xl' : 'border-white/10'} sm:rounded-[2.5rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] flex flex-col relative`}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e: any) => e.stopPropagation()}
           >
             <div className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-1000 will-change-transform ${isSolar ? 'opacity-100' : 'opacity-100'}`}>
                <AudioVisualizer 
