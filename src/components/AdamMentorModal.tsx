@@ -38,6 +38,7 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
   const [commMode, setCommMode] = useState<'pro' | 'casual'>(() => {
     return (localStorage.getItem('onyx_chat_mode') as any) || 'pro';
   });
+  const [isConsoleExpanded, setIsConsoleExpanded] = useState(false);
   const [userLocation, setUserLocation] = useState<GeolocationPosition | null>(null);
   const [isHandsFree, setIsHandsFree] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
@@ -386,98 +387,120 @@ export default function AdamMentorModal({ isOpen, onClose, selectedCourse, curre
                   )}
               </div>
 
-              {/* TACTICAL QUICK SELECTORS - FIXED BELOW PILLARS */}
-              <div className="px-4 pb-3 grid grid-cols-3 gap-2 relative z-10">
-                <div className="space-y-1">
-                  <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
-                    {['AGRESSIF', 'SÉCURITÉ', 'CRÉATIF'].map(t => (
-                      <button 
-                        key={t}
-                        onClick={() => {
-                          setSelectedTactic(t as any);
-                        }}
-                        className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${selectedTactic === t ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-400' : 'text-white/40')}`}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
-                    {['FROID', 'FORME', 'PUR'].map(f => (
-                      <button 
-                        key={f}
-                        onClick={() => {
-                          setCurrentForm(f as any);
-                        }}
-                        className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${currentForm === f ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-500' : 'text-white/40')}`}
-                      >
-                        {f}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
-                    {[
-                      { id: 'pro', label: 'PRO' },
-                      { id: 'casual', label: 'CAS' }
-                    ].map(m => (
-                      <button 
-                        key={m.id}
-                        onClick={() => {
-                          setCommMode(m.id as any);
-                        }}
-                        className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${commMode === m.id ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-500' : 'text-white/40')}`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* COLLAPSIBLE CONSOLE TOGGLE */}
+              <div className="px-4 pb-2 relative z-10">
+                <button 
+                  onClick={() => setIsConsoleExpanded(!isConsoleExpanded)}
+                  className={`w-full py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${isSolar ? 'text-black/60 hover:text-black' : 'text-[#c9964a]/60 hover:text-[#c9964a]'}`}
+                >
+                  <div className={`h-px flex-1 ${isSolar ? 'bg-black/10' : 'bg-[#c9964a]/20'}`} />
+                  <span>CONSOLE TACTIQUE {isConsoleExpanded ? '▲' : '▼'}</span>
+                  <div className={`h-px flex-1 ${isSolar ? 'bg-black/10' : 'bg-[#c9964a]/20'}`} />
+                </button>
               </div>
 
-              {/* HUD Commands & Power Info */}
-              <div className="px-4 pb-4 space-y-3 relative z-10">
-                <div className="flex gap-4">
-                  <div className="flex-1 space-y-4">
-                    <div className={`p-4 rounded-3xl border ${isSolar ? 'bg-zinc-50 border-zinc-200 shadow-md' : 'bg-white/5 border-white/10 backdrop-blur-xl'}`}>
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 opacity-60">Commandes HUD Actives</h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          { cmd: 'Hey Tee', desc: 'Réveil Onyx' },
-                          { cmd: 'Aide moi', desc: 'Conseil survie' },
-                          { cmd: 'Club', desc: 'Calcul distance' },
-                          { cmd: 'Tactique', desc: 'Analyse risque' },
-                          { cmd: 'Par/Birdie', desc: 'Score rapide' },
-                          { cmd: 'Suivant', desc: 'Coup suivant' }
-                        ].map(c => (
-                          <div key={c.cmd} className="flex flex-col">
-                            <span className={`text-[10px] font-bold ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>{c.cmd}</span>
-                            <span className="text-[8px] opacity-40 uppercase font-black">{c.desc}</span>
-                          </div>
-                        ))}
+              <AnimatePresence>
+                {isConsoleExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    {/* TACTICAL QUICK SELECTORS - FIXED BELOW PILLARS */}
+                    <div className="px-4 pb-3 grid grid-cols-3 gap-2 relative z-10">
+                      <div className="space-y-1">
+                        <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
+                          {['AGRESSIF', 'SÉCURITÉ', 'CRÉATIF'].map(t => (
+                            <button 
+                              key={t}
+                              onClick={() => {
+                                setSelectedTactic(t as any);
+                              }}
+                              className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${selectedTactic === t ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-400' : 'text-white/40')}`}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
+                          {['FROID', 'FORME', 'PUR'].map(f => (
+                            <button 
+                              key={f}
+                              onClick={() => {
+                                setCurrentForm(f as any);
+                              }}
+                              className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${currentForm === f ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-500' : 'text-white/40')}`}
+                            >
+                              {f}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className={`flex rounded-lg p-0.5 border ${isSolar ? 'bg-zinc-100/50 border-zinc-200' : 'bg-zinc-900/80 border-white/10'}`}>
+                          {[
+                            { id: 'pro', label: 'PRO' },
+                            { id: 'casual', label: 'CAS' }
+                          ].map(m => (
+                            <button 
+                              key={m.id}
+                              onClick={() => {
+                                setCommMode(m.id as any);
+                              }}
+                              className={`flex-1 py-1 rounded-md text-[7px] font-black transition-all ${commMode === m.id ? (isSolar ? 'bg-black text-white' : 'bg-[#c9964a] text-black') : (isSolar ? 'text-zinc-500' : 'text-white/40')}`}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className={`w-32 p-4 rounded-3xl border flex flex-col items-center justify-center gap-1 ${isSolar ? 'bg-zinc-50 border-zinc-200' : 'bg-black/40 border-white/5 shadow-inner'}`}>
-                    <Zap size={16} className="text-[#c9964a] mb-2 animate-pulse" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-[#c9964a]">ONYX Power</span>
-                    <span className={`text-[14px] font-black ${isSolar ? 'text-black' : 'text-white'}`}>OPTIMISÉ</span>
-                    <span className="text-[8px] opacity-40 uppercase font-black text-center mt-2">Dimming auto</span>
-                  </div>
-                </div>
+                    {/* HUD Commands & Power Info */}
+                    <div className="px-4 pb-4 space-y-3 relative z-10">
+                      <div className="flex gap-4">
+                        <div className="flex-1 space-y-4">
+                          <div className={`p-4 rounded-3xl border ${isSolar ? 'bg-zinc-50 border-zinc-200 shadow-md' : 'bg-white/5 border-white/10 backdrop-blur-xl'}`}>
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 opacity-60">Commandes HUD Actives</h4>
+                            <div className="grid grid-cols-2 gap-3">
+                              {[
+                                { cmd: 'Hey Tee', desc: 'Réveil Onyx' },
+                                { cmd: 'Aide moi', desc: 'Conseil survie' },
+                                { cmd: 'Club', desc: 'Calcul distance' },
+                                { cmd: 'Tactique', desc: 'Analyse risque' },
+                                { cmd: 'Par/Birdie', desc: 'Score rapide' },
+                                { cmd: 'Suivant', desc: 'Coup suivant' }
+                              ].map(c => (
+                                <div key={c.cmd} className="flex flex-col">
+                                  <span className={`text-[10px] font-bold ${isSolar ? 'text-black' : 'text-[#c9964a]'}`}>{c.cmd}</span>
+                                  <span className="text-[8px] opacity-40 uppercase font-black">{c.desc}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
 
-                <div className={`flex items-center gap-2 p-2 px-4 rounded-full ${isSolar ? 'bg-zinc-100' : 'bg-[#c9964a]/10'} border ${isSolar ? 'border-zinc-200' : 'border-[#c9964a]/20'}`}>
-                  <Sparkles size={12} className="text-[#c9964a]" />
-                  <p className={`text-[9px] font-bold italic ${isSolar ? 'text-zinc-600' : 'text-[#c9964a]/80'}`}>
-                    "Hey Tee, quel est mon club pour 145m ?"
-                  </p>
-                </div>
-              </div>
+                        <div className={`w-32 p-4 rounded-3xl border flex flex-col items-center justify-center gap-1 ${isSolar ? 'bg-zinc-50 border-zinc-200' : 'bg-black/40 border-white/5 shadow-inner'}`}>
+                          <Zap size={16} className="text-[#c9964a] mb-2 animate-pulse" />
+                          <span className="text-[9px] font-black uppercase tracking-widest text-[#c9964a]">ONYX Power</span>
+                          <span className={`text-[14px] font-black ${isSolar ? 'text-black' : 'text-white'}`}>OPTIMISÉ</span>
+                          <span className="text-[8px] opacity-40 uppercase font-black text-center mt-2">Dimming auto</span>
+                        </div>
+                      </div>
 
+                      <div className={`flex items-center gap-2 p-2 px-4 rounded-full ${isSolar ? 'bg-zinc-100' : 'bg-[#c9964a]/10'} border ${isSolar ? 'border-zinc-200' : 'border-[#c9964a]/20'}`}>
+                        <Sparkles size={12} className="text-[#c9964a]" />
+                        <p className={`text-[9px] font-bold italic ${isSolar ? 'text-zinc-600' : 'text-[#c9964a]/80'}`}>
+                          "Hey Tee, quel est mon club pour 145m ?"
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* SCROLLING CONVERSATION */}
