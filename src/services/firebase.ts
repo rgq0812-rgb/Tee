@@ -50,16 +50,9 @@ export const signInWithGoogle = async () => {
     // Explicitly set language
     auth.languageCode = 'fr';
     const result = await signInWithPopup(auth, googleProvider);
-    console.log("Sign-In successful:", result.user.email);
     return result;
   } catch (error: any) {
     console.error("Firebase Sign-In Error:", error.code, error.message);
-    if (error.code === 'auth/popup-blocked') {
-      throw new Error("POPUP_BLOCKED");
-    }
-    if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
-      throw new Error("POPUP_CANCELLED");
-    }
     if (error.code === 'auth/unauthorized-domain') {
       throw new Error("Ce domaine n'est pas autorisé. Contactez l'administrateur.");
     }
@@ -78,6 +71,14 @@ export const registerWithEmail = async (email: string, pass: string, name: strin
 };
 
 export const logout = () => auth ? signOut(auth) : Promise.resolve();
+
+/**
+ * Handle the result of a Google Sign-In redirect.
+ * Should be called when the app initializes.
+ */
+export const handleRedirectResult = async () => {
+  return null;
+};
 
 async function testConnection(retries = 3) {
   if (!db) {
