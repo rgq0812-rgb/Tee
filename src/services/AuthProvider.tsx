@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, db, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, handleFirestoreError, OperationType, handleRedirectResult } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface AuthContextType {
@@ -22,6 +22,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
       return;
     }
+
+    // Handle Google Redirect result on mount
+    handleRedirectResult().catch(err => console.error("Google redirect handling error:", err));
+
     return onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       

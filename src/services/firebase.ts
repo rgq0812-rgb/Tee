@@ -1,7 +1,8 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithCredential, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 
 let app;
 try {
@@ -44,13 +45,14 @@ googleProvider.setCustomParameters({
 });
 
 export const signInWithGoogle = async () => {
-  console.log("Starting Google Sign-In with popup...");
+  console.log("Starting Google Sign-In with Capacitor...");
   if (!auth) throw new Error("FIREBASE_AUTH_NOT_READY");
   try {
-    // Explicitly set language
-    auth.languageCode = 'fr';
-    const result = await signInWithPopup(auth, googleProvider);
-    return result;
+    const result = await FirebaseAuthentication.signInWithGoogle();
+    const credential = GoogleAuthProvider.credential(
+      result.credential?.idToken
+    );
+    return signInWithCredential(auth, credential);
   } catch (error: any) {
     console.error("Firebase Sign-In Error:", error.code, error.message);
     if (error.code === 'auth/unauthorized-domain') {
